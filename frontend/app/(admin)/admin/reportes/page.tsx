@@ -199,76 +199,65 @@ export default function ReportesPage() {
       {/* Tabla de progreso */}
       {tabActiva === 'progreso' && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Vendedor
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Módulos
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Progreso
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Promedio
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Intentos
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Última actividad
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.progreso.map((row, index) => (
-                <tr
-                  key={row.email}
-                  className={index !== 0 ? 'border-t border-gray-100' : ''}
-                >
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-gray-900">{row.vendedor}</p>
-                    <p className="text-xs text-gray-400">{row.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.modulosAprobados}/{row.totalModulos}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-center">
-                      <div className="w-16 h-1.5 bg-gray-100 rounded-full">
-                        <div
-                          className="h-full bg-gray-900 rounded-full"
-                          style={{ width: `${row.porcentaje}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-gray-700">
-                        {row.porcentaje}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.promedioNotas > 0
-                      ? `${row.promedioNotas.toFixed(1)}%`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.totalIntentos}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-400 text-xs">
-                    {row.fechaUltimaActividad
-                      ? new Date(row.fechaUltimaActividad).toLocaleDateString(
-                          'es-AR',
-                          { day: 'numeric', month: 'short', year: 'numeric' }
-                        )
-                      : '—'}
-                  </td>
+          {/* Vista mobile — cards */}
+          <div className="lg:hidden divide-y divide-gray-100">
+            {data?.progreso.map((row) => (
+              <div key={row.email} className="px-4 py-3 flex flex-col gap-1">
+                <p className="font-semibold text-gray-900 text-sm">{row.vendedor}</p>
+                <p className="text-xs text-gray-400">{row.email}</p>
+                <div className="flex gap-4 mt-1">
+                  <span className="text-xs text-gray-500">
+                    Módulos: <strong>{row.modulosAprobados}/{row.totalModulos}</strong>
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Progreso: <strong>{row.porcentaje}%</strong>
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Intentos: <strong>{row.totalIntentos}</strong>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Vista desktop — tabla completa */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Módulos</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Progreso</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Intentos</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Última actividad</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data?.progreso.map((row, index) => (
+                  <tr key={row.email} className={index !== 0 ? 'border-t border-gray-100' : ''}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-900">{row.vendedor}</p>
+                      <p className="text-xs text-gray-400">{row.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.modulosAprobados}/{row.totalModulos}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 justify-center">
+                        <div className="w-16 h-1.5 bg-gray-100 rounded-full">
+                          <div className="h-full bg-gray-900 rounded-full" style={{ width: `${row.porcentaje}%` }}/>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700">{row.porcentaje}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.promedioNotas > 0 ? `${row.promedioNotas.toFixed(1)}%` : '—'}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.totalIntentos}</td>
+                    <td className="px-4 py-3 text-center text-gray-400 text-xs">
+                      {row.fechaUltimaActividad ? new Date(row.fechaUltimaActividad).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -276,76 +265,70 @@ export default function ReportesPage() {
       {/* Tabla de calificaciones */}
       {tabActiva === 'calificaciones' && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Vendedor
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Promedio
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Total
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  ★★★★★
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  ★★★★
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  ★★★
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  ★★
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  ★
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.calificaciones.map((row, index) => (
-                <tr
-                  key={row.email}
-                  className={index !== 0 ? 'border-t border-gray-100' : ''}
-                >
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-gray-900">{row.vendedor}</p>
-                    <p className="text-xs text-gray-400">{row.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <span className="text-amber-400 text-sm">★</span>
-                      <span className="font-semibold text-gray-900">
-                        {row.promedio > 0 ? row.promedio.toFixed(1) : '—'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.totalCalificaciones}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.estrellas5}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.estrellas4}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.estrellas3}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.estrellas2}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
-                    {row.estrellas1}
-                  </td>
+          {/* Vista mobile — cards */}
+          <div className="lg:hidden divide-y divide-gray-100">
+            {data?.calificaciones.map((row) => (
+              <div key={row.email} className="px-4 py-3 flex flex-col gap-1">
+                <p className="font-semibold text-gray-900 text-sm">{row.vendedor}</p>
+                <p className="text-xs text-gray-400">{row.email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-amber-400">★</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {row.promedio > 0 ? row.promedio.toFixed(1) : '—'}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    · {row.totalCalificaciones} calificaciones
+                  </span>
+                </div>
+                <div className="flex gap-3 text-xs text-gray-500 mt-0.5">
+                  <span>★★★★★ {row.estrellas5}</span>
+                  <span>★★★★ {row.estrellas4}</span>
+                  <span>★★★ {row.estrellas3}</span>
+                  <span>★★ {row.estrellas2}</span>
+                  <span>★ {row.estrellas1}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Vista desktop — tabla completa */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★★★★</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★★★</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★★</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data?.calificaciones.map((row, index) => (
+                  <tr key={row.email} className={index !== 0 ? 'border-t border-gray-100' : ''}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-900">{row.vendedor}</p>
+                      <p className="text-xs text-gray-400">{row.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-amber-400 text-sm">★</span>
+                        <span className="font-semibold text-gray-900">{row.promedio > 0 ? row.promedio.toFixed(1) : '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.totalCalificaciones}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas5}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas4}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas3}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas2}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas1}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
