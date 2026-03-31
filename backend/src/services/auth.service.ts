@@ -75,8 +75,8 @@ export class AuthService {
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    });
+      expiresIn: '7d',
+    } as jwt.SignOptions);
 
     return {
       token,
