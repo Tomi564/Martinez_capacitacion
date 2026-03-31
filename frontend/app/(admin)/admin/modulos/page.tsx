@@ -175,7 +175,7 @@ export default function AdminModulosPage() {
             </div>
 
             {/* Acciones */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-col lg:flex-row items-end lg:items-center gap-1.5 flex-shrink-0">
               <Link href={`/admin/modulos/${modulo.id}`}>
                 <button className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors">
                   Editar

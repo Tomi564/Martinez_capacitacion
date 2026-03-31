@@ -198,7 +198,8 @@ export default function ReportesPage() {
 
       {/* Tabla de progreso */}
       {tabActiva === 'progreso' && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
@@ -268,12 +269,14 @@ export default function ReportesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Tabla de calificaciones */}
       {tabActiva === 'calificaciones' && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
@@ -343,6 +346,7 @@ export default function ReportesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

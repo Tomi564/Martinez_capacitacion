@@ -208,7 +208,7 @@ export default function VendedoresPage() {
               </div>
 
               {/* Acciones */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex flex-col lg:flex-row items-end lg:items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={() => handleToggleActivo(vendedor)}
                 className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
