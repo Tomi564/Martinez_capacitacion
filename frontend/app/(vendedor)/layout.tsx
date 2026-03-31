@@ -18,6 +18,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { InstallPWA } from '@/components/ui/InstallPWA';
 
 // Ítems de la navegación inferior
 const NAV_ITEMS = [
@@ -149,7 +150,7 @@ export default function VendedorLayout({
           })}
         </div>
       </nav>
-
+          <InstallPWA />
     </div>
   );
 }

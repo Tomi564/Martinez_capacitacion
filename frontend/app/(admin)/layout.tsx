@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { InstallPWA } from '@/components/ui/InstallPWA';
 
 const NAV_ITEMS = [
   {
@@ -205,6 +206,7 @@ export default function AdminLayout({
         </nav>
 
       </div>
+      <InstallPWA />
     </div>
   );
 }
