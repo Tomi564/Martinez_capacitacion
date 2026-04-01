@@ -238,7 +238,7 @@ export default function ModuloEditPage() {
               type="text"
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
             />
           </div>
 
@@ -276,7 +276,7 @@ export default function ModuloEditPage() {
               value={form.video_url}
               onChange={(e) => setForm({ ...form, video_url: e.target.value })}
               placeholder="https://..."
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
             />
           </div>
 
@@ -289,7 +289,7 @@ export default function ModuloEditPage() {
               value={form.pdf_url}
               onChange={(e) => setForm({ ...form, pdf_url: e.target.value })}
               placeholder="https://..."
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -474,7 +474,7 @@ export default function ModuloEditPage() {
                         });
                       }}
                       placeholder={`Opción ${opcion.id.toUpperCase()}`}
-                      className="flex-1 h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="flex-1 h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
                     />
                   </div>
                 ))}

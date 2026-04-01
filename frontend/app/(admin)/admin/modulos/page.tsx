@@ -250,7 +250,7 @@ export default function AdminModulosPage() {
                   value={form.titulo}
                   onChange={(e) => setForm({ ...form, titulo: e.target.value })}
                   placeholder="Ej: Introducción a los Neumáticos"
-                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
                 />
               </div>
 
@@ -273,7 +273,7 @@ export default function AdminModulosPage() {
                     min={1}
                     value={form.orden}
                     onChange={(e) => setForm({ ...form, orden: Number(e.target.value) })}
-                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -283,7 +283,7 @@ export default function AdminModulosPage() {
                     min={1}
                     value={form.duracion_min}
                     onChange={(e) => setForm({ ...form, duracion_min: Number(e.target.value) })}
-                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
                   />
                 </div>
               </div>
