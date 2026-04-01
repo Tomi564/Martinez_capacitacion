@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { modulosController } from '../controllers/modulos.controller';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
+import { progresoService } from '../services/progreso.service';
 
 const router = Router();
 
@@ -22,7 +23,6 @@ router.use(authMiddleware);
 router.get('/', modulosController.getModulos.bind(modulosController));
 
 // GET /api/modulos/mi-nivel
-import { progresoService } from '../services/progreso.service';
 
 router.get('/mi-nivel', async (req: any, res, next) => {
   try {
