@@ -175,7 +175,7 @@ export function ModuloCard({ modulo }: ModuloCardProps) {
         {modulo.estado !== 'aprobado' && modulo.intentos >= 3 && (
           <div className="mt-4 py-2.5 px-3 bg-red-50 border border-red-200 rounded-xl">
             <p className="text-xs text-red-600 text-center font-medium">
-              ▲ Límite de intentos — contactá a tu supervisor
+              ⚠ Límite de intentos — contactá a tu supervisor
             </p>
           </div>
         )}

@@ -225,8 +225,8 @@ export default function ModuloDetallePage() {
         {puedeRendirExamen && modulo.intentos >= 3 && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="12" y1="8" x2="12" y2="12"/>
                   <line x1="12" y1="16" x2="12.01" y2="16"/>
