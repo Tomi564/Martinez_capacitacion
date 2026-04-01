@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { adminController } from '../controllers/admin.controller';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
+import { supabase } from '../config/database';
 
 const router = Router();
 
@@ -113,5 +114,66 @@ router.delete(
   '/modulos/:id',
   adminController.eliminarModulo.bind(adminController)
 );
+
+// ─────────────────────────────────────────────────────
+// Notificaciones
+// ─────────────────────────────────────────────────────
+
+// GET /api/admin/notificaciones
+router.get('/notificaciones', async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('notificaciones_admin')
+      .select(`
+        *,
+        users (nombre, apellido, email),
+        modulos (titulo, orden)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw new Error('Error al obtener notificaciones');
+
+    const noLeidas = (data || []).filter(n => !n.leida).length;
+
+    return res.status(200).json({
+      notificaciones: data || [],
+      noLeidas,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/notificaciones/leer-todas
+// IMPORTANTE: debe ir antes de /:id/leer para que Express no confunda "leer-todas" con un :id
+router.patch('/notificaciones/leer-todas', async (_req, res, next) => {
+  try {
+    await supabase
+      .from('notificaciones_admin')
+      .update({ leida: true })
+      .eq('leida', false);
+
+    return res.status(200).json({ mensaje: 'Todas las notificaciones marcadas como leídas' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/notificaciones/:id/leer
+router.patch('/notificaciones/:id/leer', async (req, res, next) => {
+  try {
+    const id = req.params.id as string;
+
+    await supabase
+      .from('notificaciones_admin')
+      .update({ leida: true })
+      .eq('id', id);
+
+    return res.status(200).json({ mensaje: 'Notificación marcada como leída' });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

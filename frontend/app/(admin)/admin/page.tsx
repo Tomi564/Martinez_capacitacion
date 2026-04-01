@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
+import { NotificacionesAdmin } from '@/components/admin/NotificacionesAdmin';
 
 interface VendedorResumen {
   id: string;
@@ -277,6 +278,9 @@ export default function AdminDashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Notificaciones — vendedores que necesitan apoyo */}
+      <NotificacionesAdmin />
 
     </div>
   );

@@ -14,6 +14,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { InstallPWA } from '@/components/ui/InstallPWA';
+import { apiClient } from '@/lib/api';
 
 const NAV_ITEMS = [
   {
@@ -74,6 +75,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const { isAuthenticated, isAdmin, nombreCompleto, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificaciones, setNotificaciones] = useState(0);
 
   // Guard: solo admins
   useEffect(() => {
@@ -84,6 +86,21 @@ export default function AdminLayout({
     if (!isAdmin()) {
       router.replace('/dashboard');
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchNotificaciones = async () => {
+      try {
+        const res = await apiClient.get<{ noLeidas: number }>(
+          '/admin/notificaciones'
+        );
+        setNotificaciones(res.noLeidas);
+      } catch {}
+    };
+    fetchNotificaciones();
+    // Revisar cada 2 minutos
+    const interval = setInterval(fetchNotificaciones, 2 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const [mounted, setMounted] = useState(false);
@@ -128,6 +145,12 @@ export default function AdminLayout({
             >
               {item.icon}
               {item.label}
+              {/* Badge de notificaciones en Dashboard */}
+              {item.href === '/admin' && notificaciones > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {notificaciones > 9 ? '9+' : notificaciones}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

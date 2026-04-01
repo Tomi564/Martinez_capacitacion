@@ -191,6 +191,12 @@ export class ExamenesService {
       );
     }
 
+    // 7. Si no aprobó y alcanzó el límite de intentos, notificar al admin
+    const nuevosIntentos = (progreso.intentos || 0) + 1;
+    if (!aprobado && nuevosIntentos >= MAX_INTENTOS) {
+      await this.notificarAdminLimiteIntentos(userId, moduloId);
+    }
+
     return {
       nota,
       aprobado,
@@ -243,6 +249,34 @@ export class ExamenesService {
       .eq('modulo_id', siguienteModulo.id);
 
     return !error;
+  }
+
+  /**
+   * Notifica al admin cuando un vendedor alcanza el límite de intentos.
+   */
+  private async notificarAdminLimiteIntentos(userId: string, moduloId: string) {
+    const { data: vendedor } = await supabase
+      .from('users')
+      .select('nombre, apellido, email')
+      .eq('id', userId)
+      .single();
+
+    const { data: modulo } = await supabase
+      .from('modulos')
+      .select('titulo, orden')
+      .eq('id', moduloId)
+      .single();
+
+    if (!vendedor || !modulo) return;
+
+    await supabase.from('notificaciones_admin').insert({
+      tipo: 'limite_intentos',
+      titulo: `${vendedor.nombre} ${vendedor.apellido} necesita apoyo`,
+      mensaje: `${vendedor.nombre} ${vendedor.apellido} (${vendedor.email}) alcanzó el límite de 3 intentos en el Módulo ${modulo.orden}: "${modulo.titulo}". Se recomienda coordinar una sesión de apoyo presencial.`,
+      user_id: userId,
+      modulo_id: moduloId,
+      leida: false,
+    });
   }
 
   /**
