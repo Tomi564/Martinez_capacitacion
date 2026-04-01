@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso, ResumenCalificaciones } from '@/types';
 import { NivelBadge, type InfoNivel } from '@/components/ui/NivelBadge';
+import { Insignias } from '@/components/ui/Insignias';
 
 interface DashboardData {
   modulos: ModuloConProgreso[];
@@ -216,6 +217,11 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Insignias */}
+      {data && data.modulos.length > 0 && (
+        <Insignias modulos={data.modulos} />
       )}
 
       {/* Accesos rápidos */}

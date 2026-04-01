@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso } from '@/types';
+import { Insignias } from '@/components/ui/Insignias';
 
 export default function ProgresoPage() {
   const [modulos, setModulos] = useState<ModuloConProgreso[]>([]);
@@ -148,6 +149,11 @@ export default function ProgresoPage() {
           <p className="text-xs text-gray-500 mt-0.5">En curso</p>
         </div>
       </div>
+
+      {/* Insignias */}
+      {modulos.length > 0 && (
+        <Insignias modulos={modulos} />
+      )}
 
       {/* Detalle por módulo */}
       <div>
