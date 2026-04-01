@@ -14,6 +14,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import type { Pregunta, RespuestasExamen, ResultadoExamen, RetroalimentacionPregunta } from '@/types';
+import { CelebracionAprobado } from '@/components/ui/CelebracionAprobado';
 
 type EstadoExamen = 'cargando' | 'respondiendo' | 'enviando' | 'resultado';
 
@@ -28,6 +29,7 @@ export default function ExamenPage() {
   const [respuestas, setRespuestas] = useState<RespuestasExamen>({});
   const [resultado, setResultado] = useState<ResultadoExamen | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mostrarCelebracion, setMostrarCelebracion] = useState(false);
 
   // Timer en segundos
   const [segundos, setSegundos] = useState(0);
@@ -100,6 +102,7 @@ export default function ExamenPage() {
         { respuestas, duracion_seg: segundos }
       );
       setResultado(res);
+      if (res.aprobado) setMostrarCelebracion(true);
       setEstado('resultado');
     } catch (err) {
       setError('Error al enviar el examen. Intentá de nuevo.');
@@ -145,6 +148,16 @@ export default function ExamenPage() {
 
   if (estado === 'resultado' && resultado) {
     return (
+      <>
+      {/* Celebración */}
+      {mostrarCelebracion && (
+        <CelebracionAprobado
+          nota={resultado.nota}
+          moduloTitulo="Módulo completado"
+          siguienteDesbloqueado={resultado.siguienteModuloDesbloqueado}
+          onComplete={() => setMostrarCelebracion(false)}
+        />
+      )}
       <div className="px-4 py-8 max-w-lg mx-auto flex flex-col gap-6">
 
         {/* Ícono de resultado */}
@@ -315,6 +328,7 @@ export default function ExamenPage() {
         </div>
 
       </div>
+      </>
     );
   }
 
