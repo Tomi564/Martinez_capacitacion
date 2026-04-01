@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
@@ -90,7 +90,9 @@ export default function VendedorLayout({
     }
   }, []);
 
-  if (!isAuthenticated()) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted || !isAuthenticated()) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
