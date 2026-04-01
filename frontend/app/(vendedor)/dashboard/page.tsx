@@ -15,10 +15,12 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso, ResumenCalificaciones } from '@/types';
+import { NivelBadge, type InfoNivel } from '@/components/ui/NivelBadge';
 
 interface DashboardData {
   modulos: ModuloConProgreso[];
   calificaciones: ResumenCalificaciones;
+  nivel: InfoNivel;
 }
 
 export default function DashboardPage() {
@@ -30,14 +32,16 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const [modulosRes, calificacionesRes] = await Promise.all([
+        const [modulosRes, calificacionesRes, nivelRes] = await Promise.all([
           apiClient.get<{ modulos: ModuloConProgreso[] }>('/modulos'),
           apiClient.get<ResumenCalificaciones>('/qr/mis-calificaciones'),
+          apiClient.get<InfoNivel>('/modulos/mi-nivel'),
         ]);
 
         setData({
           modulos: modulosRes.modulos,
           calificaciones: calificacionesRes,
+          nivel: nivelRes,
         });
       } catch (err) {
         setError('Error al cargar el dashboard');
@@ -89,6 +93,11 @@ export default function DashboardPage() {
           {user?.nombre} 👋
         </h1>
       </div>
+
+      {/* Nivel actual */}
+      {data?.nivel && (
+        <NivelBadge info={data.nivel} size="md" />
+      )}
 
       {/* Tarjeta de progreso general */}
       <div className="bg-gray-900 text-white rounded-2xl p-5">

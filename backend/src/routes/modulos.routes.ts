@@ -21,6 +21,18 @@ router.use(authMiddleware);
 // GET /api/modulos
 router.get('/', modulosController.getModulos.bind(modulosController));
 
+// GET /api/modulos/mi-nivel
+import { progresoService } from '../services/progreso.service';
+
+router.get('/mi-nivel', async (req: any, res, next) => {
+  try {
+    const result = await progresoService.getNivel(req.user!.id);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/modulos/:id
 router.get('/:id', modulosController.getModuloById.bind(modulosController));
 
