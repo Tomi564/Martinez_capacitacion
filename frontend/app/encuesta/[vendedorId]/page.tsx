@@ -139,6 +139,13 @@ export default function EncuestaPage() {
             ))}
           </div>
 
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+            <p className="text-sm font-semibold text-amber-800">🎁 ¡Ya estás participando!</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Tu calificación te inscribió automáticamente en el sorteo mensual de Martínez Neumáticos.
+            </p>
+          </div>
+
           <p className="text-sm text-gray-400">
             Podés cerrar esta página
           </p>
@@ -273,6 +280,22 @@ export default function EncuestaPage() {
               'Enviar calificación'
             )}
           </button>
+
+          {/* Incentivo al cliente */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">🎁</span>
+              <div>
+                <p className="text-sm font-bold text-amber-800">
+                  ¡Tu opinión tiene premio!
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Al calificar entrás al sorteo mensual de un descuento especial
+                  en tu próxima compra en Martínez Neumáticos.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <p className="text-xs text-center text-gray-400">
             Tu opinión es anónima y ayuda a mejorar el servicio
