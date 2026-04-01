@@ -19,7 +19,7 @@ export class ExamenesService {
     // Verificar que el módulo esté disponible para este usuario
     const { data: progreso } = await supabase
       .from('progreso')
-      .select('estado')
+      .select('estado, intentos')
       .eq('user_id', userId)
       .eq('modulo_id', moduloId)
       .single();
@@ -27,6 +27,17 @@ export class ExamenesService {
     if (!progreso || progreso.estado === 'bloqueado') {
       throw new AppError(
         'Este módulo está bloqueado. Aprobá el anterior primero.',
+        403
+      );
+    }
+
+    // Verificar límite de intentos también al pedir preguntas
+    const MAX_INTENTOS = 3;
+
+    if ((progreso.intentos || 0) >= MAX_INTENTOS && progreso.estado !== 'aprobado') {
+      throw new AppError(
+        `Alcanzaste el límite de ${MAX_INTENTOS} intentos para este módulo. ` +
+        `Contactá a tu supervisor para coordinar una sesión de apoyo presencial.`,
         403
       );
     }
@@ -91,6 +102,17 @@ export class ExamenesService {
     if (!progreso || progreso.estado === 'bloqueado') {
       throw new AppError(
         'Este módulo está bloqueado. Aprobá el anterior primero.',
+        403
+      );
+    }
+
+    // Verificar límite de 3 intentos
+    const MAX_INTENTOS = 3;
+
+    if ((progreso.intentos || 0) >= MAX_INTENTOS && progreso.estado !== 'aprobado') {
+      throw new AppError(
+        `Alcanzaste el límite de ${MAX_INTENTOS} intentos para este módulo. ` +
+        `Contactá a tu supervisor para coordinar una sesión de apoyo presencial.`,
         403
       );
     }

@@ -160,7 +160,7 @@ export function ModuloCard({ modulo }: ModuloCardProps) {
         </div>
 
         {/* Botón CTA */}
-        {config.ctaText && (
+        {config.ctaText && modulo.intentos < 3 && (
           <button
             className={`
               w-full mt-4 py-2.5 rounded-xl text-white text-sm font-semibold
@@ -169,6 +169,15 @@ export function ModuloCard({ modulo }: ModuloCardProps) {
           >
             {config.ctaText} →
           </button>
+        )}
+
+        {/* Bloqueado por intentos */}
+        {modulo.estado !== 'aprobado' && modulo.intentos >= 3 && (
+          <div className="mt-4 py-2.5 px-3 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-xs text-red-600 text-center font-medium">
+              ▲ Límite de intentos — contactá a tu supervisor
+            </p>
+          </div>
         )}
 
         {/* Mensaje bloqueado */}

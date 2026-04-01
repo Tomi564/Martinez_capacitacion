@@ -199,7 +199,7 @@ export default function ModuloDetallePage() {
         )}
 
         {/* CTA: Ir al examen */}
-        {puedeRendirExamen && (
+        {puedeRendirExamen && modulo.intentos < 3 && (
           <div className="flex flex-col gap-3">
             {modulo.intentos > 0 && (
               <p className="text-xs text-center text-gray-500">
@@ -217,6 +217,26 @@ export default function ModuloDetallePage() {
             </Link>
             <p className="text-xs text-center text-gray-400">
               Necesitás 80% o más para aprobar
+            </p>
+          </div>
+        )}
+
+        {/* Bloqueado por intentos */}
+        {puedeRendirExamen && modulo.intentos >= 3 && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <p className="font-semibold text-red-800 text-sm">Límite de intentos alcanzado</p>
+            </div>
+            <p className="text-sm text-red-600">
+              Usaste los 3 intentos disponibles para este módulo.
+              Contactá a tu supervisor para coordinar una sesión de apoyo presencial.
             </p>
           </div>
         )}
