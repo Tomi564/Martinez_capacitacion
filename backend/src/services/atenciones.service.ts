@@ -20,7 +20,7 @@ export class AtencionesService {
     }
   ) {
     const { error } = await supabase.from('atenciones').insert({
-      vendedor_id: userId,
+      user_id: userId,
       canal: data.canal,
       resultado: data.resultado,
       producto: data.producto || null,
@@ -40,7 +40,7 @@ export class AtencionesService {
     const { data, error } = await supabase
       .from('atenciones')
       .select('*')
-      .eq('vendedor_id', userId)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw new AppError('Error al obtener las atenciones', 500);
