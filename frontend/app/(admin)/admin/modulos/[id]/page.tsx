@@ -141,6 +141,7 @@ export default function ModuloEditPage() {
         enunciado: nuevaPregunta.enunciado.trim(),
         opciones: nuevaPregunta.opciones.filter((o) => o.texto.trim()),
         respuesta_correcta: nuevaPregunta.respuesta_correcta,
+        explicacion: (nuevaPregunta as any).explicacion?.trim() || null,
       });
 
       setShowPreguntaModal(false);
@@ -148,7 +149,7 @@ export default function ModuloEditPage() {
         enunciado: '',
         opciones: OPCIONES_INICIALES.map((o) => ({ ...o, texto: '' })),
         respuesta_correcta: '',
-      });
+      } as any);
       fetchModulo();
     } catch (err) {
       setPreguntaError(
@@ -480,6 +481,26 @@ export default function ModuloEditPage() {
                 <p className="text-xs text-gray-400">
                   Seleccioná el radio de la respuesta correcta
                 </p>
+              </div>
+
+              {/* Explicación */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">
+                  Explicación de la respuesta correcta
+                  <span className="text-gray-400 font-normal ml-1">(opcional pero recomendado)</span>
+                </label>
+                <textarea
+                  value={(nuevaPregunta as any).explicacion || ''}
+                  onChange={(e) =>
+                    setNuevaPregunta({
+                      ...nuevaPregunta,
+                      explicacion: e.target.value,
+                    } as any)
+                  }
+                  placeholder="Ej: La banda de rodadura es la parte del neumático que entra en contacto directo con el suelo, por eso es la más importante para la tracción y el frenado."
+                  rows={2}
+                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                />
               </div>
             </div>
 

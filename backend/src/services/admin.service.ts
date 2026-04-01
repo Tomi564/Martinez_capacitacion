@@ -473,6 +473,7 @@ export class AdminService {
       enunciado: string;
       opciones: { id: string; texto: string }[];
       respuesta_correcta: string;
+      explicacion?: string;
     }
   ) {
     // Verificar que el módulo existe
@@ -501,6 +502,7 @@ export class AdminService {
       enunciado: data.enunciado.trim(),
       opciones: data.opciones,
       respuesta_correcta: data.respuesta_correcta,
+      explicacion: data.explicacion?.trim() || null,
       activo: true,
     });
 

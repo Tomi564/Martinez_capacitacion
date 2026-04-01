@@ -13,7 +13,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import type { Pregunta, RespuestasExamen, ResultadoExamen } from '@/types';
+import type { Pregunta, RespuestasExamen, ResultadoExamen, RetroalimentacionPregunta } from '@/types';
 
 type EstadoExamen = 'cargando' | 'respondiendo' | 'enviando' | 'resultado';
 
@@ -214,6 +214,70 @@ export default function ExamenPage() {
             <p className="text-sm text-blue-700 text-center">
               🔓 ¡Se desbloqueó el siguiente módulo!
             </p>
+          </div>
+        )}
+
+        {/* Retroalimentación por pregunta */}
+        {resultado.retroalimentacion && resultado.retroalimentacion.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Revisión de respuestas
+            </p>
+            {resultado.retroalimentacion.map((item, index) => {
+              const pregunta = preguntas.find(p => p.id === item.pregunta_id);
+              return (
+                <div
+                  key={item.pregunta_id}
+                  className={`rounded-2xl p-4 border ${
+                    item.correcta
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-2 mb-2">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      item.correcta ? 'bg-green-500' : 'bg-red-500'
+                    }`}>
+                      {item.correcta ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      )}
+                    </span>
+                    <p className="text-sm font-medium text-gray-900 leading-snug">
+                      {pregunta?.enunciado || `Pregunta ${index + 1}`}
+                    </p>
+                  </div>
+
+                  {!item.correcta && (
+                    <div className="ml-7 flex flex-col gap-1.5">
+                      <p className="text-xs text-red-600">
+                        Tu respuesta: <strong>
+                          {pregunta?.opciones.find(o => o.id === item.respuesta_dada)?.texto || item.respuesta_dada}
+                        </strong>
+                      </p>
+                      <p className="text-xs text-green-700">
+                        Correcta: <strong>
+                          {pregunta?.opciones.find(o => o.id === item.respuesta_correcta)?.texto || item.respuesta_correcta}
+                        </strong>
+                      </p>
+                      {item.explicacion && (
+                        <div className="mt-1 p-2.5 bg-white rounded-xl border border-red-100">
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            💡 {item.explicacion}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

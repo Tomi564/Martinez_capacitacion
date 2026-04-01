@@ -75,12 +75,21 @@ export interface Pregunta {
 // { pregunta_id: opcion_id_elegida }
 export type RespuestasExamen = Record<string, string>;
 
+export interface RetroalimentacionPregunta {
+  pregunta_id: string;
+  correcta: boolean;
+  respuesta_dada: string;
+  respuesta_correcta: string;
+  explicacion: string | null;
+}
+
 export interface ResultadoExamen {
   nota: number;
   aprobado: boolean;
   respuestasCorrectas: number;
   totalPreguntas: number;
   siguienteModuloDesbloqueado: boolean;
+  retroalimentacion: RetroalimentacionPregunta[];
   mensaje: string;
 }
 

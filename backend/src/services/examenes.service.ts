@@ -122,7 +122,7 @@ export class ExamenesService {
 
     const { data: preguntas, error: preguntasError } = await supabase
       .from('preguntas')
-      .select('id, respuesta_correcta')
+      .select('id, enunciado, opciones, respuesta_correcta, explicacion')
       .in('id', preguntaIds)
       .eq('modulo_id', moduloId)
       .eq('activo', true);
@@ -133,10 +133,25 @@ export class ExamenesService {
 
     // 3. Calcular nota
     let correctas = 0;
+    const retroalimentacion: {
+      pregunta_id: string;
+      correcta: boolean;
+      respuesta_dada: string;
+      respuesta_correcta: string;
+      explicacion: string | null;
+    }[] = [];
+
     for (const pregunta of preguntas) {
-      if (respuestas[pregunta.id] === pregunta.respuesta_correcta) {
-        correctas++;
-      }
+      const esCorrecta = respuestas[pregunta.id] === pregunta.respuesta_correcta;
+      if (esCorrecta) correctas++;
+
+      retroalimentacion.push({
+        pregunta_id: pregunta.id,
+        correcta: esCorrecta,
+        respuesta_dada: respuestas[pregunta.id] || '',
+        respuesta_correcta: pregunta.respuesta_correcta,
+        explicacion: (pregunta as any).explicacion || null,
+      });
     }
 
     const nota = (correctas / preguntas.length) * 100;
@@ -182,6 +197,7 @@ export class ExamenesService {
       respuestasCorrectas: correctas,
       totalPreguntas: preguntas.length,
       siguienteModuloDesbloqueado,
+      retroalimentacion,
       mensaje: aprobado
         ? `¡Aprobaste con ${nota.toFixed(1)}%! ${
             siguienteModuloDesbloqueado
