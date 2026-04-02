@@ -64,6 +64,17 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: '/admin/niveles',
+    label: 'Niveles',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+        <polyline points="17 6 23 6 23 12"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function AdminLayout({
@@ -74,7 +85,6 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isAdmin, nombreCompleto, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificaciones, setNotificaciones] = useState(0);
 
   // Guard: solo admins

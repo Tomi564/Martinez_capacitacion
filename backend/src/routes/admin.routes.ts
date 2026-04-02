@@ -176,4 +176,122 @@ router.patch('/notificaciones/:id/leer', async (req, res, next) => {
   }
 });
 
+// ─────────────────────────────────────────────────────
+// Niveles
+// ─────────────────────────────────────────────────────
+
+// GET /api/admin/niveles
+router.get('/niveles', async (_req, res, next) => {
+  try {
+    const { data: vendedores } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email')
+      .eq('rol', 'vendedor')
+      .eq('activo', true);
+
+    if (!vendedores?.length) {
+      return res.status(200).json({ vendedores: [] });
+    }
+
+    const { data: modulos } = await supabase
+      .from('modulos')
+      .select('id')
+      .eq('activo', true);
+
+    const totalModulos = modulos?.length || 10;
+
+    const { data: progresos } = await supabase
+      .from('progreso')
+      .select('user_id, estado, mejor_nota');
+
+    const getNivel = (userId: string) => {
+      const progVendedor = (progresos || []).filter(p => p.user_id === userId);
+      const aprobados = progVendedor.filter(p => p.estado === 'aprobado');
+      const totalAprobados = aprobados.length;
+
+      if (totalAprobados >= totalModulos) return 'profesional';
+      if (totalAprobados >= 6) return 'vendedor';
+      if (totalAprobados >= 3) return 'aprendiz';
+      if (totalAprobados > 0) return 'aprendiz';
+      return 'sin_inicio';
+    };
+
+    const NIVEL_LABELS: Record<string, string> = {
+      sin_inicio:  'Sin inicio',
+      aprendiz:    'Aprendiz',
+      vendedor:    'Vendedor',
+      profesional: 'Profesional',
+      elite:       'Élite ★',
+    };
+
+    const NIVEL_COLORS: Record<string, string> = {
+      sin_inicio:  'gray',
+      aprendiz:    'blue',
+      vendedor:    'amber',
+      profesional: 'green',
+      elite:       'purple',
+    };
+
+    const SIGUIENTE_NIVEL: Record<string, { label: string; requisito: string } | null> = {
+      sin_inicio:  { label: 'Aprendiz',    requisito: 'Aprobá los primeros 3 módulos' },
+      aprendiz:    { label: 'Vendedor',    requisito: 'Aprobá módulos 1-6 con promedio ≥80%' },
+      vendedor:    { label: 'Profesional', requisito: 'Aprobá los 10 módulos' },
+      profesional: { label: 'Élite',       requisito: 'Calificación ≥4.5/5 por 3 meses' },
+      elite:       null,
+    };
+
+    const vendedoresConNivel = vendedores.map(v => {
+      const progVendedor = (progresos || []).filter(p => p.user_id === v.id);
+      const aprobados = progVendedor.filter(p => p.estado === 'aprobado').length;
+      const nivel = getNivel(v.id);
+      const siguiente = SIGUIENTE_NIVEL[nivel];
+
+      return {
+        id: v.id,
+        nombre: v.nombre,
+        apellido: v.apellido,
+        email: v.email,
+        nivel,
+        label: NIVEL_LABELS[nivel],
+        color: NIVEL_COLORS[nivel],
+        progresoPorcentaje: totalModulos > 0
+          ? Math.round((aprobados / totalModulos) * 100)
+          : 0,
+        modulosAprobados: aprobados,
+        totalModulos,
+        siguienteNivel: siguiente?.label || null,
+        requisiteSiguiente: siguiente?.requisito || null,
+      };
+    });
+
+    // Ordenar por nivel descendente
+    const ordenNivel = ['elite', 'profesional', 'vendedor', 'aprendiz', 'sin_inicio'];
+    vendedoresConNivel.sort((a, b) =>
+      ordenNivel.indexOf(a.nivel) - ordenNivel.indexOf(b.nivel)
+    );
+
+    return res.status(200).json({ vendedores: vendedoresConNivel });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// Inactivos
+// ─────────────────────────────────────────────────────
+
+// GET /api/admin/inactivos
+// Vendedores que llevan más de 3 días sin avanzar
+router.get('/inactivos', async (_req, res, next) => {
+  try {
+    const { data, error } = await supabase.rpc('detectar_inactivos');
+
+    if (error) throw new Error('Error al obtener vendedores inactivos');
+
+    return res.status(200).json({ inactivos: data || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
