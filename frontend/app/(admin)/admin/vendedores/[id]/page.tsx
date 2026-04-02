@@ -101,7 +101,7 @@ export default function VendedorDetallePage() {
   const porcentaje = total > 0 ? Math.round((aprobados / total) * 100) : 0;
 
   return (
-    <div className="px-4 lg:px-8 py-6 flex flex-col gap-6 max-w-4xl mx-auto">
+    <div className="px-4 lg:px-8 py-6 flex flex-col gap-6 max-w-4xl mx-auto overflow-x-hidden">
 
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -121,15 +121,15 @@ export default function VendedorDetallePage() {
       {/* Tarjeta de perfil */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center text-lg font-bold">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center text-lg font-bold shrink-0">
               {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
             </div>
-            <div>
-              <p className="font-bold text-gray-900 text-lg">
+            <div className="min-w-0">
+              <p className="font-bold text-gray-900 text-lg truncate">
                 {vendedor.nombre} {vendedor.apellido}
               </p>
-              <p className="text-sm text-gray-500">{vendedor.email}</p>
+              <p className="text-sm text-gray-500 truncate">{vendedor.email}</p>
               <p className="text-xs text-gray-400 mt-1">
                 Registrado el{' '}
                 {new Date(vendedor.created_at).toLocaleDateString('es-AR', {

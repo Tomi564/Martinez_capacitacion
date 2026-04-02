@@ -74,10 +74,18 @@ export function VendedoresInactivos() {
 
               {/* Días badge */}
               <div className="flex-shrink-0 text-center">
-                <p className="text-2xl font-black text-amber-600">
-                  {v.dias_inactivo ?? '—'}
-                </p>
-                <p className="text-xs text-amber-500">días</p>
+                {v.ultimo_intento ? (
+                  <>
+                    <p className="text-2xl font-black text-amber-600">
+                      {v.dias_inactivo}
+                    </p>
+                    <p className="text-xs text-amber-500">días</p>
+                  </>
+                ) : (
+                  <p className="text-xs font-semibold text-amber-600 text-center">
+                    Sin<br/>inicio
+                  </p>
+                )}
               </div>
 
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

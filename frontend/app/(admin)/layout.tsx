@@ -191,7 +191,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Contenido principal */}
-      <div className="flex-1 lg:ml-64 flex flex-col">
+      <div className="flex-1 lg:ml-64 flex flex-col w-0 min-w-0 overflow-x-hidden">
 
         {/* Header mobile */}
         <header className="lg:hidden bg-gray-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
@@ -212,7 +212,7 @@ export default function AdminLayout({
         </header>
 
         {/* Página */}
-        <main className="flex-1 pb-20 lg:pb-0">
+        <main className="flex-1 pb-20 lg:pb-0 overflow-x-hidden">
           {children}
         </main>
 
