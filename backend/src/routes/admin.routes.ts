@@ -97,6 +97,24 @@ router.patch(
   adminController.updatePregunta.bind(adminController)
 );
 
+// DELETE /api/admin/modulos/:id/preguntas/:preguntaId — elimina permanentemente
+router.delete('/modulos/:id/preguntas/:preguntaId', async (req, res, next) => {
+  try {
+    const { preguntaId } = req.params;
+
+    const { error } = await supabase
+      .from('preguntas')
+      .delete()
+      .eq('id', preguntaId);
+
+    if (error) throw new Error('Error al eliminar la pregunta');
+
+    return res.status(200).json({ mensaje: 'Pregunta eliminada' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/admin/vendedores/:id
 router.get(
   '/vendedores/:id',

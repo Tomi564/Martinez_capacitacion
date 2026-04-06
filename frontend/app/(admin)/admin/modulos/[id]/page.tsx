@@ -16,6 +16,7 @@ import type { Modulo, Pregunta, OpcionPregunta } from '@/types';
 
 interface PreguntaCompleta extends Pregunta {
   respuesta_correcta: string;
+  explicacion: string | null;
 }
 
 interface ModuloDetalle extends Modulo {
@@ -26,6 +27,7 @@ interface NuevaPregunta {
   enunciado: string;
   opciones: OpcionPregunta[];
   respuesta_correcta: string;
+  explicacion: string;
 }
 
 const OPCIONES_INICIALES: OpcionPregunta[] = [
@@ -61,6 +63,7 @@ export default function ModuloEditPage() {
     enunciado: '',
     opciones: OPCIONES_INICIALES,
     respuesta_correcta: '',
+    explicacion: '',
   });
   const [isCreatingPregunta, setIsCreatingPregunta] = useState(false);
   const [preguntaError, setPreguntaError] = useState<string | null>(null);
@@ -141,7 +144,7 @@ export default function ModuloEditPage() {
         enunciado: nuevaPregunta.enunciado.trim(),
         opciones: nuevaPregunta.opciones.filter((o) => o.texto.trim()),
         respuesta_correcta: nuevaPregunta.respuesta_correcta,
-        explicacion: (nuevaPregunta as any).explicacion?.trim() || null,
+        explicacion: nuevaPregunta.explicacion.trim() || null,
       });
 
       setShowPreguntaModal(false);
@@ -149,7 +152,8 @@ export default function ModuloEditPage() {
         enunciado: '',
         opciones: OPCIONES_INICIALES.map((o) => ({ ...o, texto: '' })),
         respuesta_correcta: '',
-      } as any);
+        explicacion: '',
+      });
       fetchModulo();
     } catch (err) {
       setPreguntaError(
@@ -160,15 +164,13 @@ export default function ModuloEditPage() {
     }
   };
 
-  const handleDesactivarPregunta = async (preguntaId: string) => {
+  const handleEliminarPregunta = async (preguntaId: string) => {
+    if (!confirm('¿Eliminar esta pregunta? Esta acción no se puede deshacer.')) return;
     try {
-      await apiClient.patch(
-        `/admin/modulos/${moduloId}/preguntas/${preguntaId}`,
-        { activo: false }
-      );
+      await apiClient.delete(`/admin/modulos/${moduloId}/preguntas/${preguntaId}`);
       fetchModulo();
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setError('Error al eliminar la pregunta');
     }
   };
 
@@ -352,7 +354,7 @@ export default function ModuloEditPage() {
                 </p>
               </div>
               <button
-                onClick={() => handleDesactivarPregunta(pregunta.id)}
+                onClick={() => handleEliminarPregunta(pregunta.id)}
                 className="text-xs px-2 py-1 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 flex-shrink-0"
               >
                 Eliminar
@@ -382,6 +384,15 @@ export default function ModuloEditPage() {
                 </div>
               ))}
             </div>
+
+            {/* Explicación */}
+            {pregunta.explicacion && (
+              <div className="ml-9 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-xl">
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  💡 <span className="font-semibold">Explicación:</span> {pregunta.explicacion}
+                </p>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -490,12 +501,12 @@ export default function ModuloEditPage() {
                   <span className="text-gray-400 font-normal ml-1">(opcional pero recomendado)</span>
                 </label>
                 <textarea
-                  value={(nuevaPregunta as any).explicacion || ''}
+                  value={nuevaPregunta.explicacion}
                   onChange={(e) =>
                     setNuevaPregunta({
                       ...nuevaPregunta,
                       explicacion: e.target.value,
-                    } as any)
+                    })
                   }
                   placeholder="Ej: La banda de rodadura es la parte del neumático que entra en contacto directo con el suelo, por eso es la más importante para la tracción y el frenado."
                   rows={2}
