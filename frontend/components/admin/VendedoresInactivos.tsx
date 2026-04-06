@@ -10,11 +10,11 @@ import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 
 interface VendedorInactivo {
-  user_id: string;
+  id: string;
   nombre: string;
   apellido: string;
   email: string;
-  dias_inactivo: number;
+  dias_inactivo: number | null;
   ultimo_intento: string | null;
 }
 
@@ -52,7 +52,7 @@ export function VendedoresInactivos() {
 
       <div className="flex flex-col gap-2">
         {inactivos.map((v) => (
-          <Link key={v.user_id} href={`/admin/vendedores/${v.user_id}`}>
+          <Link key={v.id} href={`/admin/vendedores/${v.id}`}>
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-transform">
               {/* Avatar */}
               <div className="w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center text-sm font-bold text-amber-800 flex-shrink-0">
