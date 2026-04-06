@@ -125,7 +125,13 @@ export class AdminController {
   async updateModulo(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const moduloId = req.params.id as string;
-      const data = req.body;
+      const { titulo, descripcion, duracion_min, activo } = req.body;
+
+      const data: Record<string, unknown> = {};
+      if (titulo !== undefined)       data.titulo       = titulo;
+      if (descripcion !== undefined)  data.descripcion  = descripcion;
+      if (duracion_min !== undefined) data.duracion_min = Number(duracion_min);
+      if (activo !== undefined)       data.activo       = activo;
 
       const result = await adminService.updateModulo(moduloId, data);
       return res.status(200).json(result);
@@ -168,7 +174,7 @@ export class AdminController {
   async crearPregunta(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const moduloId = req.params.id as string;
-      const { enunciado, opciones, respuesta_correcta } = req.body;
+      const { enunciado, opciones, respuesta_correcta, explicacion } = req.body;
 
       if (!enunciado || !opciones || !respuesta_correcta) {
         return res.status(400).json({
@@ -180,6 +186,7 @@ export class AdminController {
         enunciado,
         opciones,
         respuesta_correcta,
+        explicacion,
       });
 
       return res.status(201).json(result);

@@ -89,7 +89,14 @@ export default function DashboardPage() {
 
       {/* Saludo */}
       <div>
-        <p className="text-sm text-gray-500">Buenos días,</p>
+        <p className="text-sm text-gray-500">
+          {(() => {
+            const h = new Date().getHours();
+            if (h >= 6 && h < 13) return 'Buenos días,';
+            if (h >= 13 && h < 20) return 'Buenas tardes,';
+            return 'Buenas noches,';
+          })()}
+        </p>
         <h1 className="text-2xl font-bold text-gray-900">
           {user?.nombre} 👋
         </h1>

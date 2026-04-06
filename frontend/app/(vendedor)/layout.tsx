@@ -107,7 +107,7 @@ export default function VendedorLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isAdmin, nombreCompleto, logout } = useAuth();
+  const { isAuthenticated, isAdmin, nombreCompleto, logout, refreshUser } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Guard: redirigir si no está autenticado o es admin
@@ -118,7 +118,10 @@ export default function VendedorLayout({
     }
     if (isAdmin()) {
       router.replace('/admin');
+      return;
     }
+    // Verificar que el token siga siendo válido en el servidor
+    refreshUser();
   }, []);
 
   const [mounted, setMounted] = useState(false);

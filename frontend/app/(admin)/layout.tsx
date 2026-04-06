@@ -115,7 +115,7 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isAdmin, nombreCompleto, logout } = useAuth();
+  const { isAuthenticated, isAdmin, nombreCompleto, logout, refreshUser } = useAuth();
   const [notificaciones, setNotificaciones] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -127,7 +127,10 @@ export default function AdminLayout({
     }
     if (!isAdmin()) {
       router.replace('/dashboard');
+      return;
     }
+    // Verificar que el token siga siendo válido en el servidor
+    refreshUser();
   }, []);
 
   useEffect(() => {
