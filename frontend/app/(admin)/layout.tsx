@@ -16,7 +16,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { InstallPWA } from '@/components/ui/InstallPWA';
 import { apiClient } from '@/lib/api';
 
-const NAV_ITEMS = [
+// Ítems siempre visibles en el nav inferior (mobile)
+const NAV_PRIMARY = [
   {
     href: '/admin',
     label: 'Dashboard',
@@ -25,53 +26,6 @@ const NAV_ITEMS = [
       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-      </svg>
-    ),
-  },
-  {
-    href: '/admin/vendedores',
-    label: 'Vendedores',
-    exactMatch: false,
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-    ),
-  },
-  {
-    href: '/admin/modulos',
-    label: 'Módulos',
-    exactMatch: false,
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-      </svg>
-    ),
-  },
-  {
-    href: '/admin/reportes',
-    label: 'Reportes',
-    exactMatch: false,
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="18" y1="20" x2="18" y2="10"/>
-        <line x1="12" y1="20" x2="12" y2="4"/>
-        <line x1="6" y1="20" x2="6" y2="14"/>
-      </svg>
-    ),
-  },
-  {
-    href: '/admin/niveles',
-    label: 'Niveles',
-    exactMatch: false,
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-        <polyline points="17 6 23 6 23 12"/>
       </svg>
     ),
   },
@@ -87,18 +41,72 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+];
+
+// Ítems en el sheet expandible (botón central)
+const NAV_SECONDARY = [
+  {
+    href: '/admin/vendedores',
+    label: 'Vendedores',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/modulos',
+    label: 'Módulos',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/reportes',
+    label: 'Reportes',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/niveles',
+    label: 'Niveles',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+        <polyline points="17 6 23 6 23 12"/>
+      </svg>
+    ),
+  },
   {
     href: '/admin/stock',
     label: 'Stock',
     exactMatch: false,
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
     ),
   },
 ];
+
+// Todos los ítems juntos para el sidebar desktop
+const NAV_ITEMS = [...NAV_PRIMARY.slice(0, 1), ...NAV_SECONDARY, ...NAV_PRIMARY.slice(1)];
 
 export default function AdminLayout({
   children,
@@ -109,6 +117,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const { isAuthenticated, isAdmin, nombreCompleto, logout } = useAuth();
   const [notificaciones, setNotificaciones] = useState(0);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Guard: solo admins
   useEffect(() => {
@@ -240,16 +249,105 @@ export default function AdminLayout({
         </main>
 
         {/* Bottom nav — solo mobile */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
-          <div className="flex items-center justify-around px-2 py-2">
-            {NAV_ITEMS.map((item) => (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20">
+
+          {/* Overlay oscuro al abrir el sheet */}
+          <div
+            onClick={() => setSheetOpen(false)}
+            className={`fixed inset-0 bg-black transition-opacity duration-300 ${
+              sheetOpen ? 'opacity-40 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+          />
+
+          {/* Sheet de ítems secundarios */}
+          <div
+            className={`absolute bottom-full left-0 right-0 bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out ${
+              sheetOpen ? 'translate-y-0' : 'translate-y-full'
+            }`}
+          >
+            {/* Handle visual */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-6 py-2">
+              Navegación
+            </p>
+            <div className="grid grid-cols-3 gap-1 px-4 pb-6 pt-1">
+              {NAV_SECONDARY.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSheetOpen(false)}
+                  className={`flex flex-col items-center gap-1.5 px-2 py-4 rounded-2xl transition-colors active:scale-95 ${
+                    isActive(item)
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {item.icon}
+                  <span className="text-xs font-medium">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Barra inferior fija */}
+          <div className="relative bg-white border-t border-gray-200 flex items-center justify-around px-6 py-2">
+
+            {/* Ítem izquierdo — Dashboard */}
+            {NAV_PRIMARY.slice(0, 1).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors min-w-[60px] ${
-                  isActive(item)
-                    ? 'text-gray-900'
-                    : 'text-gray-400'
+                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-colors ${
+                  isActive(item) ? 'text-gray-900' : 'text-gray-400'
+                }`}
+              >
+                {item.icon}
+                <span className={`text-xs ${isActive(item) ? 'font-semibold' : 'font-normal'}`}>
+                  {item.label}
+                </span>
+                {/* Badge de notificaciones */}
+                {item.href === '/admin' && notificaciones > 0 && (
+                  <span className="absolute top-2 ml-4 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                    {notificaciones > 9 ? '9+' : notificaciones}
+                  </span>
+                )}
+              </Link>
+            ))}
+
+            {/* Botón central FAB */}
+            <button
+              onClick={() => setSheetOpen((v) => !v)}
+              className={`relative -top-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
+                sheetOpen
+                  ? 'bg-gray-700 shadow-gray-400'
+                  : NAV_SECONDARY.some((item) => isActive(item))
+                  ? 'bg-gray-600 shadow-gray-300'
+                  : 'bg-gray-900 shadow-gray-300'
+              }`}
+              aria-label="Más opciones"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`w-6 h-6 text-white transition-transform duration-300 ${sheetOpen ? 'rotate-45' : ''}`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+
+            {/* Ítem derecho — Ventas */}
+            {NAV_PRIMARY.slice(1).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-colors ${
+                  isActive(item) ? 'text-gray-900' : 'text-gray-400'
                 }`}
               >
                 {item.icon}
@@ -258,6 +356,7 @@ export default function AdminLayout({
                 </span>
               </Link>
             ))}
+
           </div>
         </nav>
 
