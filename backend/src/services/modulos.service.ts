@@ -113,7 +113,8 @@ export class ModulosService {
       .eq('activo', true)
       .order('orden', { ascending: true });
 
-    if (error || !modulos?.length) return;
+    if (error) throw new Error('Error al obtener módulos para inicializar progreso');
+    if (!modulos?.length) return;
 
     // Crear registros de progreso
     const registros = modulos.map((modulo) => ({
@@ -128,9 +129,7 @@ export class ModulosService {
       .from('progreso')
       .insert(registros);
 
-    if (insertError) {
-      console.error('Error al inicializar progreso:', insertError);
-    }
+    if (insertError) throw new Error('Error al inicializar progreso del vendedor');
   }
 }
 

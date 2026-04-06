@@ -601,32 +601,32 @@ export class AdminService {
   }
 
   /**
-   * Elimina un vendedor y todos sus datos asociados.
+   * Desactiva un vendedor (soft delete — preserva historial).
    */
   async eliminarVendedor(vendedorId: string) {
     const { error } = await supabase
       .from('users')
-      .delete()
+      .update({ activo: false })
       .eq('id', vendedorId)
       .eq('rol', 'vendedor');
 
-    if (error) throw new AppError('Error al eliminar el vendedor', 500);
+    if (error) throw new AppError('Error al desactivar el vendedor', 500);
 
-    return { mensaje: 'Vendedor eliminado correctamente' };
+    return { mensaje: 'Vendedor desactivado correctamente' };
   }
 
   /**
-   * Elimina un módulo y todos sus datos asociados.
+   * Desactiva un módulo (soft delete — preserva historial de exámenes).
    */
   async eliminarModulo(moduloId: string) {
     const { error } = await supabase
       .from('modulos')
-      .delete()
+      .update({ activo: false })
       .eq('id', moduloId);
 
-    if (error) throw new AppError('Error al eliminar el módulo', 500);
+    if (error) throw new AppError('Error al desactivar el módulo', 500);
 
-    return { mensaje: 'Módulo eliminado correctamente' };
+    return { mensaje: 'Módulo desactivado correctamente' };
   }
 }
 
