@@ -258,6 +258,19 @@ export class AdminController {
   }
 
   /**
+   * POST /api/admin/vendedores/:id/reset-progreso
+   */
+  async resetProgresoVendedor(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const vendedorId = req.params.id as string;
+      const result = await adminService.resetProgresoVendedor(vendedorId);
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * DELETE /api/admin/modulos/:id
    */
   async eliminarModulo(req: AuthRequest, res: Response, next: NextFunction) {

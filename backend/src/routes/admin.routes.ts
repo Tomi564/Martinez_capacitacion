@@ -127,6 +127,12 @@ router.patch(
   adminController.resetPasswordVendedor.bind(adminController)
 );
 
+// POST /api/admin/vendedores/:id/reset-progreso
+router.post(
+  '/vendedores/:id/reset-progreso',
+  adminController.resetProgresoVendedor.bind(adminController)
+);
+
 // DELETE /api/admin/vendedores/:id
 router.delete(
   '/vendedores/:id',
@@ -144,7 +150,7 @@ router.delete(
 // ─────────────────────────────────────────────────────
 
 // GET /api/admin/notificaciones
-router.get('/notificaciones', async (req, res, next) => {
+router.get('/notificaciones', async (_req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('notificaciones_admin')

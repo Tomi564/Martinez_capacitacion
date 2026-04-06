@@ -633,6 +633,35 @@ export class AdminService {
   }
 
   /**
+   * Reinicia el progreso de un vendedor a estado inicial
+   * (módulo 1 = disponible, resto = bloqueado, intentos = 0, mejor_nota = 0).
+   */
+  async resetProgresoVendedor(vendedorId: string) {
+    // Verificar que el vendedor existe
+    const { data: vendedor } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor')
+      .single();
+
+    if (!vendedor) throw new AppError('Vendedor no encontrado', 404);
+
+    // Eliminar todo el progreso existente
+    const { error: deleteError } = await supabase
+      .from('progreso')
+      .delete()
+      .eq('user_id', vendedorId);
+
+    if (deleteError) throw new AppError('Error al reiniciar el progreso', 500);
+
+    // Re-inicializar desde cero
+    await modulosService.inicializarProgreso(vendedorId);
+
+    return { mensaje: 'Progreso reiniciado correctamente' };
+  }
+
+  /**
    * Desactiva un módulo (soft delete — preserva historial de exámenes).
    */
   async eliminarModulo(moduloId: string) {
