@@ -601,6 +601,23 @@ export class AdminService {
   }
 
   /**
+   * Cambia la contraseña de un vendedor.
+   */
+  async resetPasswordVendedor(vendedorId: string, nuevaContrasena: string) {
+    const passwordHash = await bcrypt.hash(nuevaContrasena, 12);
+
+    const { error } = await supabase
+      .from('users')
+      .update({ password_hash: passwordHash })
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor');
+
+    if (error) throw new AppError('Error al cambiar la contraseña', 500);
+
+    return { mensaje: 'Contraseña actualizada correctamente' };
+  }
+
+  /**
    * Desactiva un vendedor (soft delete — preserva historial).
    */
   async eliminarVendedor(vendedorId: string) {

@@ -121,6 +121,12 @@ router.get(
   adminController.getVendedorById.bind(adminController)
 );
 
+// PATCH /api/admin/vendedores/:id/reset-password
+router.patch(
+  '/vendedores/:id/reset-password',
+  adminController.resetPasswordVendedor.bind(adminController)
+);
+
 // DELETE /api/admin/vendedores/:id
 router.delete(
   '/vendedores/:id',
@@ -222,11 +228,24 @@ router.get('/niveles', async (_req, res, next) => {
       .from('progreso')
       .select('user_id, estado, mejor_nota');
 
+    // Calificaciones QR promedio por vendedor (para determinar nivel élite)
+    const { data: calificaciones } = await supabase
+      .from('calificaciones_qr')
+      .select('vendedor_id, calificacion');
+
+    const getPromedioQR = (userId: string) => {
+      const cals = (calificaciones || []).filter(c => c.vendedor_id === userId);
+      if (!cals.length) return 0;
+      return cals.reduce((acc, c) => acc + c.calificacion, 0) / cals.length;
+    };
+
     const getNivel = (userId: string) => {
       const progVendedor = (progresos || []).filter(p => p.user_id === userId);
       const aprobados = progVendedor.filter(p => p.estado === 'aprobado');
       const totalAprobados = aprobados.length;
 
+      // Élite: completó todos los módulos Y promedio QR ≥ 4.5
+      if (totalAprobados >= totalModulos && getPromedioQR(userId) >= 4.5) return 'elite';
       if (totalAprobados >= totalModulos) return 'profesional';
       if (totalAprobados >= 6) return 'vendedor';
       if (totalAprobados >= 3) return 'aprendiz';
@@ -254,7 +273,7 @@ router.get('/niveles', async (_req, res, next) => {
       sin_inicio:  { label: 'Aprendiz',    requisito: 'Aprobá los primeros 3 módulos' },
       aprendiz:    { label: 'Vendedor',    requisito: 'Aprobá módulos 1-6 con promedio ≥80%' },
       vendedor:    { label: 'Profesional', requisito: 'Aprobá los 10 módulos' },
-      profesional: { label: 'Élite',       requisito: 'Calificación ≥4.5/5 por 3 meses' },
+      profesional: { label: 'Élite',       requisito: 'Completá todos los módulos y alcanzá un promedio de calificaciones QR ≥4.5' },
       elite:       null,
     };
 

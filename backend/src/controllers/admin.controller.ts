@@ -226,6 +226,25 @@ export class AdminController {
   }
 
   /**
+   * PATCH /api/admin/vendedores/:id/reset-password
+   */
+  async resetPasswordVendedor(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const vendedorId = req.params.id as string;
+      const { nuevaContrasena } = req.body;
+
+      if (!nuevaContrasena || nuevaContrasena.length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+      }
+
+      const result = await adminService.resetPasswordVendedor(vendedorId, nuevaContrasena);
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * DELETE /api/admin/vendedores/:id
    */
   async eliminarVendedor(req: AuthRequest, res: Response, next: NextFunction) {

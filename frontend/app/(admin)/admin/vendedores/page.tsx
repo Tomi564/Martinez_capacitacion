@@ -34,6 +34,7 @@ export default function VendedoresPage() {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -134,6 +135,20 @@ export default function VendedoresPage() {
         </div>
       )}
 
+      {/* Buscador */}
+      <div className="relative">
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre o email..."
+          className="w-full h-11 pl-10 pr-4 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+        />
+      </div>
+
       {/* Lista de vendedores */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
@@ -145,7 +160,17 @@ export default function VendedoresPage() {
           <span className="text-center">Acciones</span>
         </div>
 
-        {vendedores.map((vendedor, index) => {
+        {vendedores
+          .filter((v) => {
+            const q = busqueda.toLowerCase();
+            return (
+              !q ||
+              v.nombre.toLowerCase().includes(q) ||
+              v.apellido.toLowerCase().includes(q) ||
+              v.email.toLowerCase().includes(q)
+            );
+          })
+          .map((vendedor, index) => {
           const porcentaje =
             vendedor.totalModulos > 0
               ? Math.round(
@@ -236,10 +261,15 @@ export default function VendedoresPage() {
           );
         })}
 
-        {vendedores.length === 0 && (
+        {vendedores.filter((v) => {
+          const q = busqueda.toLowerCase();
+          return !q || v.nombre.toLowerCase().includes(q) || v.apellido.toLowerCase().includes(q) || v.email.toLowerCase().includes(q);
+        }).length === 0 && (
           <div className="px-4 py-10 text-center">
             <p className="text-2xl mb-2">👥</p>
-            <p className="text-gray-500 text-sm">No hay vendedores aún</p>
+            <p className="text-gray-500 text-sm">
+              {busqueda ? 'Sin resultados para esa búsqueda' : 'No hay vendedores aún'}
+            </p>
           </div>
         )}
       </div>
