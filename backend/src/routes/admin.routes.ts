@@ -281,14 +281,59 @@ router.get('/niveles', async (_req, res, next) => {
 // ─────────────────────────────────────────────────────
 
 // GET /api/admin/inactivos
-// Vendedores que llevan más de 3 días sin avanzar
+// Vendedores que llevan más de 3 días sin avanzar (o nunca empezaron)
 router.get('/inactivos', async (_req, res, next) => {
   try {
-    const { data, error } = await supabase.rpc('detectar_inactivos');
+    // Traer todos los vendedores activos
+    const { data: vendedores, error: errV } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email')
+      .eq('rol', 'vendedor')
+      .eq('activo', true);
 
-    if (error) throw new Error('Error al obtener vendedores inactivos');
+    if (errV) throw new Error('Error al obtener vendedores');
 
-    return res.status(200).json({ inactivos: data || [] });
+    if (!vendedores?.length) {
+      return res.status(200).json({ inactivos: [] });
+    }
+
+    // Traer el último intento de cada vendedor
+    const { data: progresos } = await supabase
+      .from('progreso')
+      .select('user_id, ultimo_intento')
+      .in('user_id', vendedores.map(v => v.id));
+
+    const ahora = new Date();
+    const DIAS_LIMITE = 3;
+
+    const inactivos = vendedores
+      .map(v => {
+        const intentos = (progresos || []).filter(p => p.user_id === v.id);
+        const fechas = intentos
+          .map(p => p.ultimo_intento)
+          .filter(Boolean)
+          .sort()
+          .reverse();
+
+        const ultimoIntento = fechas[0] || null;
+
+        if (!ultimoIntento) {
+          // Nunca empezó
+          return { ...v, ultimo_intento: null, dias_inactivo: null };
+        }
+
+        const diasTranscurridos = Math.floor(
+          (ahora.getTime() - new Date(ultimoIntento).getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (diasTranscurridos >= DIAS_LIMITE) {
+          return { ...v, ultimo_intento: ultimoIntento, dias_inactivo: diasTranscurridos };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    return res.status(200).json({ inactivos });
   } catch (error) {
     next(error);
   }

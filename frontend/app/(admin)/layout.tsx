@@ -292,14 +292,14 @@ export default function AdminLayout({
           </div>
 
           {/* Barra inferior fija */}
-          <div className="relative bg-white border-t border-gray-200 flex items-center justify-around px-6 py-2">
+          <div className="relative bg-white border-t border-gray-200 grid grid-cols-3 items-center py-2">
 
             {/* Ítem izquierdo — Dashboard */}
             {NAV_PRIMARY.slice(0, 1).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-colors ${
+                className={`flex flex-col items-center gap-0.5 py-1 rounded-xl transition-colors ${
                   isActive(item) ? 'text-gray-900' : 'text-gray-400'
                 }`}
               >
@@ -319,7 +319,7 @@ export default function AdminLayout({
             {/* Botón central FAB */}
             <button
               onClick={() => setSheetOpen((v) => !v)}
-              className={`relative -top-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
+              className={`relative -top-5 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
                 sheetOpen
                   ? 'bg-gray-700 shadow-gray-400'
                   : NAV_SECONDARY.some((item) => isActive(item))
@@ -346,7 +346,7 @@ export default function AdminLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-colors ${
+                className={`flex flex-col items-center gap-0.5 py-1 rounded-xl transition-colors ${
                   isActive(item) ? 'text-gray-900' : 'text-gray-400'
                 }`}
               >
