@@ -26,6 +26,7 @@ import examenesRoutes from './routes/examenes.routes';
 import qrRoutes from './routes/qr.routes';
 import adminRoutes from './routes/admin.routes';
 import atencionesRoutes from './routes/atenciones.routes';
+import productosRoutes from './routes/productos.routes';
 const app = express();
 
 // ─────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ app.use('/api/examenes', examenesRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/atenciones', atencionesRoutes);
+app.use('/api/productos', productosRoutes);
 
 // ─────────────────────────────────────────────────────
 // 404 — cualquier ruta no definida cae acá

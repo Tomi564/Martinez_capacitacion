@@ -332,8 +332,8 @@ export default function AtencionesPage() {
                 type="text"
                 value={form.producto}
                 onChange={(e) => setForm({ ...form, producto: e.target.value })}
-                placeholder="Ej: Pirelli 205/55 R16 x4"
-                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+                placeholder="Ej: Pirelli P400 185/65 R15"
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
               />
             </div>
 
@@ -349,8 +349,8 @@ export default function AtencionesPage() {
                     type="number"
                     value={form.monto}
                     onChange={(e) => setForm({ ...form, monto: e.target.value })}
-                    placeholder="0"
-                    className="h-11 pl-7 pr-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-full placeholder:text-gray-400"
+                    placeholder="85000"
+                    className="h-11 pl-7 pr-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 w-full placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -364,9 +364,9 @@ export default function AtencionesPage() {
               <textarea
                 value={form.observaciones}
                 onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
-                placeholder="Ej: El cliente quedó interesado, vuelve la semana que viene"
+                placeholder="Ej: Cliente consultó por otro modelo, vuelve la semana que viene"
                 rows={2}
-                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none placeholder:text-gray-400"
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none placeholder:text-gray-400"
               />
             </div>
 
