@@ -16,6 +16,7 @@ interface Producto {
   codigo: string | null;
   precio: number | null;
   stock: number | null;
+  stock_minimo: number | null;
 }
 
 export function BuscadorProductos() {
@@ -124,15 +125,20 @@ export function BuscadorProductos() {
                         ${p.precio.toLocaleString('es-AR')}
                       </p>
                     )}
-                    {p.stock != null && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${
-                        p.stock > 0
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-600'
-                      }`}>
-                        {p.stock > 0 ? `${p.stock} en stock` : 'Sin stock'}
-                      </span>
-                    )}
+                    {p.stock != null && (() => {
+                      const bajo = (p.stock_minimo ?? 0) > 0 && p.stock <= (p.stock_minimo ?? 0);
+                      return (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${
+                          p.stock === 0
+                            ? 'bg-red-100 text-red-600'
+                            : bajo
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {p.stock === 0 ? 'Sin stock' : bajo ? `⚠️ Bajo stock (${p.stock})` : `${p.stock} en stock`}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

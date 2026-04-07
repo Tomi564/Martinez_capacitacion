@@ -17,6 +17,25 @@ import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso, ResumenCalificaciones } from '@/types';
 import { NivelBadge, type InfoNivel } from '@/components/ui/NivelBadge';
 import { Insignias } from '@/components/ui/Insignias';
+import { suscribirPush } from '@/hooks/usePushNotifications';
+
+interface Comunicado {
+  id: string;
+  titulo: string;
+  contenido: string;
+  created_at: string;
+}
+
+interface Objetivo {
+  meta_ventas: number;
+  meta_conversion: number;
+}
+
+interface ProgresoObjetivo {
+  ventas: number;
+  total: number;
+  tasaConversion: number;
+}
 
 interface DashboardData {
   modulos: ModuloConProgreso[];
@@ -29,14 +48,27 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [comunicado, setComunicado] = useState<Comunicado | null>(null);
+  const [objetivo, setObjetivo] = useState<Objetivo | null>(null);
+  const [progresoObjetivo, setProgresoObjetivo] = useState<ProgresoObjetivo | null>(null);
+  const [pushPermiso, setPushPermiso] = useState<NotificationPermission | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushPermiso(Notification.permission);
+      if (Notification.permission === 'granted') suscribirPush();
+    }
+  }, []);
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const [modulosRes, calificacionesRes, nivelRes] = await Promise.all([
+        const [modulosRes, calificacionesRes, nivelRes, comunicadoRes, objetivoRes] = await Promise.all([
           apiClient.get<{ modulos: ModuloConProgreso[] }>('/modulos'),
           apiClient.get<ResumenCalificaciones>('/qr/mis-calificaciones'),
           apiClient.get<InfoNivel>('/modulos/mi-nivel'),
+          apiClient.get<{ comunicado: Comunicado | null }>('/comunicados'),
+          apiClient.get<{ objetivo: Objetivo | null; progreso: ProgresoObjetivo }>('/objetivos/actual'),
         ]);
 
         setData({
@@ -44,6 +76,9 @@ export default function DashboardPage() {
           calificaciones: calificacionesRes,
           nivel: nivelRes,
         });
+        setComunicado(comunicadoRes.comunicado);
+        setObjetivo(objetivoRes.objetivo);
+        setProgresoObjetivo(objetivoRes.progreso);
       } catch (err) {
         setError('Error al cargar el dashboard');
         console.error(err);
@@ -101,6 +136,64 @@ export default function DashboardPage() {
           {user?.nombre} 👋
         </h1>
       </div>
+
+      {/* Banner de comunicado activo */}
+      {comunicado && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-xl shrink-0">📣</span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-amber-900">{comunicado.titulo}</p>
+              <p className="text-sm text-amber-800 mt-0.5 whitespace-pre-wrap">{comunicado.contenido}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Card de objetivo del mes */}
+      {objetivo && progresoObjetivo && (objetivo.meta_ventas > 0 || objetivo.meta_conversion > 0) && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Objetivo del mes</p>
+          <div className="flex flex-col gap-3">
+            {objetivo.meta_ventas > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-700">Ventas cerradas</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {progresoObjetivo.ventas} / {objetivo.meta_ventas}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      progresoObjetivo.ventas >= objetivo.meta_ventas ? 'bg-green-500' : 'bg-gray-900'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((progresoObjetivo.ventas / objetivo.meta_ventas) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {objetivo.meta_conversion > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-700">Tasa de conversión</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {progresoObjetivo.tasaConversion}% / {objetivo.meta_conversion}%
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      progresoObjetivo.tasaConversion >= objetivo.meta_conversion ? 'bg-green-500' : 'bg-gray-900'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((progresoObjetivo.tasaConversion / objetivo.meta_conversion) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Nivel actual */}
       {data?.nivel && (
@@ -229,6 +322,23 @@ export default function DashboardPage() {
       {/* Insignias */}
       {data && data.modulos.length > 0 && (
         <Insignias modulos={data.modulos} />
+      )}
+
+      {/* Activar notificaciones push */}
+      {pushPermiso === 'default' && (
+        <button
+          onClick={async () => {
+            const ok = await suscribirPush();
+            setPushPermiso(ok ? 'granted' : 'denied');
+          }}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <span className="text-xl">🔔</span>
+          <div className="text-left">
+            <p className="font-semibold">Activar notificaciones</p>
+            <p className="text-xs text-gray-400">Recibí avisos de comunicados y novedades</p>
+          </div>
+        </button>
       )}
 
       {/* Accesos rápidos */}

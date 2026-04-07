@@ -20,9 +20,10 @@ interface Producto {
   codigo: string | null;
   precio: number | null;
   stock: number | null;
+  stock_minimo: number | null;
 }
 
-const FORM_VACIO = { nombre: '', marca: '', descripcion: '', codigo: '', precio: '', stock: '' };
+const FORM_VACIO = { nombre: '', marca: '', descripcion: '', codigo: '', precio: '', stock: '', stock_minimo: '' };
 
 export default function StockAdminPage() {
   const [tab, setTab] = useState<'buscar' | 'gestionar'>('buscar');
@@ -58,12 +59,13 @@ export default function StockAdminPage() {
 
   const abrirEditar = (p: Producto) => {
     setForm({
-      nombre:      p.nombre,
-      marca:       p.marca,
-      descripcion: p.descripcion || '',
-      codigo:      p.codigo || '',
-      precio:      p.precio != null ? String(p.precio) : '',
-      stock:       p.stock != null ? String(p.stock) : '',
+      nombre:       p.nombre,
+      marca:        p.marca,
+      descripcion:  p.descripcion || '',
+      codigo:       p.codigo || '',
+      precio:       p.precio != null ? String(p.precio) : '',
+      stock:        p.stock != null ? String(p.stock) : '',
+      stock_minimo: p.stock_minimo != null ? String(p.stock_minimo) : '',
     });
     setEditando(p);
     setModal('editar');
@@ -74,12 +76,13 @@ export default function StockAdminPage() {
     setGuardando(true);
     try {
       const body = {
-        nombre:      form.nombre.trim(),
-        marca:       form.marca.trim(),
-        descripcion: form.descripcion.trim() || null,
-        codigo:      form.codigo.trim() || null,
-        precio:      form.precio !== '' ? Number(form.precio) : null,
-        stock:       form.stock !== '' ? Number(form.stock) : 0,
+        nombre:       form.nombre.trim(),
+        marca:        form.marca.trim(),
+        descripcion:  form.descripcion.trim() || null,
+        codigo:       form.codigo.trim() || null,
+        precio:       form.precio !== '' ? Number(form.precio) : null,
+        stock:        form.stock !== '' ? Number(form.stock) : 0,
+        stock_minimo: form.stock_minimo !== '' ? Number(form.stock_minimo) : 0,
       };
 
       if (modal === 'nuevo') {
@@ -130,6 +133,26 @@ export default function StockAdminPage() {
         <h1 className="text-2xl font-bold text-gray-900">Stock de productos</h1>
         <p className="text-sm text-gray-500 mt-1">Buscá o gestioná el catálogo de productos</p>
       </div>
+
+      {/* Alertas de stock bajo */}
+      {tab === 'gestionar' && productos.filter(p =>
+        (p.stock_minimo ?? 0) > 0 && (p.stock ?? 0) <= (p.stock_minimo ?? 0)
+      ).length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <p className="text-sm font-semibold text-red-700 mb-2">
+            ⚠️ Productos con stock bajo
+          </p>
+          <div className="flex flex-col gap-1">
+            {productos
+              .filter(p => (p.stock_minimo ?? 0) > 0 && (p.stock ?? 0) <= (p.stock_minimo ?? 0))
+              .map(p => (
+                <p key={p.id} className="text-xs text-red-600">
+                  • {p.marca} {p.nombre} — {p.stock ?? 0} unidades (mínimo: {p.stock_minimo})
+                </p>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
@@ -223,9 +246,17 @@ export default function StockAdminPage() {
                       <div className="flex gap-3 mt-1">
                         {p.precio != null && <span className="text-xs font-semibold text-gray-900">${p.precio.toLocaleString('es-AR')}</span>}
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          (p.stock ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                          (p.stock ?? 0) === 0
+                            ? 'bg-red-100 text-red-600'
+                            : (p.stock_minimo ?? 0) > 0 && (p.stock ?? 0) <= (p.stock_minimo ?? 0)
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-green-100 text-green-700'
                         }`}>
-                          {(p.stock ?? 0) > 0 ? `${p.stock} en stock` : 'Sin stock'}
+                          {(p.stock ?? 0) === 0
+                            ? 'Sin stock'
+                            : (p.stock_minimo ?? 0) > 0 && (p.stock ?? 0) <= (p.stock_minimo ?? 0)
+                            ? `⚠️ ${p.stock} (bajo)`
+                            : `${p.stock} en stock`}
                         </span>
                       </div>
                     </div>
@@ -273,9 +304,17 @@ export default function StockAdminPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            (p.stock ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                            (p.stock ?? 0) === 0
+                              ? 'bg-red-100 text-red-600'
+                              : (p.stock_minimo ?? 0) > 0 && (p.stock ?? 0) <= (p.stock_minimo ?? 0)
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-green-100 text-green-700'
                           }`}>
-                            {(p.stock ?? 0) > 0 ? p.stock : 'Sin stock'}
+                            {(p.stock ?? 0) === 0
+                              ? 'Sin stock'
+                              : (p.stock_minimo ?? 0) > 0 && (p.stock ?? 0) <= (p.stock_minimo ?? 0)
+                              ? `⚠️ ${p.stock}`
+                              : p.stock}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -321,6 +360,7 @@ export default function StockAdminPage() {
                 { key: 'descripcion', label: 'Descripción',  placeholder: 'Ej: Neumático para autos medianos', required: false },
                 { key: 'precio',      label: 'Precio ($)',   placeholder: 'Ej: 45000',                   required: false },
                 { key: 'stock',       label: 'Stock',        placeholder: 'Ej: 12',                      required: false },
+                { key: 'stock_minimo', label: 'Stock mínimo', placeholder: 'Ej: 3 (alerta si baja de aquí)', required: false },
               ].map(f => (
                 <div key={f.key} className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-gray-700">

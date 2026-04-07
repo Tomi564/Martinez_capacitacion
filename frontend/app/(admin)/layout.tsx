@@ -103,6 +103,17 @@ const NAV_SECONDARY = [
       </svg>
     ),
   },
+  {
+    href: '/admin/comunicados',
+    label: 'Comunicados',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3z"/>
+        <path d="M9 17v1a3 3 0 0 0 6 0v-1"/>
+      </svg>
+    ),
+  },
 ];
 
 // Todos los ítems juntos para el sidebar desktop

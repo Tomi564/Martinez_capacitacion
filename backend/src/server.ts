@@ -27,6 +27,10 @@ import qrRoutes from './routes/qr.routes';
 import adminRoutes from './routes/admin.routes';
 import atencionesRoutes from './routes/atenciones.routes';
 import productosRoutes from './routes/productos.routes';
+import comunicadosRoutes from './routes/comunicados.routes';
+import rankingRoutes from './routes/ranking.routes';
+import objetivosRoutes from './routes/objetivos.routes';
+import pushRoutes from './routes/push.routes';
 const app = express();
 
 // ─────────────────────────────────────────────────────
@@ -87,6 +91,10 @@ app.use('/api/qr', qrRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/atenciones', atencionesRoutes);
 app.use('/api/productos', productosRoutes);
+app.use('/api/comunicados', comunicadosRoutes);
+app.use('/api/ranking', rankingRoutes);
+app.use('/api/objetivos', objetivosRoutes);
+app.use('/api/push', pushRoutes);
 
 // ─────────────────────────────────────────────────────
 // 404 — cualquier ruta no definida cae acá

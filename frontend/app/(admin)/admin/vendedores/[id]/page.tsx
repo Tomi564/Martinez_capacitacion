@@ -53,13 +53,29 @@ export default function VendedorDetallePage() {
   const [resetProgresoLoading, setResetProgresoLoading] = useState(false);
   const [resetProgresoMsg, setResetProgresoMsg] = useState<string | null>(null);
 
+  // Objetivos del mes
+  const [objetivo, setObjetivo] = useState<{ meta_ventas: number; meta_conversion: number } | null>(null);
+  const [editandoObjetivo, setEditandoObjetivo] = useState(false);
+  const [objForm, setObjForm] = useState({ meta_ventas: '', meta_conversion: '' });
+  const [guardandoObj, setGuardandoObj] = useState(false);
+
   useEffect(() => {
     const fetchVendedor = async () => {
       try {
-        const res = await apiClient.get<{ vendedor: VendedorDetalle }>(
-          `/admin/vendedores/${vendedorId}`
-        );
-        setVendedor(res.vendedor);
+        const [vendRes, objRes] = await Promise.all([
+          apiClient.get<{ vendedor: VendedorDetalle }>(`/admin/vendedores/${vendedorId}`),
+          apiClient.get<{ objetivo: { meta_ventas: number; meta_conversion: number } | null }>(
+            `/admin/vendedores/${vendedorId}/objetivo`
+          ),
+        ]);
+        setVendedor(vendRes.vendedor);
+        if (objRes.objetivo) {
+          setObjetivo(objRes.objetivo);
+          setObjForm({
+            meta_ventas: String(objRes.objetivo.meta_ventas || ''),
+            meta_conversion: String(objRes.objetivo.meta_conversion || ''),
+          });
+        }
       } catch (err) {
         setError('Error al cargar el vendedor');
         console.error(err);
@@ -102,6 +118,25 @@ export default function VendedorDetallePage() {
     } finally {
       setResetLoading(false);
     }
+  };
+
+  const handleGuardarObjetivo = async () => {
+    setGuardandoObj(true);
+    try {
+      const ahora = new Date();
+      await apiClient.post(`/admin/vendedores/${vendedorId}/objetivo`, {
+        mes: ahora.getMonth() + 1,
+        anio: ahora.getFullYear(),
+        meta_ventas: objForm.meta_ventas ? Number(objForm.meta_ventas) : 0,
+        meta_conversion: objForm.meta_conversion ? Number(objForm.meta_conversion) : 0,
+      });
+      setObjetivo({
+        meta_ventas: objForm.meta_ventas ? Number(objForm.meta_ventas) : 0,
+        meta_conversion: objForm.meta_conversion ? Number(objForm.meta_conversion) : 0,
+      });
+      setEditandoObjetivo(false);
+    } catch { /* silencioso */ }
+    finally { setGuardandoObj(false); }
   };
 
   const handleResetProgreso = async () => {
@@ -402,6 +437,73 @@ export default function VendedorDetallePage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Objetivo del mes */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Objetivo del mes
+          </p>
+          <button
+            onClick={() => setEditandoObjetivo(v => !v)}
+            className="text-xs text-gray-500 hover:text-gray-900 font-medium"
+          >
+            {editandoObjetivo ? 'Cancelar' : objetivo ? 'Editar' : '+ Asignar'}
+          </button>
+        </div>
+
+        {editandoObjetivo ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600">Meta ventas</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={objForm.meta_ventas}
+                  onChange={e => setObjForm(f => ({ ...f, meta_ventas: e.target.value }))}
+                  placeholder="Ej: 20"
+                  className="h-10 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600">Meta conversión %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={objForm.meta_conversion}
+                  onChange={e => setObjForm(f => ({ ...f, meta_conversion: e.target.value }))}
+                  placeholder="Ej: 60"
+                  className="h-10 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleGuardarObjetivo}
+              disabled={guardandoObj}
+              className="w-full h-10 bg-gray-900 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+            >
+              {guardandoObj ? 'Guardando...' : 'Guardar objetivo'}
+            </button>
+          </div>
+        ) : objetivo ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-2 gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900">{objetivo.meta_ventas}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Ventas meta</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900">{objetivo.meta_conversion}%</p>
+              <p className="text-xs text-gray-500 mt-0.5">Conversión meta</p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white border border-dashed border-gray-300 rounded-2xl p-6 text-center">
+            <p className="text-sm text-gray-400">Sin objetivo asignado para este mes</p>
+          </div>
+        )}
       </div>
 
     </div>

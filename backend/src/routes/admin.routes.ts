@@ -382,4 +382,115 @@ router.get('/inactivos', async (_req, res, next) => {
   }
 });
 
+// ─────────────────────────────────────────────────────
+// Comunicados
+// ─────────────────────────────────────────────────────
+
+// GET /api/admin/comunicados
+router.get('/comunicados', async (_req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('comunicados')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error('Error al obtener comunicados');
+    return res.status(200).json({ comunicados: data || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/comunicados
+router.post('/comunicados', async (req, res, next) => {
+  try {
+    const { titulo, contenido } = req.body;
+    if (!titulo?.trim() || !contenido?.trim()) {
+      return res.status(400).json({ error: 'Título y contenido son requeridos' });
+    }
+    // Desactivar todos los anteriores antes de crear uno nuevo activo
+    await supabase.from('comunicados').update({ activo: false }).eq('activo', true);
+
+    const { data, error } = await supabase
+      .from('comunicados')
+      .insert({ titulo: titulo.trim(), contenido: contenido.trim(), activo: true })
+      .select()
+      .single();
+    if (error) throw new Error('Error al crear comunicado');
+    return res.status(201).json({ comunicado: data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/comunicados/:id
+router.patch('/comunicados/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { activo } = req.body;
+    if (typeof activo !== 'boolean') {
+      return res.status(400).json({ error: 'activo debe ser boolean' });
+    }
+    await supabase.from('comunicados').update({ activo }).eq('id', id);
+    return res.status(200).json({ mensaje: 'Comunicado actualizado' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// Objetivos
+// ─────────────────────────────────────────────────────
+
+// POST /api/admin/vendedores/:id/objetivo
+router.post('/vendedores/:id/objetivo', async (req, res, next) => {
+  try {
+    const vendedorId = req.params.id as string;
+    const { mes, anio, meta_ventas, meta_conversion } = req.body;
+
+    if (!mes || !anio) {
+      return res.status(400).json({ error: 'mes y anio son requeridos' });
+    }
+
+    const { error } = await supabase
+      .from('objetivos')
+      .upsert(
+        {
+          user_id: vendedorId,
+          mes: Number(mes),
+          anio: Number(anio),
+          meta_ventas: meta_ventas ? Number(meta_ventas) : 0,
+          meta_conversion: meta_conversion ? Number(meta_conversion) : 0,
+        },
+        { onConflict: 'user_id,mes,anio' }
+      );
+
+    if (error) throw new Error('Error al guardar objetivo');
+    return res.status(200).json({ mensaje: 'Objetivo guardado correctamente' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/vendedores/:id/objetivo
+router.get('/vendedores/:id/objetivo', async (req, res, next) => {
+  try {
+    const vendedorId = req.params.id as string;
+    const ahora = new Date();
+    const mes = ahora.getMonth() + 1;
+    const anio = ahora.getFullYear();
+
+    const { data } = await supabase
+      .from('objetivos')
+      .select('meta_ventas, meta_conversion, mes, anio')
+      .eq('user_id', vendedorId)
+      .eq('mes', mes)
+      .eq('anio', anio)
+      .maybeSingle();
+
+    return res.status(200).json({ objetivo: data || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
