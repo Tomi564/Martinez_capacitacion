@@ -37,6 +37,14 @@ interface AtencionesData {
   stats: StatsAtenciones;
 }
 
+interface ProductoSugerencia {
+  id: string;
+  nombre: string;
+  marca: string;
+  precio: number | null;
+  stock: number;
+}
+
 const CANALES = [
   { id: 'whatsapp',     label: 'WhatsApp',      icono: '💬' },
   { id: 'mercadolibre', label: 'Mercado Libre',  icono: '🛒' },
@@ -46,7 +54,7 @@ const CANALES = [
 ];
 
 const RESULTADOS = [
-  { id: 'venta',     label: 'Venta cerrada',  icono: '✅', color: 'bg-green-50 border-green-200 text-green-700' },
+  { id: 'venta_cerrada', label: 'Venta cerrada',  icono: '✅', color: 'bg-green-50 border-green-200 text-green-700' },
   { id: 'no_venta',  label: 'Sin venta',      icono: '❌', color: 'bg-red-50 border-red-200 text-red-700' },
   { id: 'pendiente', label: 'Pendiente',      icono: '⏳', color: 'bg-amber-50 border-amber-200 text-amber-700' },
 ];
@@ -58,6 +66,7 @@ export default function AtencionesPage() {
   const [isGuardando, setIsGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [atencionDetalle, setAtencionDetalle] = useState<Atencion | null>(null);
 
   const [form, setForm] = useState({
     canal: '',
@@ -66,6 +75,9 @@ export default function AtencionesPage() {
     monto: '',
     observaciones: '',
   });
+
+  const [sugerencias, setSugerencias] = useState<ProductoSugerencia[]>([]);
+  const [buscandoProducto, setBuscandoProducto] = useState(false);
 
   const fetchAtenciones = async () => {
     try {
@@ -205,9 +217,10 @@ export default function AtencionesPage() {
               const canal = formatCanal(atencion.canal);
               const resultado = formatResultado(atencion.resultado);
               return (
-                <div
+                <button
                   key={atencion.id}
-                  className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-start gap-3"
+                  onClick={() => setAtencionDetalle(atencion)}
+                  className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-start gap-3 text-left w-full active:scale-[0.99] transition-transform"
                 >
                   <span className="text-xl shrink-0 mt-0.5">{canal.icono}</span>
                   <div className="flex-1 min-w-0">
@@ -239,7 +252,10 @@ export default function AtencionesPage() {
                       })}
                     </p>
                   </div>
-                </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-300 shrink-0 mt-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
               );
             })}
           </div>
@@ -256,6 +272,86 @@ export default function AtencionesPage() {
           </p>
         </div>
       )}
+
+      {/* Modal detalle de atención */}
+      {atencionDetalle && (() => {
+        const canal = formatCanal(atencionDetalle.canal);
+        const resultado = formatResultado(atencionDetalle.resultado);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900">Detalle de atención</h2>
+                <button
+                  onClick={() => setAtencionDetalle(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Canal</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {canal.icono} {canal.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Resultado</span>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full border ${resultado.color}`}>
+                    {resultado.icono} {resultado.label}
+                  </span>
+                </div>
+                {atencionDetalle.producto && (
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Producto</span>
+                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[60%]">
+                      {atencionDetalle.producto}
+                    </span>
+                  </div>
+                )}
+                {atencionDetalle.monto && (
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Monto</span>
+                    <span className="text-sm font-bold text-green-600">
+                      ${atencionDetalle.monto.toLocaleString('es-AR')}
+                    </span>
+                  </div>
+                )}
+                {atencionDetalle.observaciones && (
+                  <div className="flex flex-col gap-1 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Observaciones</span>
+                    <span className="text-sm text-gray-700">{atencionDetalle.observaciones}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-500">Fecha</span>
+                  <span className="text-sm text-gray-700">
+                    {new Date(atencionDetalle.created_at).toLocaleDateString('es-AR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setAtencionDetalle(null)}
+                className="w-full py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal de registro */}
       {showForm && (
@@ -323,22 +419,75 @@ export default function AtencionesPage() {
               </div>
             </div>
 
-            {/* Producto (opcional) */}
-            <div className="flex flex-col gap-1.5">
+            {/* Producto (opcional) con autocomplete */}
+            <div className="flex flex-col gap-1.5 relative">
               <label className="text-sm font-medium text-gray-700">
                 Producto <span className="text-gray-400 font-normal">(opcional)</span>
               </label>
-              <input
-                type="text"
-                value={form.producto}
-                onChange={(e) => setForm({ ...form, producto: e.target.value })}
-                placeholder="Ej: Pirelli P400 185/65 R15"
-                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={form.producto}
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setForm({ ...form, producto: val });
+                    if (val.length < 2) { setSugerencias([]); return; }
+                    setBuscandoProducto(true);
+                    try {
+                      const res = await apiClient.get<{ productos: ProductoSugerencia[] }>(
+                        `/productos?q=${encodeURIComponent(val)}`
+                      );
+                      setSugerencias(res.productos.slice(0, 6));
+                    } catch { setSugerencias([]); }
+                    finally { setBuscandoProducto(false); }
+                  }}
+                  onBlur={() => setTimeout(() => setSugerencias([]), 150)}
+                  placeholder="Ej: Dunlop, Pirelli…"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400 w-full"
+                />
+                {buscandoProducto && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+              {sugerencias.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden mt-1">
+                  {sugerencias.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onMouseDown={() => {
+                        setForm({
+                          ...form,
+                          producto: `${s.marca} ${s.nombre}`,
+                          monto: s.precio ? String(s.precio) : form.monto,
+                        });
+                        setSugerencias([]);
+                      }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between gap-3 border-b border-gray-100 last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {s.marca} {s.nombre}
+                        </p>
+                        {s.precio && (
+                          <p className="text-xs text-gray-400">${s.precio.toLocaleString('es-AR')}</p>
+                        )}
+                      </div>
+                      <span className={`text-xs shrink-0 font-medium px-2 py-0.5 rounded-full ${
+                        s.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {s.stock > 0 ? `Stock: ${s.stock}` : 'Sin stock'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Monto (opcional, solo si es venta) */}
-            {form.resultado === 'venta' && (
+            {form.resultado === 'venta_cerrada' && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-gray-700">
                   Monto <span className="text-gray-400 font-normal">(opcional)</span>

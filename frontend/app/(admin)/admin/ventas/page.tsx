@@ -25,15 +25,15 @@ interface Atencion {
 }
 
 const RESULTADO_LABEL: Record<string, string> = {
-  venta:          'Venta cerrada',
-  sin_venta:      'Sin venta',
-  en_seguimiento: 'Pendiente',
+  venta_cerrada:  'Venta cerrada',
+  no_venta:       'Sin venta',
+  pendiente:      'Pendiente',
 };
 
 const RESULTADO_STYLE: Record<string, string> = {
-  venta:          'bg-green-100 text-green-700',
-  sin_venta:      'bg-red-100 text-red-600',
-  en_seguimiento: 'bg-amber-100 text-amber-700',
+  venta_cerrada:  'bg-green-100 text-green-700',
+  no_venta:       'bg-red-100 text-red-600',
+  pendiente:      'bg-amber-100 text-amber-700',
 };
 
 const CANAL_LABEL: Record<string, string> = {
@@ -123,8 +123,8 @@ export default function VentasAdminPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Total registradas', value: filtradas.length, color: 'text-gray-900' },
-          { label: 'Ventas cerradas',   value: filtradas.filter(a => a.resultado === 'venta').length,          color: 'text-green-600' },
-          { label: 'Pendientes',        value: filtradas.filter(a => a.resultado === 'en_seguimiento').length,  color: 'text-amber-600' },
+          { label: 'Ventas cerradas',   value: filtradas.filter(a => a.resultado === 'venta_cerrada').length, color: 'text-green-600' },
+          { label: 'Pendientes',        value: filtradas.filter(a => a.resultado === 'pendiente').length,       color: 'text-amber-600' },
           {
             label: 'Monto total',
             value: totalMonto > 0
@@ -161,9 +161,9 @@ export default function VentasAdminPage() {
           className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 sm:w-52"
         >
           <option value="todos">Todos los resultados</option>
-          <option value="venta">Venta cerrada</option>
-          <option value="en_seguimiento">Pendiente</option>
-          <option value="sin_venta">Sin venta</option>
+          <option value="venta_cerrada">Venta cerrada</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="no_venta">Sin venta</option>
         </select>
       </div>
 

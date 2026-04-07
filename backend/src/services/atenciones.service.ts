@@ -47,15 +47,16 @@ export class AtencionesService {
 
     const atenciones = data || [];
 
-    const stats = {
-      total: atenciones.length,
-      ventas: atenciones.filter((a) => a.resultado === 'venta').length,
-      enSeguimiento: atenciones.filter((a) => a.resultado === 'en_seguimiento').length,
-      sinVenta: atenciones.filter((a) => a.resultado === 'sin_venta').length,
-      montoTotal: atenciones
-        .filter((a) => a.monto)
-        .reduce((acc, a) => acc + (a.monto || 0), 0),
-    };
+    const total = atenciones.length;
+    const ventas = atenciones.filter((a) => a.resultado === 'venta_cerrada').length;
+    const noVentas = atenciones.filter((a) => a.resultado === 'no_venta').length;
+    const pendientes = atenciones.filter((a) => a.resultado === 'pendiente').length;
+    const montoTotal = atenciones
+      .filter((a) => a.monto)
+      .reduce((acc, a) => acc + (a.monto || 0), 0);
+    const tasaConversion = total > 0 ? Math.round((ventas / total) * 100) : 0;
+
+    const stats = { total, ventas, noVentas, pendientes, montoTotal, tasaConversion };
 
     return { atenciones, stats };
   }
