@@ -28,7 +28,7 @@ export async function suscribirPush(): Promise<boolean> {
 
     const suscripcion = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
     });
 
     await enviarSuscripcion(suscripcion);
