@@ -52,6 +52,7 @@ export default function ModuloEditPage() {
   const [form, setForm] = useState({
     titulo: '',
     descripcion: '',
+    contenido: '',
     duracion_min: 30,
     video_url: '',
     pdf_url: '',
@@ -77,6 +78,7 @@ export default function ModuloEditPage() {
       setForm({
         titulo: res.modulo.titulo,
         descripcion: res.modulo.descripcion || '',
+        contenido: res.modulo.contenido || '',
         duracion_min: res.modulo.duracion_min,
         video_url: res.modulo.video_url || '',
         pdf_url: res.modulo.pdf_url || '',
@@ -102,6 +104,7 @@ export default function ModuloEditPage() {
       await apiClient.patch(`/admin/modulos/${moduloId}`, {
         titulo: form.titulo.trim(),
         descripcion: form.descripcion.trim(),
+        contenido: form.contenido.trim() || null,
         duracion_min: Number(form.duracion_min),
         video_url: form.video_url.trim() || null,
         pdf_url: form.pdf_url.trim() || null,
@@ -240,7 +243,7 @@ export default function ModuloEditPage() {
               type="text"
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
             />
           </div>
 
@@ -250,7 +253,21 @@ export default function ModuloEditPage() {
               value={form.descripcion}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               rows={3}
-              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
+              Material de estudio
+              <span className="text-gray-400 font-normal ml-1">(el vendedor lo lee antes del examen)</span>
+            </label>
+            <textarea
+              value={form.contenido}
+              onChange={(e) => setForm({ ...form, contenido: e.target.value })}
+              rows={12}
+              placeholder="Escribí aquí el contenido del módulo: conceptos clave, procedimientos, información importante para el examen..."
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y placeholder:text-gray-400"
             />
           </div>
 
@@ -265,7 +282,7 @@ export default function ModuloEditPage() {
               onChange={(e) =>
                 setForm({ ...form, duracion_min: Number(e.target.value) })
               }
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-32"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 w-32"
             />
           </div>
 
@@ -278,7 +295,7 @@ export default function ModuloEditPage() {
               value={form.video_url}
               onChange={(e) => setForm({ ...form, video_url: e.target.value })}
               placeholder="https://..."
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
             />
           </div>
 

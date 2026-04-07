@@ -158,6 +158,20 @@ export default function ModuloDetallePage() {
           )}
         </div>
 
+        {/* Material de estudio (contenido escrito) */}
+        {modulo.contenido && (
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 mb-3">
+              Material de estudio
+            </h2>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {modulo.contenido}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Material descargable */}
         {modulo.pdf_url && (
           <div>

@@ -39,6 +39,7 @@ export interface Modulo {
   id: string;
   titulo: string;
   descripcion: string;
+  contenido: string | null;
   orden: number;
   video_url: string | null;
   pdf_url: string | null;
