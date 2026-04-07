@@ -13,6 +13,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso } from '@/types';
 
@@ -164,10 +166,18 @@ export default function ModuloDetallePage() {
             <h2 className="text-lg font-bold text-gray-900 mb-3">
               Material de estudio
             </h2>
-            <div className="bg-white border border-gray-200 rounded-2xl p-4">
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 prose prose-sm max-w-none
+              prose-headings:font-bold prose-headings:text-gray-900
+              prose-p:text-gray-700 prose-p:leading-relaxed
+              prose-strong:text-gray-900
+              prose-table:text-sm prose-table:w-full
+              prose-th:bg-gray-100 prose-th:text-gray-800 prose-th:font-semibold prose-th:px-3 prose-th:py-2 prose-th:text-left
+              prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-gray-100 prose-td:text-gray-700
+              prose-ul:text-gray-700 prose-li:text-gray-700
+            ">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {modulo.contenido}
-              </p>
+              </ReactMarkdown>
             </div>
           </div>
         )}
