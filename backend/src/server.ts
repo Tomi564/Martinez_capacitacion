@@ -44,7 +44,20 @@ app.use(helmet());
 // ─────────────────────────────────────────────────────
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin: (origin, callback) => {
+      // Permite requests sin origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      const allowed = process.env.FRONTEND_URL || '';
+      // Acepta el dominio exacto o cualquier preview de Vercel del mismo proyecto
+      if (
+        origin === allowed ||
+        origin === 'http://localhost:3000' ||
+        /^https:\/\/martinez-capac[^.]*\.vercel\.app$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS: origen no permitido: ${origin}`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
