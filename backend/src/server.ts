@@ -18,6 +18,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import cron from 'node-cron';
 
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
@@ -31,6 +32,11 @@ import comunicadosRoutes from './routes/comunicados.routes';
 import rankingRoutes from './routes/ranking.routes';
 import objetivosRoutes from './routes/objetivos.routes';
 import pushRoutes from './routes/push.routes';
+import {
+  recordatorioModuloInactivo,
+  recordatorioObjetivoMitadMes,
+  recordatorioCierreRanking,
+} from './services/recordatorios.service';
 const app = express();
 
 // ─────────────────────────────────────────────────────
@@ -130,6 +136,28 @@ app.listen(PORT, () => {
   console.log(`✅ Backend corriendo en http://localhost:${PORT}`);
   console.log(`   Entorno: ${process.env.NODE_ENV}`);
   console.log(`   Frontend permitido: ${process.env.FRONTEND_URL}`);
+
+  // ─────────────────────────────────────────────────────
+  // Cron jobs — recordatorios automáticos
+  // Timezone: America/Argentina/Salta (UTC-3, sin DST)
+  // ─────────────────────────────────────────────────────
+
+  // Diario a las 10:00 — módulos sin avanzar hace 3+ días
+  cron.schedule('0 10 * * *', () => {
+    recordatorioModuloInactivo().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  // Día 15 de cada mes a las 9:00 — objetivo mensual por debajo del 40%
+  cron.schedule('0 9 15 * *', () => {
+    recordatorioObjetivoMitadMes().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  // Viernes a las 17:00 — cierre de ranking mañana (sábado)
+  cron.schedule('0 17 * * 5', () => {
+    recordatorioCierreRanking().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  console.log('   ⏰ Cron jobs activos: módulos, objetivos, ranking');
 });
 
 export default app;
