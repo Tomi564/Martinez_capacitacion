@@ -493,4 +493,68 @@ router.get('/vendedores/:id/objetivo', async (req, res, next) => {
   }
 });
 
+// ─────────────────────────────────────────────────────
+// Sugerencias al desarrollador
+// ─────────────────────────────────────────────────────
+
+// GET /api/admin/sugerencias
+router.get('/sugerencias', async (_req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('sugerencias_dev')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error('Error al obtener sugerencias');
+    return res.status(200).json({ sugerencias: data || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/sugerencias
+router.post('/sugerencias', async (req, res, next) => {
+  try {
+    const { texto } = req.body;
+    if (!texto?.trim()) {
+      return res.status(400).json({ error: 'El texto es requerido' });
+    }
+    const { data, error } = await supabase
+      .from('sugerencias_dev')
+      .insert({ texto: texto.trim(), estado: 'pendiente' })
+      .select()
+      .single();
+    if (error) throw new Error('Error al guardar sugerencia');
+    return res.status(201).json({ sugerencia: data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/sugerencias/:id
+router.patch('/sugerencias/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+    const estadosValidos = ['pendiente', 'visto', 'en_progreso', 'listo'];
+    if (!estadosValidos.includes(estado)) {
+      return res.status(400).json({ error: 'Estado inválido' });
+    }
+    await supabase.from('sugerencias_dev').update({ estado }).eq('id', id);
+    return res.status(200).json({ mensaje: 'Estado actualizado' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/sugerencias/:id
+router.delete('/sugerencias/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await supabase.from('sugerencias_dev').delete().eq('id', id);
+    return res.status(200).json({ mensaje: 'Sugerencia eliminada' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
