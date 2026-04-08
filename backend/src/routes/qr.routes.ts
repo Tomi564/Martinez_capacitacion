@@ -7,7 +7,7 @@
 
 import { Router } from 'express';
 import { qrController } from '../controllers/qr.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -44,6 +44,14 @@ router.get(
   '/mis-calificaciones',
   authMiddleware,
   qrController.getMisCalificaciones.bind(qrController)
+);
+
+// GET /api/qr/participantes — solo admin
+router.get(
+  '/participantes',
+  authMiddleware,
+  requireRole('admin'),
+  qrController.getParticipantes.bind(qrController)
 );
 
 export default router;

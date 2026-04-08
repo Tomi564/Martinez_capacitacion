@@ -43,7 +43,7 @@ export class QRController {
   async calificar(req: Request, res: Response, next: NextFunction) {
     try {
       const codigo = req.params.codigo as string;
-      const { estrellas, comentario } = req.body;
+      const { estrellas, comentario, nombre, apellido, dni, contacto } = req.body;
 
       if (!estrellas) {
         return res.status(400).json({
@@ -57,11 +57,16 @@ export class QRController {
         req.socket.remoteAddress ||
         'unknown';
 
+      const participante = (nombre && apellido && dni && contacto)
+        ? { nombre, apellido, dni, contacto }
+        : undefined;
+
       const result = await qrService.guardarCalificacion(
         codigo,
         Number(estrellas),
         comentario || null,
-        ipCliente
+        ipCliente,
+        participante
       );
 
       return res.status(201).json(result);
@@ -83,6 +88,23 @@ export class QRController {
       const userId = req.user!.id;
       const result = await qrService.getMisCalificaciones(userId);
       return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/qr/participantes
+   * Lista de participantes del sorteo — solo admin
+   */
+  async getParticipantes(
+    _req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const result = await qrService.getParticipantesSorteo();
+      return res.status(200).json({ participantes: result });
     } catch (error) {
       next(error);
     }

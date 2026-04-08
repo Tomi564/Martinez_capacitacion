@@ -93,7 +93,8 @@ export class QRService {
     codigo: string,
     estrellas: number,
     comentario: string | null,
-    ipCliente: string
+    ipCliente: string,
+    participante?: { nombre: string; apellido: string; dni: string; contacto: string }
   ) {
     // Validar estrellas
     if (estrellas < 1 || estrellas > 5) {
@@ -143,7 +144,31 @@ export class QRService {
       throw new AppError('Error al guardar la calificación', 500);
     }
 
+    // Guardar datos del participante para el sorteo (si los proporcionó)
+    if (participante?.nombre && participante?.apellido && participante?.dni && participante?.contacto) {
+      await supabase.from('participantes_sorteo').insert({
+        nombre: participante.nombre.trim(),
+        apellido: participante.apellido.trim(),
+        dni: participante.dni.trim(),
+        contacto: participante.contacto.trim(),
+        vendedor_id: qr.user_id,
+      });
+    }
+
     return { mensaje: '¡Gracias por tu calificación!' };
+  }
+
+  async getParticipantesSorteo() {
+    const { data, error } = await supabase
+      .from('participantes_sorteo')
+      .select(`
+        id, nombre, apellido, dni, contacto, created_at,
+        vendedor:users!vendedor_id(nombre, apellido)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new AppError('Error al obtener participantes', 500);
+    return data || [];
   }
 
   /**

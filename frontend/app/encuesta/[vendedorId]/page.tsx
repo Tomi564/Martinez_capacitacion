@@ -35,6 +35,10 @@ export default function EncuestaPage() {
   const [estrellas, setEstrellas] = useState<number>(0);
   const [estrellasHover, setEstrellasHover] = useState<number>(0);
   const [comentario, setComentario] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
+  const [dni, setDni] = useState('');
+  const [contacto, setContacto] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,6 +66,10 @@ export default function EncuestaPage() {
       await apiClient.post(`/qr/calificar/${codigo}`, {
         estrellas,
         comentario: comentario.trim() || null,
+        nombre: nombre.trim() || undefined,
+        apellido: apellido.trim() || undefined,
+        dni: dni.trim() || undefined,
+        contacto: contacto.trim() || undefined,
       });
       setEstado('gracias');
     } catch {
@@ -265,6 +273,63 @@ export default function EncuestaPage() {
             </p>
           </div>
 
+          {/* Datos para el sorteo */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl">🎁</span>
+              <p className="text-sm font-bold text-gray-900">
+                Completá tus datos para participar del sorteo mensual
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600">Nombre</label>
+                <input
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Juan"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600">Apellido</label>
+                <input
+                  type="text"
+                  value={apellido}
+                  onChange={(e) => setApellido(e.target.value)}
+                  placeholder="García"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600">DNI</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={dni}
+                onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
+                placeholder="12345678"
+                maxLength={8}
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600">Teléfono o email</label>
+              <input
+                type="text"
+                value={contacto}
+                onChange={(e) => setContacto(e.target.value)}
+                placeholder="3874123456 / juan@gmail.com"
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
+            <p className="text-xs text-gray-400">
+              Opcional — solo se usa para contactarte si ganás
+            </p>
+          </div>
+
           {/* Botón enviar */}
           <button
             onClick={handleSubmit}
@@ -281,24 +346,8 @@ export default function EncuestaPage() {
             )}
           </button>
 
-          {/* Incentivo al cliente */}
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl shrink-0">🎁</span>
-              <div>
-                <p className="text-sm font-bold text-amber-800">
-                  ¡Tu opinión tiene premio!
-                </p>
-                <p className="text-xs text-amber-700 mt-0.5">
-                  Al calificar entrás al sorteo mensual de un descuento especial
-                  en tu próxima compra en Martínez Neumáticos.
-                </p>
-              </div>
-            </div>
-          </div>
-
           <p className="text-xs text-center text-gray-400">
-            Tu opinión es anónima y ayuda a mejorar el servicio
+            Tus datos son confidenciales y no serán compartidos
           </p>
 
         </div>
