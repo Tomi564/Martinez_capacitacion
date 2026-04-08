@@ -18,10 +18,10 @@ import { VendedoresInactivos } from '@/components/admin/VendedoresInactivos';
 interface RankingEntry {
   id: string;
   nombre: string;
-  modulosAprobados: number;
-  totalModulos: number;
+  totalVentas: number;
+  totalAtenciones: number;
+  montoTotal: number;
   tasaConversion: number;
-  promedioQR: number;
 }
 
 interface VendedorResumen {
@@ -54,10 +54,10 @@ export default function AdminDashboardPage() {
       try {
         const [dashRes, rankRes] = await Promise.all([
           apiClient.get<DashboardAdminData>('/admin/dashboard'),
-          apiClient.get<{ ranking: RankingEntry[] }>('/ranking'),
+          apiClient.get<{ stats: RankingEntry[] }>('/ranking/historico'),
         ]);
         setData(dashRes);
-        setRanking(rankRes.ranking.slice(0, 5));
+        setRanking(rankRes.stats.slice(0, 5));
       } catch (err) {
         setError('Error al cargar el dashboard');
         console.error(err);
@@ -301,9 +301,8 @@ export default function AdminDashboardPage() {
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
             {ranking.map((entry, i) => {
               const MEDALLAS = ['🥇', '🥈', '🥉'];
-              const pct = entry.totalModulos > 0
-                ? Math.round((entry.modulosAprobados / entry.totalModulos) * 100)
-                : 0;
+              const maxVentas = ranking[0]?.totalVentas || 1;
+              const pct = Math.round((entry.totalVentas / maxVentas) * 100);
               return (
                 <div key={entry.id} className={`px-4 py-3 flex items-center gap-3 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <span className="text-lg w-7 text-center shrink-0">
@@ -315,15 +314,15 @@ export default function AdminDashboardPage() {
                       <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div className="h-full bg-gray-900 rounded-full" style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-xs text-gray-400 shrink-0">{pct}%</span>
+                      <span className="text-xs text-gray-400 shrink-0">{entry.totalVentas} ventas</span>
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
                     {entry.tasaConversion > 0 && (
                       <p className="text-xs text-gray-500">{entry.tasaConversion}% conv.</p>
                     )}
-                    {entry.promedioQR > 0 && (
-                      <p className="text-xs text-amber-500">★ {entry.promedioQR}</p>
+                    {entry.montoTotal > 0 && (
+                      <p className="text-xs text-green-600">${entry.montoTotal.toLocaleString('es-AR')}</p>
                     )}
                   </div>
                 </div>
