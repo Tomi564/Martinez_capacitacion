@@ -557,4 +557,108 @@ router.delete('/sugerencias/:id', async (req, res, next) => {
   }
 });
 
+// ─────────────────────────────────────────────────────
+// Estadísticas para gráficos
+// GET /api/admin/estadisticas
+// ─────────────────────────────────────────────────────
+router.get('/estadisticas', async (_req, res, next) => {
+  try {
+    const [
+      { data: atenciones },
+      { data: vendedores },
+      { data: progresos },
+      { data: modulos },
+    ] = await Promise.all([
+      supabase.from('atenciones').select('user_id, resultado, monto, created_at'),
+      supabase.from('users').select('id, nombre, apellido').eq('rol', 'vendedor').eq('activo', true),
+      supabase.from('progreso').select('user_id, modulo_id, estado, mejor_nota'),
+      supabase.from('modulos').select('id, titulo, orden').eq('activo', true).order('orden'),
+    ]);
+
+    const todasAtenciones = atenciones || [];
+    const todosVendedores = vendedores || [];
+
+    // ── 1. Ventas por semana (últimas 8 semanas) ──
+    const ventasPorSemana: { semana: string; ventas: number; monto: number }[] = [];
+    for (let i = 7; i >= 0; i--) {
+      const lunes = new Date();
+      lunes.setDate(lunes.getDate() - lunes.getDay() + 1 - i * 7);
+      lunes.setHours(0, 0, 0, 0);
+      const sabado = new Date(lunes);
+      sabado.setDate(lunes.getDate() + 6);
+      sabado.setHours(23, 59, 59, 999);
+
+      const ventasSemana = todasAtenciones.filter((a) => {
+        const fecha = new Date(a.created_at);
+        return a.resultado === 'venta_cerrada' && fecha >= lunes && fecha <= sabado;
+      });
+
+      const label = `${lunes.getDate()}/${lunes.getMonth() + 1}`;
+      ventasPorSemana.push({
+        semana: label,
+        ventas: ventasSemana.length,
+        monto: ventasSemana.reduce((acc, a) => acc + (a.monto || 0), 0),
+      });
+    }
+
+    // ── 2. Módulos: aprobados vs reprobados ──
+    const moduloStats = (modulos || []).map((m) => {
+      const progresosModulo = (progresos || []).filter((p) => p.modulo_id === m.id);
+      const aprobados = progresosModulo.filter((p) => p.estado === 'aprobado').length;
+      const reprobados = progresosModulo.filter(
+        (p) => p.estado !== 'aprobado' && p.mejor_nota !== null && (p.mejor_nota || 0) > 0
+      ).length;
+      return {
+        modulo: `M${m.orden}`,
+        titulo: m.titulo,
+        aprobados,
+        reprobados,
+      };
+    });
+
+    // ── 3. Tasa de conversión por vendedor ──
+    const conversionPorVendedor = todosVendedores.map((v) => {
+      const atenc = todasAtenciones.filter((a) => a.user_id === v.id);
+      const ventas = atenc.filter((a) => a.resultado === 'venta_cerrada').length;
+      const tasa = atenc.length > 0 ? Math.round((ventas / atenc.length) * 100) : 0;
+      return {
+        nombre: v.nombre,
+        tasa,
+        ventas,
+        total: atenc.length,
+      };
+    }).sort((a, b) => b.tasa - a.tasa);
+
+    // ── 4. Monto acumulado por mes (últimos 6 meses) ──
+    const montoPorMes: { mes: string; monto: number; ventas: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const fecha = new Date();
+      fecha.setMonth(fecha.getMonth() - i);
+      const mes = fecha.getMonth();
+      const anio = fecha.getFullYear();
+
+      const ventasMes = todasAtenciones.filter((a) => {
+        const d = new Date(a.created_at);
+        return a.resultado === 'venta_cerrada' && d.getMonth() === mes && d.getFullYear() === anio;
+      });
+
+      const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      montoPorMes.push({
+        mes: MESES[mes],
+        monto: ventasMes.reduce((acc, a) => acc + (a.monto || 0), 0),
+        ventas: ventasMes.length,
+      });
+    }
+
+    return res.status(200).json({
+      ventasPorSemana,
+      moduloStats,
+      conversionPorVendedor,
+      montoPorMes,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
