@@ -85,9 +85,6 @@ export default function RankingPage() {
             <p className="font-bold truncate">{miEntry.nombre}</p>
             <div className="flex gap-3 mt-1 text-xs text-gray-300">
               <span>🛒 {miEntry.cantidadVentas} {miEntry.cantidadVentas === 1 ? 'venta' : 'ventas'}</span>
-              {miEntry.montoTotal > 0 && (
-                <span>💰 ${miEntry.montoTotal.toLocaleString('es-AR')}</span>
-              )}
             </div>
           </div>
         </div>
@@ -133,7 +130,7 @@ export default function RankingPage() {
                 <p className={`text-xs mt-1 ${esMio ? 'text-gray-400' : 'text-gray-500'}`}>
                   {entry.cantidadVentas === 0
                     ? 'Sin ventas aún'
-                    : `${entry.cantidadVentas} ${entry.cantidadVentas === 1 ? 'venta' : 'ventas'}${entry.montoTotal > 0 ? ` · $${entry.montoTotal.toLocaleString('es-AR')}` : ''}`
+                    : `${entry.cantidadVentas} ${entry.cantidadVentas === 1 ? 'venta' : 'ventas'}`
                   }
                 </p>
               </div>

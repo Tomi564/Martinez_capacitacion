@@ -86,7 +86,7 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 // ─────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'production' ? 100 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas peticiones. Intentá de nuevo en 15 minutos.' },

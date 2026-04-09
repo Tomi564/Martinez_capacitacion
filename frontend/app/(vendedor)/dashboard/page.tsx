@@ -150,23 +150,46 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Card de objetivo del mes */}
-      {objetivo && progresoObjetivo && (objetivo.meta_ventas > 0 || objetivo.meta_conversion > 0) && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Objetivo del mes</p>
-          <div className="flex flex-col gap-3">
+      {/* Nivel actual */}
+      {data?.nivel && (
+        <NivelBadge info={data.nivel} size="md" />
+      )}
+
+      {/* Tarjeta de progreso unificada */}
+      <div className="bg-gray-900 text-white rounded-2xl p-5 flex flex-col gap-4">
+        {/* Módulos */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-gray-400">Capacitación</p>
+            <p className="text-sm font-bold">
+              {resumen?.aprobados} / {resumen?.total} módulos
+            </p>
+          </div>
+          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white rounded-full transition-all duration-500"
+              style={{ width: `${porcentaje}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">{porcentaje}% completado</p>
+        </div>
+
+        {/* Objetivo del mes — integrado si existe */}
+        {objetivo && progresoObjetivo && (objetivo.meta_ventas > 0 || objetivo.meta_conversion > 0) && (
+          <div className="border-t border-gray-700 pt-4 flex flex-col gap-3">
+            <p className="text-sm text-gray-400">Objetivo del mes</p>
             {objetivo.meta_ventas > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-700">Ventas cerradas</span>
-                  <span className="text-sm font-bold text-gray-900">
+                  <span className="text-xs text-gray-300">Ventas cerradas</span>
+                  <span className="text-xs font-bold text-white">
                     {progresoObjetivo.ventas} / {objetivo.meta_ventas}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      progresoObjetivo.ventas >= objetivo.meta_ventas ? 'bg-green-500' : 'bg-gray-900'
+                      progresoObjetivo.ventas >= objetivo.meta_ventas ? 'bg-green-400' : 'bg-white'
                     }`}
                     style={{ width: `${Math.min(100, Math.round((progresoObjetivo.ventas / objetivo.meta_ventas) * 100))}%` }}
                   />
@@ -176,15 +199,15 @@ export default function DashboardPage() {
             {objetivo.meta_conversion > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-700">Tasa de conversión</span>
-                  <span className="text-sm font-bold text-gray-900">
+                  <span className="text-xs text-gray-300">Tasa de conversión</span>
+                  <span className="text-xs font-bold text-white">
                     {progresoObjetivo.tasaConversion}% / {objetivo.meta_conversion}%
                   </span>
                 </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      progresoObjetivo.tasaConversion >= objetivo.meta_conversion ? 'bg-green-500' : 'bg-gray-900'
+                      progresoObjetivo.tasaConversion >= objetivo.meta_conversion ? 'bg-green-400' : 'bg-white'
                     }`}
                     style={{ width: `${Math.min(100, Math.round((progresoObjetivo.tasaConversion / objetivo.meta_conversion) * 100))}%` }}
                   />
@@ -192,46 +215,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Nivel actual */}
-      {data?.nivel && (
-        <NivelBadge info={data.nivel} size="md" />
-      )}
-
-      {/* Tarjeta de progreso general */}
-      <div className="bg-gray-900 text-white rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm text-gray-400">Tu progreso</p>
-            <p className="text-3xl font-bold mt-0.5">{porcentaje}%</p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold">{resumen?.aprobados}</p>
-            <p className="text-sm text-gray-400">
-              de {resumen?.total} módulos
-            </p>
-          </div>
-        </div>
-
-        {/* Barra de progreso */}
-        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-white rounded-full transition-all duration-500"
-            style={{ width: `${porcentaje}%` }}
-          />
-        </div>
-
-        {/* Estado de módulos */}
-        <div className="flex gap-4 mt-4 text-xs">
-          <span className="text-green-400">
-            ✓ {resumen?.aprobados} aprobados
-          </span>
-          <span className="text-gray-400">
-            ○ {(resumen?.total ?? 0) - (resumen?.aprobados ?? 0)} restantes
-          </span>
-        </div>
+        )}
       </div>
 
       {/* Módulo actual — acción principal */}

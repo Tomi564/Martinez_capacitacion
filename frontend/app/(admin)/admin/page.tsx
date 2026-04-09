@@ -140,27 +140,19 @@ export default function AdminDashboardPage() {
 
       {/* Accesos rápidos */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <Link href="/admin/vendedores">
-          <div className="bg-gray-900 text-white rounded-2xl p-4 active:scale-95 transition-transform">
-            <span className="text-2xl">👥</span>
-            <p className="font-semibold mt-2 text-sm">Gestionar vendedores</p>
-            <p className="text-xs text-gray-400 mt-0.5">Crear, editar, desactivar</p>
-          </div>
-        </Link>
-        <Link href="/admin/modulos">
-          <div className="bg-gray-900 text-white rounded-2xl p-4 active:scale-95 transition-transform">
-            <span className="text-2xl">📚</span>
-            <p className="font-semibold mt-2 text-sm">Gestionar módulos</p>
-            <p className="text-xs text-gray-400 mt-0.5">Contenido y preguntas</p>
-          </div>
-        </Link>
-        <Link href="/admin/reportes">
-          <div className="bg-gray-900 text-white rounded-2xl p-4 active:scale-95 transition-transform">
-            <span className="text-2xl">📊</span>
-            <p className="font-semibold mt-2 text-sm">Ver reportes</p>
-            <p className="text-xs text-gray-400 mt-0.5">Exportar datos</p>
-          </div>
-        </Link>
+        {[
+          { href: '/admin/vendedores', emoji: '👥', label: 'Vendedores', sub: 'Crear, editar, desactivar' },
+          { href: '/admin/modulos',    emoji: '📚', label: 'Módulos',    sub: 'Contenido y preguntas' },
+          { href: '/admin/reportes',   emoji: '📊', label: 'Reportes',   sub: 'Progreso y calificaciones' },
+        ].map((item) => (
+          <Link key={item.href} href={item.href} className="h-full">
+            <div className="bg-gray-900 text-white rounded-2xl p-4 h-full active:scale-95 transition-transform flex flex-col">
+              <span className="text-2xl">{item.emoji}</span>
+              <p className="font-semibold mt-2 text-sm">{item.label}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{item.sub}</p>
+            </div>
+          </Link>
+        ))}
       </div>
 
       {/* Tabla de progreso de vendedores */}

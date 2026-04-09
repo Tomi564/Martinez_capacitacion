@@ -161,9 +161,9 @@ export default function ReportesPage() {
       {/* Encabezado */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Analíticas</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Exportá los datos en formato CSV
+            Intentos, promedios y calificaciones del equipo
           </p>
         </div>
         <button
@@ -191,7 +191,7 @@ export default function ReportesPage() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {tab === 'progreso' ? 'Progreso' : 'Calificaciones'}
+            {tab === 'progreso' ? 'Capacitación' : 'Calificaciones QR'}
           </button>
         ))}
       </div>
@@ -205,17 +205,22 @@ export default function ReportesPage() {
               <div key={row.email} className="px-4 py-3 flex flex-col gap-1">
                 <p className="font-semibold text-gray-900 text-sm">{row.vendedor}</p>
                 <p className="text-xs text-gray-400">{row.email}</p>
-                <div className="flex gap-4 mt-1">
+                <div className="flex gap-4 mt-1 flex-wrap">
                   <span className="text-xs text-gray-500">
-                    Módulos: <strong>{row.modulosAprobados}/{row.totalModulos}</strong>
+                    Módulos: <strong className="text-gray-900">{row.modulosAprobados}/{row.totalModulos}</strong>
                   </span>
                   <span className="text-xs text-gray-500">
-                    Progreso: <strong>{row.porcentaje}%</strong>
+                    Promedio: <strong className="text-gray-900">{row.promedioNotas > 0 ? `${row.promedioNotas.toFixed(1)}%` : '—'}</strong>
                   </span>
                   <span className="text-xs text-gray-500">
-                    Intentos: <strong>{row.totalIntentos}</strong>
+                    Intentos: <strong className="text-gray-900">{row.totalIntentos}</strong>
                   </span>
                 </div>
+                {row.fechaUltimaActividad && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Última actividad: {new Date(row.fechaUltimaActividad).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -227,8 +232,7 @@ export default function ReportesPage() {
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Módulos</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Progreso</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio examen</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Intentos</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Última actividad</th>
                 </tr>
@@ -240,17 +244,20 @@ export default function ReportesPage() {
                       <p className="font-semibold text-gray-900">{row.vendedor}</p>
                       <p className="text-xs text-gray-400">{row.email}</p>
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.modulosAprobados}/{row.totalModulos}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 justify-center">
-                        <div className="w-16 h-1.5 bg-gray-100 rounded-full">
-                          <div className="h-full bg-gray-900 rounded-full" style={{ width: `${row.porcentaje}%` }}/>
-                        </div>
-                        <span className="text-xs font-semibold text-gray-700">{row.porcentaje}%</span>
-                      </div>
+                    <td className="px-4 py-3 text-center text-gray-700">
+                      <span className="font-semibold">{row.modulosAprobados}/{row.totalModulos}</span>
+                      <span className="text-gray-400 text-xs ml-1">({row.porcentaje}%)</span>
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.promedioNotas > 0 ? `${row.promedioNotas.toFixed(1)}%` : '—'}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.totalIntentos}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${row.promedioNotas >= 70 ? 'text-green-700' : row.promedioNotas > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
+                        {row.promedioNotas > 0 ? `${row.promedioNotas.toFixed(1)}%` : '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${row.totalIntentos > row.totalModulos ? 'text-amber-700' : 'text-gray-900'}`}>
+                        {row.totalIntentos}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-center text-gray-400 text-xs">
                       {row.fechaUltimaActividad ? new Date(row.fechaUltimaActividad).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                     </td>
