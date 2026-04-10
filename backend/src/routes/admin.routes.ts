@@ -8,6 +8,11 @@ import { Router } from 'express';
 import { adminController } from '../controllers/admin.controller';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 import { supabase } from '../config/database';
+import { Resend } from 'resend';
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 const router = Router();
 
@@ -524,6 +529,17 @@ router.post('/sugerencias', async (req, res, next) => {
       .select()
       .single();
     if (error) throw new Error('Error al guardar sugerencia');
+
+    // Notificar al dev por email (fire-and-forget)
+    if (resend && process.env.DEV_EMAIL) {
+      resend.emails.send({
+        from: 'Martinez App <onboarding@resend.dev>',
+        to: process.env.DEV_EMAIL,
+        subject: '💡 Nueva sugerencia del cliente',
+        html: `<p style="font-family:sans-serif"><strong>Nueva sugerencia:</strong></p><blockquote style="border-left:3px solid #888;padding-left:12px;color:#444">${texto.trim()}</blockquote><p style="color:#888;font-size:12px">Podés cambiar el estado desde el panel de admin.</p>`,
+      }).catch(() => {});
+    }
+
     return res.status(201).json({ sugerencia: data });
   } catch (error) {
     next(error);
