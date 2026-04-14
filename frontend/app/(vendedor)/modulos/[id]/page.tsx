@@ -235,7 +235,7 @@ export default function ModuloDetallePage() {
               </p>
             )}
             <Link href={`/modulos/${modulo.id}/examen`}>
-              <button className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl text-base active:scale-95 transition-transform">
+              <button className="w-full py-4 bg-[#C8102E] text-white font-bold rounded-2xl text-base active:scale-95 transition-transform">
                 {modulo.intentos === 0 ? 'Rendir examen' : 'Volver a rendir'} →
               </button>
             </Link>

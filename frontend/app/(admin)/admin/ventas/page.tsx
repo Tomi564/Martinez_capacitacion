@@ -146,7 +146,7 @@ export default function VentasAdminPage() {
         <select
           value={filtroVendedor}
           onChange={e => setFiltroVendedor(e.target.value)}
-          className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 flex-1"
+          className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] flex-1"
         >
           <option value="todos">Todos los vendedores</option>
           {vendedores.map(v => (
@@ -158,7 +158,7 @@ export default function VentasAdminPage() {
         <select
           value={filtroResultado}
           onChange={e => setFiltroResultado(e.target.value)}
-          className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 sm:w-52"
+          className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] sm:w-52"
         >
           <option value="todos">Todos los resultados</option>
           <option value="venta_cerrada">Venta cerrada</option>

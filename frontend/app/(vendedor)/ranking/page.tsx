@@ -76,7 +76,7 @@ export default function RankingPage() {
 
       {/* Mi posición destacada */}
       {miEntry && (
-        <div className="bg-gray-900 text-white rounded-2xl p-4 flex items-center gap-4">
+        <div className="bg-[#C8102E] text-white rounded-2xl p-4 flex items-center gap-4">
           <div className="text-3xl font-black w-12 text-center shrink-0">
             {miPosicion < 3 ? MEDALLAS[miPosicion] : `#${miPosicion + 1}`}
           </div>
@@ -101,7 +101,7 @@ export default function RankingPage() {
               key={entry.id}
               className={`rounded-2xl p-4 flex items-center gap-3 ${
                 esMio
-                  ? 'bg-gray-900 text-white border-2 border-gray-700'
+                  ? 'bg-[#C8102E] text-white border-2 border-gray-700'
                   : 'bg-white border border-gray-200'
               }`}
             >

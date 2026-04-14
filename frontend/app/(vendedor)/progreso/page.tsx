@@ -86,7 +86,7 @@ export default function ProgresoPage() {
       </div>
 
       {/* Tarjeta principal de progreso */}
-      <div className="bg-gray-900 text-white rounded-2xl p-5">
+      <div className="bg-[#C8102E] text-white rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm text-gray-400">Completado</p>

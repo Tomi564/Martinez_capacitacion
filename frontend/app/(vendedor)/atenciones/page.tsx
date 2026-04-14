@@ -154,7 +154,7 @@ export default function AtencionesPage() {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
@@ -175,7 +175,7 @@ export default function AtencionesPage() {
       {data && (
         <div className="flex flex-col gap-3">
           {/* Tasa de conversión destacada */}
-          <div className="bg-gray-900 text-white rounded-2xl p-5">
+          <div className="bg-[#C8102E] text-white rounded-2xl p-5">
             <p className="text-sm text-gray-400 mb-1">Tasa de conversión</p>
             <p className="text-4xl font-black">{data.stats.tasaConversion}%</p>
             <div className="w-full h-2 bg-gray-700 rounded-full mt-3 overflow-hidden">
@@ -347,7 +347,7 @@ export default function AtencionesPage() {
 
               <button
                 onClick={() => setAtencionDetalle(null)}
-                className="w-full py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm"
+                className="w-full py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm"
               >
                 Cerrar
               </button>
@@ -390,7 +390,7 @@ export default function AtencionesPage() {
                     onClick={() => setForm({ ...form, resultado: resultado.id })}
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-medium ${
                       form.resultado === resultado.id
-                        ? 'border-gray-900 bg-gray-900 text-white'
+                        ? 'border-gray-900 bg-[#C8102E] text-white'
                         : 'border-gray-200 text-gray-600'
                     }`}
                   >
@@ -411,7 +411,7 @@ export default function AtencionesPage() {
                     onClick={() => setForm({ ...form, canal: canal.id })}
                     className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border-2 transition-all text-xs font-medium ${
                       form.canal === canal.id
-                        ? 'border-gray-900 bg-gray-900 text-white'
+                        ? 'border-gray-900 bg-[#C8102E] text-white'
                         : 'border-gray-200 text-gray-600'
                     }`}
                   >
@@ -448,7 +448,7 @@ export default function AtencionesPage() {
                     }}
                     onBlur={() => setTimeout(() => setSugerencias([]), 150)}
                     placeholder="Buscar por marca o medida…"
-                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400 w-full"
+                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
                   />
                   {buscandoProducto && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -506,7 +506,7 @@ export default function AtencionesPage() {
                     value={form.monto}
                     onChange={(e) => setForm({ ...form, monto: e.target.value })}
                     placeholder="85000"
-                    className="h-11 pl-7 pr-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 w-full placeholder:text-gray-400"
+                    className="h-11 pl-7 pr-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] w-full placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -530,7 +530,7 @@ export default function AtencionesPage() {
                 onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
                 placeholder="Ej: Cliente vuelve la semana que viene por otro modelo…"
                 rows={2}
-                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none placeholder:text-gray-400"
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none placeholder:text-gray-400"
               />
             )}
 
@@ -544,7 +544,7 @@ export default function AtencionesPage() {
               <button
                 onClick={handleGuardar}
                 disabled={isGuardando || !form.canal || !form.resultado}
-                className="flex-1 py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isGuardando ? (
                   <>

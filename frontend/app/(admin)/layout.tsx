@@ -209,17 +209,21 @@ export default function AdminLayout({
     <div className="min-h-screen bg-gray-50 flex">
 
       {/* Sidebar — visible en desktop */}
-      <aside className="hidden lg:flex flex-col w-64 bg-gray-900 text-white fixed inset-y-0 left-0 z-20">
+      <aside className="hidden lg:flex flex-col w-64 bg-[#C8102E] text-white fixed inset-y-0 left-0 z-20">
 
         {/* Logo */}
-        <div className="px-6 py-5 border-b border-gray-700">
+        <div className="px-6 py-5 border-b border-[#A30D25]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-sm">🔧</span>
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow">
+              <svg viewBox="0 0 32 32" className="w-5 h-5" fill="none">
+                <circle cx="16" cy="16" r="13" fill="#C8102E"/>
+                <circle cx="16" cy="16" r="5" fill="white"/>
+                <circle cx="16" cy="16" r="2" fill="#C8102E"/>
+              </svg>
             </div>
             <div>
-              <p className="text-sm font-bold">Martínez</p>
-              <p className="text-xs text-gray-400">Panel Admin</p>
+              <p className="text-sm font-extrabold tracking-tight">Martínez</p>
+              <p className="text-xs text-red-200">Panel Admin</p>
             </div>
           </div>
         </div>
@@ -232,8 +236,8 @@ export default function AdminLayout({
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 isActive(item)
-                  ? 'bg-white text-gray-900'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? 'bg-white text-[#C8102E] font-bold'
+                  : 'text-red-100 hover:text-white hover:bg-[#A30D25]'
               }`}
             >
               {item.icon}
@@ -249,9 +253,9 @@ export default function AdminLayout({
         </nav>
 
         {/* Usuario y logout */}
-        <div className="px-3 py-4 border-t border-gray-700">
+        <div className="px-3 py-4 border-t border-[#A30D25]">
           <div className="flex items-center gap-3 px-3 py-2 mb-2">
-            <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold">
+            <div className="w-8 h-8 bg-[#A30D25] rounded-full flex items-center justify-center text-xs font-bold">
               A
             </div>
             <div className="flex-1 min-w-0">
@@ -261,7 +265,7 @@ export default function AdminLayout({
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-200 hover:text-white hover:bg-[#A30D25] transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -277,7 +281,7 @@ export default function AdminLayout({
       <div className="flex-1 lg:ml-64 flex flex-col w-0 min-w-0 overflow-x-hidden">
 
         {/* Header mobile */}
-        <header className="lg:hidden bg-gray-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+        <header className="lg:hidden bg-[#C8102E] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-2">
             <span className="text-sm">🔧</span>
             <p className="text-sm font-bold">Panel Admin</p>
@@ -331,7 +335,7 @@ export default function AdminLayout({
                   onClick={() => setSheetOpen(false)}
                   className={`flex flex-col items-center gap-1.5 px-2 py-4 rounded-2xl transition-colors active:scale-95 ${
                     isActive(item)
-                      ? 'bg-gray-900 text-white'
+                      ? 'bg-[#C8102E] text-white'
                       : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -351,7 +355,7 @@ export default function AdminLayout({
                 key={item.href}
                 href={item.href}
                 className={`flex flex-col items-center gap-0.5 py-1 rounded-xl transition-colors ${
-                  isActive(item) ? 'text-gray-900' : 'text-gray-400'
+                  isActive(item) ? 'text-[#C8102E]' : 'text-gray-400'
                 }`}
               >
                 {item.icon}
@@ -372,10 +376,10 @@ export default function AdminLayout({
               onClick={() => setSheetOpen((v) => !v)}
               className={`relative -top-5 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
                 sheetOpen
-                  ? 'bg-gray-700 shadow-gray-400'
+                  ? 'bg-[#A30D25] shadow-red-400'
                   : NAV_SECONDARY.some((item) => isActive(item))
-                  ? 'bg-gray-600 shadow-gray-300'
-                  : 'bg-gray-900 shadow-gray-300'
+                  ? 'bg-[#A30D25] shadow-red-300'
+                  : 'bg-[#C8102E] shadow-red-300'
               }`}
               aria-label="Más opciones"
             >
@@ -398,7 +402,7 @@ export default function AdminLayout({
                 key={item.href}
                 href={item.href}
                 className={`flex flex-col items-center gap-0.5 py-1 rounded-xl transition-colors ${
-                  isActive(item) ? 'text-gray-900' : 'text-gray-400'
+                  isActive(item) ? 'text-[#C8102E]' : 'text-gray-400'
                 }`}
               >
                 {item.icon}

@@ -136,7 +136,7 @@ export default function ExamenPage() {
         </div>
         <button
           onClick={() => router.back()}
-          className="w-full py-3 bg-gray-900 text-white rounded-xl font-semibold"
+          className="w-full py-3 bg-[#C8102E] text-white rounded-xl font-semibold"
         >
           Volver al módulo
         </button>
@@ -298,7 +298,7 @@ export default function ExamenPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => router.push('/modulos')}
-            className="w-full py-3 bg-gray-900 text-white font-semibold rounded-xl"
+            className="w-full py-3 bg-[#C8102E] text-white font-semibold rounded-xl"
           >
             Ver todos los módulos
           </button>
@@ -396,7 +396,7 @@ export default function ExamenPage() {
                   w-full text-left px-4 py-4 rounded-2xl border-2 transition-all
                   active:scale-95
                   ${seleccionada
-                    ? 'border-gray-900 bg-gray-900 text-white'
+                    ? 'border-gray-900 bg-[#C8102E] text-white'
                     : 'border-gray-200 bg-white text-gray-900 hover:border-gray-400'
                   }
                 `}
@@ -448,7 +448,7 @@ export default function ExamenPage() {
         <button
           onClick={submitExamen}
           disabled={!todasRespondidas || estado === 'enviando'}
-          className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl disabled:opacity-40 active:scale-95 transition-transform flex items-center justify-center gap-2"
+          className="w-full py-4 bg-[#C8102E] text-white font-bold rounded-2xl disabled:opacity-40 active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
           {estado === 'enviando' ? (
             <>

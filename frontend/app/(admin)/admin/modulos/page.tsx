@@ -116,7 +116,7 @@ export default function AdminModulosPage() {
             });
             setShowModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
@@ -142,7 +142,7 @@ export default function AdminModulosPage() {
             }`}
           >
             {/* Número de orden */}
-            <div className="w-10 h-10 bg-gray-900 text-white rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0">
+            <div className="w-10 h-10 bg-[#C8102E] text-white rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0">
               {modulo.orden}
             </div>
 
@@ -250,7 +250,7 @@ export default function AdminModulosPage() {
                   value={form.titulo}
                   onChange={(e) => setForm({ ...form, titulo: e.target.value })}
                   placeholder="Ej: Introducción a los Neumáticos"
-                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
                 />
               </div>
 
@@ -261,7 +261,7 @@ export default function AdminModulosPage() {
                   onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
                   placeholder="Descripción del módulo..."
                   rows={3}
-                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
                 />
               </div>
 
@@ -273,7 +273,7 @@ export default function AdminModulosPage() {
                     min={1}
                     value={form.orden}
                     onChange={(e) => setForm({ ...form, orden: Number(e.target.value) })}
-                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -283,7 +283,7 @@ export default function AdminModulosPage() {
                     min={1}
                     value={form.duracion_min}
                     onChange={(e) => setForm({ ...form, duracion_min: Number(e.target.value) })}
-                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+                    className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -302,7 +302,7 @@ export default function AdminModulosPage() {
               <button
                 onClick={handleCrear}
                 disabled={isCreating}
-                className="flex-1 py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isCreating ? (
                   <>

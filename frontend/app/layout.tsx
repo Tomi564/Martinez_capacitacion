@@ -10,12 +10,13 @@
  */
 
 import type { Metadata, Viewport } from 'next';
-import { Geist } from 'next/font/google';
+import { Montserrat } from 'next/font/google';
 import './globals.css';
 
-const geist = Geist({
+const montserrat = Montserrat({
   subsets: ['latin'],
-  variable: '--font-geist',
+  variable: '--font-montserrat',
+  weight: ['400', '500', '600', '700', '800'],
 });
 
 // ─────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,        // Evita zoom accidental en inputs
-  themeColor: '#111827',
+  themeColor: '#C8102E',
 };
 
 export default function RootLayout({
@@ -56,7 +57,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={geist.variable}>
+    <html lang="es" className={montserrat.variable}>
       <head>
         {/* PWA — iOS necesita estos tags adicionales */}
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />

@@ -95,12 +95,12 @@ export default function SugerenciasPage() {
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Ej: Quiero que la pantalla de ventas muestre el total del día más grande..."
           rows={4}
-          className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none placeholder:text-gray-400"
+          className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none placeholder:text-gray-400"
         />
         <button
           onClick={handleEnviar}
           disabled={!texto.trim() || guardando}
-          className="self-end px-5 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl disabled:opacity-40 flex items-center gap-2"
+          className="self-end px-5 py-2.5 bg-[#C8102E] text-white text-sm font-semibold rounded-xl disabled:opacity-40 flex items-center gap-2"
         >
           {guardando ? (
             <>

@@ -180,7 +180,7 @@ export default function StockAdminPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={abrirNuevo}
-              className="h-10 px-4 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
+              className="h-10 px-4 bg-[#C8102E] text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
             >
               + Nuevo producto
             </button>
@@ -371,7 +371,7 @@ export default function StockAdminPage() {
                     value={(form as any)[f.key]}
                     onChange={e => setForm({ ...form, [f.key]: e.target.value })}
                     placeholder={f.placeholder}
-                    className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+                    className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
                   />
                 </div>
               ))}
@@ -387,7 +387,7 @@ export default function StockAdminPage() {
               <button
                 onClick={handleGuardar}
                 disabled={guardando || !form.nombre.trim() || !form.marca.trim()}
-                className="flex-1 h-11 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+                className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
               >
                 {guardando ? 'Guardando...' : 'Guardar'}
               </button>

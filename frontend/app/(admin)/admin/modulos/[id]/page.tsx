@@ -244,7 +244,7 @@ export default function ModuloEditPage() {
               type="text"
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
             />
           </div>
 
@@ -254,7 +254,7 @@ export default function ModuloEditPage() {
               value={form.descripcion}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               rows={3}
-              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
             />
           </div>
 
@@ -268,7 +268,7 @@ export default function ModuloEditPage() {
               onChange={(e) => setForm({ ...form, contenido: e.target.value })}
               rows={12}
               placeholder="Escribí aquí el contenido del módulo: conceptos clave, procedimientos, información importante para el examen..."
-              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y placeholder:text-gray-400"
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-y placeholder:text-gray-400"
             />
           </div>
 
@@ -283,7 +283,7 @@ export default function ModuloEditPage() {
               onChange={(e) =>
                 setForm({ ...form, duracion_min: Number(e.target.value) })
               }
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 w-32"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] w-32"
             />
           </div>
 
@@ -296,7 +296,7 @@ export default function ModuloEditPage() {
               value={form.video_url}
               onChange={(e) => setForm({ ...form, video_url: e.target.value })}
               placeholder="https://..."
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
             />
           </div>
 
@@ -309,7 +309,7 @@ export default function ModuloEditPage() {
               value={form.pdf_url}
               onChange={(e) => setForm({ ...form, pdf_url: e.target.value })}
               placeholder="https://..."
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -317,7 +317,7 @@ export default function ModuloEditPage() {
         <button
           onClick={handleGuardar}
           disabled={isSaving}
-          className="w-full py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isSaving ? (
             <>
@@ -338,7 +338,7 @@ export default function ModuloEditPage() {
           </h2>
           <button
             onClick={() => setShowPreguntaModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-xl text-sm font-semibold"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#C8102E] text-white rounded-xl text-sm font-semibold"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
@@ -460,7 +460,7 @@ export default function ModuloEditPage() {
                   }
                   placeholder="¿Cuál es...?"
                   rows={2}
-                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
                 />
               </div>
 
@@ -503,7 +503,7 @@ export default function ModuloEditPage() {
                         });
                       }}
                       placeholder={`Opción ${opcion.id.toUpperCase()}`}
-                      className="flex-1 h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder:text-gray-400"
+                      className="flex-1 h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
                     />
                   </div>
                 ))}
@@ -528,7 +528,7 @@ export default function ModuloEditPage() {
                   }
                   placeholder="Ej: La banda de rodadura es la parte del neumático que entra en contacto directo con el suelo, por eso es la más importante para la tracción y el frenado."
                   rows={2}
-                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                  className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
                 />
               </div>
             </div>
@@ -546,7 +546,7 @@ export default function ModuloEditPage() {
               <button
                 onClick={handleCrearPregunta}
                 disabled={isCreatingPregunta}
-                className="flex-1 py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isCreatingPregunta ? (
                   <>

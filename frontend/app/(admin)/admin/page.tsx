@@ -146,7 +146,7 @@ export default function AdminDashboardPage() {
           { href: '/admin/reportes',   emoji: '📊', label: 'Reportes',   sub: 'Progreso y calificaciones' },
         ].map((item) => (
           <Link key={item.href} href={item.href} className="h-full">
-            <div className="bg-gray-900 text-white rounded-2xl p-4 h-full active:scale-95 transition-transform flex flex-col">
+            <div className="bg-[#C8102E] text-white rounded-2xl p-4 h-full active:scale-95 transition-transform flex flex-col">
               <span className="text-2xl">{item.emoji}</span>
               <p className="font-semibold mt-2 text-sm">{item.label}</p>
               <p className="text-xs text-gray-400 mt-0.5">{item.sub}</p>
@@ -275,7 +275,7 @@ export default function AdminDashboardPage() {
                 No hay vendedores registrados aún
               </p>
               <Link href="/admin/vendedores">
-                <button className="mt-3 px-4 py-2 bg-gray-900 text-white text-sm rounded-xl">
+                <button className="mt-3 px-4 py-2 bg-[#C8102E] text-white text-sm rounded-xl">
                   Agregar vendedor
                 </button>
               </Link>

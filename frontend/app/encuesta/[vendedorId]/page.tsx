@@ -167,7 +167,7 @@ export default function EncuestaPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* Header */}
-      <div className="bg-gray-900 text-white px-6 pt-12 pb-8">
+      <div className="bg-[#C8102E] text-white px-6 pt-12 pb-8">
         <div className="max-w-sm mx-auto">
           {/* Avatar del vendedor */}
           <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mb-4 text-xl font-bold">
@@ -266,7 +266,7 @@ export default function EncuestaPage() {
               placeholder="Contanos tu experiencia..."
               rows={3}
               maxLength={300}
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
             />
             <p className="text-xs text-gray-400 text-right mt-1">
               {comentario.length}/300
@@ -289,7 +289,7 @@ export default function EncuestaPage() {
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Juan"
-                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -299,7 +299,7 @@ export default function EncuestaPage() {
                   value={apellido}
                   onChange={(e) => setApellido(e.target.value)}
                   placeholder="García"
-                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function EncuestaPage() {
                 onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
                 placeholder="12345678"
                 maxLength={8}
-                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -322,7 +322,7 @@ export default function EncuestaPage() {
                 value={contacto}
                 onChange={(e) => setContacto(e.target.value)}
                 placeholder="3874123456 / juan@gmail.com"
-                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
               />
             </div>
             <p className="text-xs text-gray-400">
@@ -334,7 +334,7 @@ export default function EncuestaPage() {
           <button
             onClick={handleSubmit}
             disabled={estrellas === 0 || estado === 'enviando'}
-            className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl disabled:opacity-40 active:scale-95 transition-transform flex items-center justify-center gap-2"
+            className="w-full py-4 bg-[#C8102E] text-white font-bold rounded-2xl disabled:opacity-40 active:scale-95 transition-transform flex items-center justify-center gap-2"
           >
             {estado === 'enviando' ? (
               <>

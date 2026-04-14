@@ -44,16 +44,21 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
 
       {/* Header con branding */}
-      <div className="bg-gray-900 text-white px-6 pt-16 pb-12">
+      <div className="bg-[#C8102E] text-white px-6 pt-16 pb-12">
         <div className="max-w-sm mx-auto">
-          {/* Logo / ícono */}
-          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mb-6">
-            <span className="text-2xl">🔧</span>
+          {/* Logo */}
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+            <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none">
+              <circle cx="24" cy="24" r="20" fill="#C8102E"/>
+              <circle cx="24" cy="24" r="8" fill="white"/>
+              <circle cx="24" cy="24" r="3" fill="#C8102E"/>
+              <path d="M24 4 L24 12 M24 36 L24 44 M4 24 L12 24 M36 24 L44 24" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
           </div>
-          <h1 className="text-2xl font-bold mb-1">
+          <h1 className="text-2xl font-extrabold mb-1 tracking-tight">
             Martínez Neumáticos
           </h1>
-          <p className="text-gray-400 text-sm">
+          <p className="text-red-200 text-sm font-medium">
             Sistema de capacitación
           </p>
         </div>
@@ -93,7 +98,7 @@ export default function LoginPage() {
                 autoCapitalize="none"
                 required
                 disabled={isLoading}
-                className="w-full h-12 px-4 bg-white border border-gray-200 rounded-xl text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
+                className="w-full h-12 px-4 bg-white border border-gray-200 rounded-xl text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
               />
             </div>
 
@@ -115,7 +120,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   required
                   disabled={isLoading}
-                  className="w-full h-12 px-4 pr-12 bg-white border border-gray-200 rounded-xl text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
+                  className="w-full h-12 px-4 pr-12 bg-white border border-gray-200 rounded-xl text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
                 />
                 {/* Toggle mostrar/ocultar contraseña */}
                 <button
@@ -146,7 +151,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading || !email || !password}
-              className="w-full h-12 bg-gray-900 text-white font-semibold rounded-xl mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+              className="w-full h-12 bg-[#C8102E] hover:bg-[#A30D25] text-white font-bold rounded-xl mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
             >
               {isLoading ? (
                 <>

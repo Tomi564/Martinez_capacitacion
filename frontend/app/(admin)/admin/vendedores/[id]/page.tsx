@@ -205,7 +205,7 @@ export default function VendedorDetallePage() {
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0">
-            <div className="w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center text-lg font-bold shrink-0">
+            <div className="w-14 h-14 bg-[#C8102E] text-white rounded-2xl flex items-center justify-center text-lg font-bold shrink-0">
               {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
             </div>
             <div className="min-w-0">
@@ -464,7 +464,7 @@ export default function VendedorDetallePage() {
                   value={objForm.meta_ventas}
                   onChange={e => setObjForm(f => ({ ...f, meta_ventas: e.target.value }))}
                   placeholder="Ej: 20"
-                  className="h-10 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="h-10 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -476,14 +476,14 @@ export default function VendedorDetallePage() {
                   value={objForm.meta_conversion}
                   onChange={e => setObjForm(f => ({ ...f, meta_conversion: e.target.value }))}
                   placeholder="Ej: 60"
-                  className="h-10 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="h-10 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
             </div>
             <button
               onClick={handleGuardarObjetivo}
               disabled={guardandoObj}
-              className="w-full h-10 bg-gray-900 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              className="w-full h-10 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
               {guardandoObj ? 'Guardando...' : 'Guardar objetivo'}
             </button>
@@ -598,7 +598,7 @@ export default function VendedorDetallePage() {
               value={nuevaContrasena}
               onChange={(e) => setNuevaContrasena(e.target.value)}
               placeholder="Mínimo 6 caracteres"
-              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
             />
           </div>
 
@@ -612,7 +612,7 @@ export default function VendedorDetallePage() {
             <button
               onClick={handleResetPassword}
               disabled={resetLoading || nuevaContrasena.length < 6}
-              className="flex-1 py-3 bg-gray-900 text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {resetLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

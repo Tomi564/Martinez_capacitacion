@@ -75,7 +75,7 @@ export default function ComunicadosPage() {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 h-10 px-4 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors shrink-0"
+          className="flex items-center gap-2 h-10 px-4 bg-[#C8102E] text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors shrink-0"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -96,7 +96,7 @@ export default function ComunicadosPage() {
 
       {/* Activo destacado */}
       {comunicados.filter(c => c.activo).map(c => (
-        <div key={c.id} className="bg-gray-900 text-white rounded-2xl p-5 flex flex-col gap-3">
+        <div key={c.id} className="bg-[#C8102E] text-white rounded-2xl p-5 flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -178,7 +178,7 @@ export default function ComunicadosPage() {
                 value={titulo}
                 onChange={e => setTitulo(e.target.value)}
                 placeholder="Ej: Llegan Michelin el viernes"
-                className="h-11 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="h-11 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -188,7 +188,7 @@ export default function ComunicadosPage() {
                 onChange={e => setContenido(e.target.value)}
                 placeholder="Ej: El viernes 10 a las 9hs llega el camión con Michelin Pilot. Coordiná con depósito."
                 rows={4}
-                className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
               />
             </div>
             <div className="flex gap-3">
@@ -198,7 +198,7 @@ export default function ComunicadosPage() {
               <button
                 onClick={handleGuardar}
                 disabled={guardando || !titulo.trim() || !contenido.trim()}
-                className="flex-1 h-11 bg-gray-900 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
               >
                 {guardando ? 'Publicando...' : 'Publicar'}
               </button>
