@@ -73,7 +73,7 @@ app.use(
 // ─────────────────────────────────────────────────────
 // Parseo de JSON
 // ─────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '500kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─────────────────────────────────────────────────────

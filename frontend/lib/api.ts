@@ -56,6 +56,15 @@ async function request<T>(
 
   // Si la respuesta no es OK, extraemos el mensaje de error del backend
   if (!response.ok) {
+    // 401 = token expirado o inválido → limpiar sesión y redirigir al login
+    if (response.status === 401) {
+      try {
+        localStorage.removeItem('martinez-auth');
+      } catch {}
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
       errorData.error || `Error ${response.status}: ${response.statusText}`

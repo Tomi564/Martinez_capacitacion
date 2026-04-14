@@ -32,7 +32,10 @@ const withPWA = require('next-pwa')({
     },
     {
       // Cachear llamadas a la API por 5 minutos
-      urlPattern: /^http:\/\/localhost:3001\/api\/.*/i,
+      urlPattern: ({ url }: { url: URL }) => {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+        return url.href.startsWith(apiUrl);
+      },
       handler: 'NetworkFirst',
       options: {
         cacheName: 'api-cache',

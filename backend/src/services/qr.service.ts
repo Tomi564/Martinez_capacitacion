@@ -8,6 +8,7 @@
  *  - Obtener resumen de calificaciones
  */
 
+import { randomBytes } from 'crypto';
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 
@@ -219,11 +220,10 @@ export class QRService {
    */
   private generarCodigo(longitud: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let resultado = '';
-    for (let i = 0; i < longitud; i++) {
-      resultado += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return resultado;
+    const bytes = randomBytes(longitud);
+    return Array.from(bytes)
+      .map((b) => chars[b % chars.length])
+      .join('');
   }
 }
 
