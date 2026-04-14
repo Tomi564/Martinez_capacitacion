@@ -108,57 +108,80 @@ export default function ModuloDetallePage() {
           )}
         </div>
 
-        {/* Material de estudio */}
-        {(modulo.pdf_url || modulo.video_url) && (
-          <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Material de estudio</h2>
+        {/* Material de estudio — siempre visible */}
+        <div className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Material de estudio</h2>
 
-            {modulo.pdf_url && (
-              <Link href={modulo.pdf_url} target="_blank">
-                <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
-                  <div className="w-11 h-11 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#C8102E]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                      <line x1="12" y1="18" x2="12" y2="12"/>
-                      <line x1="9" y1="15" x2="15" y2="15"/>
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">Descargar material PDF</p>
-                    <p className="text-xs text-gray-500">Módulo {modulo.orden} — {modulo.titulo}</p>
-                  </div>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
+          {modulo.pdf_url ? (
+            <Link href={modulo.pdf_url} target="_blank">
+              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
+                <div className="w-11 h-11 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#C8102E]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <line x1="9" y1="15" x2="15" y2="15"/>
                   </svg>
                 </div>
-              </Link>
-            )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">Descargar material PDF</p>
+                  <p className="text-xs text-gray-500">Módulo {modulo.orden} — {modulo.titulo}</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl p-4 opacity-50">
+              <div className="w-11 h-11 bg-gray-200 rounded-xl flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-500">Material PDF</p>
+                <p className="text-xs text-gray-400">Próximamente disponible</p>
+              </div>
+            </div>
+          )}
 
-            {modulo.video_url && (
-              <Link href={modulo.video_url} target="_blank">
-                <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
-                  <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">Ver video</p>
-                    <p className="text-xs text-gray-500">Módulo {modulo.orden} — {modulo.titulo}</p>
-                  </div>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                    <polyline points="15 3 21 3 21 9"/>
-                    <line x1="10" y1="14" x2="21" y2="3"/>
+          {modulo.video_url ? (
+            <Link href={modulo.video_url} target="_blank">
+              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
+                <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
                   </svg>
                 </div>
-              </Link>
-            )}
-          </div>
-        )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">Ver video</p>
+                  <p className="text-xs text-gray-500">Módulo {modulo.orden} — {modulo.titulo}</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl p-4 opacity-50">
+              <div className="w-11 h-11 bg-gray-200 rounded-xl flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-500">Video</p>
+                <p className="text-xs text-gray-400">Próximamente disponible</p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Aprobado */}
         {modulo.estado === 'aprobado' && (
