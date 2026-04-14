@@ -44,7 +44,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
 
       {/* Header con branding */}
-      <div className="bg-[#C8102E] text-white px-6 pt-16 pb-12">
+      <div className="bg-[#1F1F1F] text-white px-6 pt-16 pb-12">
         <div className="max-w-sm mx-auto">
           {/* Logo */}
           <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-lg">
@@ -58,7 +58,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-extrabold mb-1 tracking-tight">
             Martínez Neumáticos
           </h1>
-          <p className="text-red-200 text-sm font-medium">
+          <p className="text-gray-400 text-sm font-medium">
             Sistema de capacitación
           </p>
         </div>

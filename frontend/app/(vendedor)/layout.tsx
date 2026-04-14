@@ -148,16 +148,16 @@ export default function VendedorLayout({
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* Header superior */}
-      <header className="bg-[#C8102E] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+      <header className="bg-[#1F1F1F] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <div>
-          <p className="text-xs text-red-200">Bienvenido</p>
+          <p className="text-xs text-gray-400">Bienvenido</p>
           <p className="text-sm font-bold truncate max-w-[200px]">
             {nombreCompleto()}
           </p>
         </div>
         <button
           onClick={logout}
-          className="p-2 rounded-lg hover:bg-[#A30D25] transition-colors"
+          className="p-2 rounded-lg hover:bg-[#2F2F2F] transition-colors"
           aria-label="Cerrar sesión"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -239,10 +239,10 @@ export default function VendedorLayout({
             onClick={() => setSheetOpen((v) => !v)}
             className={`relative -top-5 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
               sheetOpen
-                ? 'bg-[#A30D25] shadow-red-400'
+                ? 'bg-[#C8102E] shadow-red-400'
                 : NAV_SECONDARY.some((item) => isActive(item))
-                ? 'bg-[#A30D25] shadow-red-300'
-                : 'bg-[#C8102E] shadow-red-300'
+                ? 'bg-[#C8102E] shadow-red-300'
+                : 'bg-[#1F1F1F] shadow-gray-400'
             }`}
             aria-label="Más opciones"
           >
