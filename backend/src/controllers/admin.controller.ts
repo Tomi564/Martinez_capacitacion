@@ -125,7 +125,7 @@ export class AdminController {
   async updateModulo(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const moduloId = req.params.id as string;
-      const { titulo, descripcion, duracion_min, activo, video_url, pdf_url, contenido } = req.body;
+      const { titulo, descripcion, duracion_min, activo, video_url, pdf_url } = req.body;
 
       const data: Record<string, unknown> = {};
       if (titulo !== undefined)       data.titulo       = titulo;
@@ -134,7 +134,6 @@ export class AdminController {
       if (activo !== undefined)       data.activo       = activo;
       if (video_url !== undefined)    data.video_url    = video_url;
       if (pdf_url !== undefined)      data.pdf_url      = pdf_url;
-      if (contenido !== undefined)    data.contenido    = contenido;
 
       const result = await adminService.updateModulo(moduloId, data);
       return res.status(200).json(result);
