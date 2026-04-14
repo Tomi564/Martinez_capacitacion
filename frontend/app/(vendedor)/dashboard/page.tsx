@@ -97,7 +97,7 @@ export default function DashboardPage() {
     disponible: data.modulos.find(m => m.estado === 'disponible' || m.estado === 'en_curso'),
   } : null;
 
-  const porcentaje = resumen
+  const porcentaje = resumen && resumen.total > 0
     ? Math.round((resumen.aprobados / resumen.total) * 100)
     : 0;
 

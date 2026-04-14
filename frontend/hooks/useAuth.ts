@@ -127,7 +127,18 @@ export const useAuth = create<AuthState>()(
 
       isVendedor: () => get().user?.rol === 'vendedor',
 
-      isAuthenticated: () => !!get().token && !!get().user,
+      isAuthenticated: () => {
+        const { token, user } = get();
+        if (!token || !user) return false;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.exp && Date.now() / 1000 > payload.exp) {
+            get().logout();
+            return false;
+          }
+        } catch {}
+        return true;
+      },
 
       // ─────────────────────────────────────────────────────
       // Helpers
