@@ -221,6 +221,21 @@ export default function ExamenPage() {
           </div>
         )}
 
+        {/* Capacitación completa — ir al certificado */}
+        {resultado.capacitacionCompleta && (
+          <div className="bg-[#1F1F1F] rounded-2xl p-5 flex flex-col items-center gap-3 text-center">
+            <p className="text-2xl">🎓</p>
+            <p className="text-white font-bold text-base">¡Completaste toda la capacitación!</p>
+            <p className="text-gray-400 text-sm">Tu certificado está listo. El equipo va a coordinar tu premio.</p>
+            <button
+              onClick={() => router.push('/modulos/certificado')}
+              className="mt-1 px-6 py-2.5 bg-[#C8102E] text-white font-bold rounded-xl text-sm active:scale-95 transition-transform"
+            >
+              Ver mi certificado
+            </button>
+          </div>
+        )}
+
         {/* Siguiente módulo desbloqueado */}
         {resultado.siguienteModuloDesbloqueado && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">

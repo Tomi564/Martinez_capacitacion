@@ -90,6 +90,7 @@ export interface ResultadoExamen {
   respuestasCorrectas: number;
   totalPreguntas: number;
   siguienteModuloDesbloqueado: boolean;
+  capacitacionCompleta?: boolean;
   retroalimentacion: RetroalimentacionPregunta[];
   mensaje: string;
 }

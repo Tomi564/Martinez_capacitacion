@@ -189,6 +189,10 @@ export class ExamenesService {
         userId,
         moduloId
       );
+      // Si no hay siguiente módulo = completó toda la capacitación
+      if (!siguienteModuloDesbloqueado) {
+        await this.notificarAdminCapacitacionCompleta(userId).catch(() => {});
+      }
     }
 
     // 7. Si no aprobó y alcanzó el límite de intentos, notificar al admin
@@ -203,6 +207,7 @@ export class ExamenesService {
       respuestasCorrectas: correctas,
       totalPreguntas: preguntas.length,
       siguienteModuloDesbloqueado,
+      capacitacionCompleta: aprobado && !siguienteModuloDesbloqueado,
       retroalimentacion,
       mensaje: aprobado
         ? `¡Aprobaste con ${nota.toFixed(1)}%! ${
@@ -277,6 +282,58 @@ export class ExamenesService {
       modulo_id: moduloId,
       leida: false,
     });
+  }
+
+  private async notificarAdminCapacitacionCompleta(userId: string) {
+    const { data: vendedor } = await supabase
+      .from('users')
+      .select('nombre, apellido, email')
+      .eq('id', userId)
+      .single();
+
+    if (!vendedor) return;
+
+    const nombre = `${vendedor.nombre} ${vendedor.apellido}`;
+
+    // Notificación en panel admin
+    await supabase.from('notificaciones_admin').insert({
+      tipo: 'capacitacion_completa',
+      titulo: `🎓 ${nombre} completó la capacitación`,
+      mensaje: `${nombre} (${vendedor.email}) aprobó todos los módulos. Coordiná la entrega del premio.`,
+      user_id: userId,
+      leida: false,
+    });
+
+    // Push a todos los admins
+    const { data: admins } = await supabase
+      .from('users')
+      .select('id')
+      .eq('rol', 'admin')
+      .eq('activo', true);
+
+    if (!admins?.length) return;
+
+    const { data: subs } = await supabase
+      .from('push_subscriptions')
+      .select('subscription')
+      .in('user_id', admins.map((a: { id: string }) => a.id));
+
+    if (!subs?.length) return;
+
+    const webpush = await import('web-push');
+    const payload = JSON.stringify({
+      title: `🎓 ${nombre} completó la capacitación`,
+      body: 'Aprobó todos los módulos. Coordiná la entrega del premio.',
+    });
+
+    await Promise.allSettled(
+      subs.map((s: { subscription: string }) =>
+        webpush.default.sendNotification(
+          typeof s.subscription === 'string' ? JSON.parse(s.subscription) : s.subscription,
+          payload
+        )
+      )
+    );
   }
 
   /**
