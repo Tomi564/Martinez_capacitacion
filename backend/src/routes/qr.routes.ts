@@ -46,11 +46,11 @@ router.get(
   qrController.getMisCalificaciones.bind(qrController)
 );
 
-// GET /api/qr/participantes — solo admin
+// GET /api/qr/participantes — admin y vendedor
 router.get(
   '/participantes',
   authMiddleware,
-  requireRole('admin'),
+  requireRole('admin', 'vendedor'),
   qrController.getParticipantes.bind(qrController)
 );
 

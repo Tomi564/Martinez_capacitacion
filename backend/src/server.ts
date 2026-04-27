@@ -31,6 +31,7 @@ import productosRoutes from './routes/productos.routes';
 import comunicadosRoutes from './routes/comunicados.routes';
 import rankingRoutes from './routes/ranking.routes';
 import objetivosRoutes from './routes/objetivos.routes';
+import mecanicoRoutes from './routes/mecanico.routes';
 import pushRoutes from './routes/push.routes';
 import {
   recordatorioModuloInactivo,
@@ -114,6 +115,7 @@ app.use('/api/comunicados', comunicadosRoutes);
 app.use('/api/ranking', rankingRoutes);
 app.use('/api/objetivos', objetivosRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/mecanico', mecanicoRoutes);
 
 // ─────────────────────────────────────────────────────
 // 404 — cualquier ruta no definida cae acá

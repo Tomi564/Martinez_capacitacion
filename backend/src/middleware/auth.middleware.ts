@@ -21,7 +21,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
-    rol: 'vendedor' | 'admin';
+    rol: 'vendedor' | 'admin' | 'mecanico';
     nombre: string;
     apellido: string;
   };
@@ -78,7 +78,7 @@ export const authMiddleware = (
  *  requireRole('admin')             → solo admins
  *  requireRole('admin', 'vendedor') → ambos roles
  */
-export const requireRole = (...roles: Array<'vendedor' | 'admin'>) => {
+export const requireRole = (...roles: Array<'vendedor' | 'admin' | 'mecanico'>) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'No autenticado.' });

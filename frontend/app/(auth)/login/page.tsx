@@ -14,30 +14,28 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error, clearError, isAuthenticated, isAdmin } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated, isAdmin, user } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Si ya está autenticado, redirigir
+  const getRedirect = () => {
+    const { user: u, isAdmin: ia } = useAuth.getState();
+    return ia() ? '/admin' : u?.rol === 'mecanico' ? '/mecanico' : '/dashboard';
+  };
+
   useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace(isAdmin() ? '/admin' : '/dashboard');
-    }
+    if (isAuthenticated()) router.replace(getRedirect());
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-
     try {
       await login(email, password);
-      // Login exitoso — redirigir según rol
-      router.replace(isAdmin() ? '/admin' : '/dashboard');
-    } catch {
-      // El error ya está en el store, no hace falta manejarlo acá
-    }
+      router.replace(getRedirect());
+    } catch {}
   };
 
   return (

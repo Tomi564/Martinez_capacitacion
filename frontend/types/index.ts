@@ -10,7 +10,7 @@
 // USUARIOS
 // ─────────────────────────────────────────────────────
 
-export type Rol = 'vendedor' | 'admin';
+export type Rol = 'vendedor' | 'admin' | 'mecanico';
 
 export interface User {
   id: string;
