@@ -55,6 +55,8 @@ export default function ModuloEditPage() {
     duracion_min: 30,
     video_url: '',
     pdf_url: '',
+    nota_aprobacion: '',
+    porcentaje_aprobacion: 80,
   });
 
   // Form de nueva pregunta
@@ -81,6 +83,8 @@ export default function ModuloEditPage() {
         duracion_min: res.modulo.duracion_min,
         video_url: res.modulo.video_url || '',
         pdf_url: res.modulo.pdf_url || '',
+        nota_aprobacion: (res.modulo as any).nota_aprobacion || '',
+        porcentaje_aprobacion: (res.modulo as any).porcentaje_aprobacion ?? 80,
       });
     } catch (err) {
       setError('Error al cargar el módulo');
@@ -107,6 +111,8 @@ export default function ModuloEditPage() {
         duracion_min: Number(form.duracion_min),
         video_url: form.video_url.trim() || null,
         pdf_url: form.pdf_url.trim() || null,
+        nota_aprobacion: form.nota_aprobacion.trim() || null,
+        porcentaje_aprobacion: Number(form.porcentaje_aprobacion) || 80,
       });
       setSuccessMsg('Módulo guardado correctamente');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -294,6 +300,41 @@ export default function ModuloEditPage() {
               value={form.pdf_url}
               onChange={(e) => setForm({ ...form, pdf_url: e.target.value })}
               placeholder="https://..."
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
+            />
+          </div>
+
+          {/* Porcentaje de aprobación */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
+              Porcentaje mínimo para aprobar
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={form.porcentaje_aprobacion}
+                onChange={(e) => setForm({ ...form, porcentaje_aprobacion: Number(e.target.value) })}
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] w-24"
+              />
+              <span className="text-sm text-gray-500">%</span>
+              <span className="text-xs text-gray-400 ml-1">
+                (tolerancia: {Math.max(0, (modulo?.preguntas?.length ?? 0) - Math.ceil((modulo?.preguntas?.length ?? 0) * form.porcentaje_aprobacion / 100))} error/es sobre {modulo?.preguntas?.length ?? '?'} preguntas)
+              </span>
+            </div>
+          </div>
+
+          {/* Nota de aprobación (texto) */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
+              Nota para el vendedor
+            </label>
+            <input
+              type="text"
+              value={form.nota_aprobacion}
+              onChange={(e) => setForm({ ...form, nota_aprobacion: e.target.value })}
+              placeholder="Ej: 70% o más para aprobar · 3 intentos máximo"
               className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
             />
           </div>

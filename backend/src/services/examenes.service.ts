@@ -8,7 +8,7 @@
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 
-const NOTA_MINIMA_APROBACION = 80;
+const NOTA_MINIMA_APROBACION_DEFAULT = 80;
 
 export class ExamenesService {
   /**
@@ -92,12 +92,19 @@ export class ExamenesService {
     duracionSeg?: number
   ) {
     // 1. Verificar que el módulo no esté bloqueado
-    const { data: progreso } = await supabase
-      .from('progreso')
-      .select('estado, mejor_nota, intentos')
-      .eq('user_id', userId)
-      .eq('modulo_id', moduloId)
-      .single();
+    const [{ data: progreso }, { data: moduloData }] = await Promise.all([
+      supabase
+        .from('progreso')
+        .select('estado, mejor_nota, intentos')
+        .eq('user_id', userId)
+        .eq('modulo_id', moduloId)
+        .single(),
+      supabase
+        .from('modulos')
+        .select('porcentaje_aprobacion')
+        .eq('id', moduloId)
+        .single(),
+    ]);
 
     if (!progreso || progreso.estado === 'bloqueado') {
       throw new AppError(
@@ -132,6 +139,10 @@ export class ExamenesService {
     }
 
     // 3. Calcular nota
+    const porcentajeAprobacion = (moduloData as any)?.porcentaje_aprobacion ?? NOTA_MINIMA_APROBACION_DEFAULT;
+    const minimasCorrectas = Math.ceil(preguntas.length * porcentajeAprobacion / 100);
+    const tolerancia = preguntas.length - minimasCorrectas;
+
     let correctas = 0;
     const retroalimentacion: {
       pregunta_id: string;
@@ -150,12 +161,23 @@ export class ExamenesService {
         correcta: esCorrecta,
         respuesta_dada: respuestas[pregunta.id] || '',
         respuesta_correcta: pregunta.respuesta_correcta,
-        explicacion: (pregunta as any).explicacion || null,
+        explicacion: null, // se asigna abajo según tolerancia
       });
     }
 
+    const errores = preguntas.length - correctas;
     const nota = (correctas / preguntas.length) * 100;
-    const aprobado = nota >= NOTA_MINIMA_APROBACION;
+    const aprobado = correctas >= minimasCorrectas;
+
+    // Mostrar explicación solo si los errores están dentro de la tolerancia
+    const mostrarExplicacion = errores > 0 && errores <= tolerancia;
+    if (mostrarExplicacion) {
+      for (let i = 0; i < retroalimentacion.length; i++) {
+        if (!retroalimentacion[i].correcta) {
+          retroalimentacion[i].explicacion = (preguntas[i] as any).explicacion || null;
+        }
+      }
+    }
 
     // 4. Guardar el intento siempre, independientemente del resultado
     await supabase.from('intentos_examen').insert({
@@ -215,7 +237,7 @@ export class ExamenesService {
               ? 'Se desbloqueó el siguiente módulo.'
               : '¡Completaste todos los módulos!'
           }`
-        : `Obtuviste ${nota.toFixed(1)}%. Necesitás ${NOTA_MINIMA_APROBACION}% para aprobar. ¡Podés volver a intentarlo!`,
+        : `Obtuviste ${nota.toFixed(1)}%. Necesitás ${porcentajeAprobacion}% para aprobar. ¡Podés volver a intentarlo!`,
     };
   }
 

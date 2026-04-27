@@ -90,6 +90,14 @@ export default function ModuloDetallePage() {
           <p className="text-sm text-gray-600 leading-relaxed">{modulo.descripcion}</p>
         </div>
 
+        {/* Nota de aprobación */}
+        {(modulo as any).nota_aprobacion && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2">
+            <span className="text-amber-500 text-base mt-0.5">📋</span>
+            <p className="text-sm text-amber-800 font-medium">{(modulo as any).nota_aprobacion}</p>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="flex gap-3">
           <div className="flex-1 bg-white border border-gray-200 rounded-xl p-3 text-center">
