@@ -181,17 +181,26 @@ export class QRService {
     };
   }
 
-  async getParticipantesSorteo() {
-    const { data, error } = await supabase
+  async getParticipantesSorteo(limit = 20, offset = 0) {
+    const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+
+    const { data, error, count } = await supabase
       .from('participantes_sorteo')
       .select(`
         id, nombre, apellido, dni, contacto, created_at,
         vendedor:users!vendedor_id(nombre, apellido)
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(safeOffset, safeOffset + safeLimit - 1);
 
     if (error) throw new AppError('Error al obtener participantes', 500);
-    return data || [];
+    return {
+      participantes: data || [],
+      total: count || 0,
+      limit: safeLimit,
+      offset: safeOffset,
+    };
   }
 
   /**

@@ -13,14 +13,25 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 // ─── Clientes ───────────────────────────────────────────────────────────────
 
 // GET /api/mecanico/clientes — lista para admin/vendedor
-router.get('/clientes', requireRole('admin', 'vendedor'), async (_req, res: Response, next: NextFunction) => {
+router.get('/clientes', requireRole('admin', 'vendedor'), async (req, res: Response, next: NextFunction) => {
   try {
-    const { data, error } = await supabase
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const { data, error, count } = await supabase
       .from('vehiculos')
-      .select(`id, patente, marca, modelo, anio, medida_rueda, created_at, clientes(id, nombre, apellido, dni, telefono, email), visitas_taller(id, estado, motivo, observaciones, km, diagnostico_enviado, created_at)`)
-      .order('created_at', { ascending: false });
+      .select(
+        `id, patente, marca, modelo, anio, medida_rueda, created_at, clientes(id, nombre, apellido, dni, telefono, email), visitas_taller(id, estado, motivo, observaciones, km, diagnostico_enviado, created_at)`,
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) throw new AppError('Error al obtener vehículos', 500);
-    return res.json({ vehiculos: data });
+    return res.json({
+      vehiculos: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
   } catch (e) { next(e); }
 });
 
@@ -116,15 +127,23 @@ router.get('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest
     const mecanicoId = req.user!.id;
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
 
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('visitas_taller')
-      .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`)
+      .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' })
       .eq('mecanico_id', mecanicoId)
       .gte('created_at', hoy.toISOString())
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) throw new AppError('Error al obtener visitas', 500);
-    return res.json({ visitas: data });
+    return res.json({
+      visitas: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
   } catch (e) { next(e); }
 });
 

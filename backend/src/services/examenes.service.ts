@@ -10,6 +10,7 @@ import { AppError } from '../middleware/errorHandler';
 
 const NOTA_MINIMA_APROBACION_DEFAULT = 80;
 type TipoPregunta = 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+const examenesServidos = new Map<string, string[]>();
 
 function normalizarTexto(texto: string): string {
   return (texto || '')
@@ -41,6 +42,9 @@ function puntuarDesarrollo(respuesta: string, clave: string, puntajeMaximo: numb
 }
 
 export class ExamenesService {
+  private getExamenKey(userId: string, moduloId: string) {
+    return `${userId}:${moduloId}`;
+  }
   /**
    * Obtiene preguntas aleatorias para un examen.
    * NUNCA incluye la respuesta_correcta en la respuesta.
@@ -105,6 +109,10 @@ export class ExamenesService {
 
     // Máximo 10 preguntas por examen
     const preguntasExamen = shuffled.slice(0, 10);
+    examenesServidos.set(
+      this.getExamenKey(userId, moduloId),
+      preguntasExamen.map((p: any) => p.id)
+    );
 
     // Marcar el módulo como 'en_curso' si estaba 'disponible'
     if (progreso.estado === 'disponible') {
@@ -174,8 +182,29 @@ export class ExamenesService {
       );
     }
 
-    // 2. Obtener respuestas correctas
-    const preguntaIds = Object.keys(respuestas);
+    // 2. Validar que estén respondidas todas las preguntas del examen servido
+    const examKey = this.getExamenKey(userId, moduloId);
+    const preguntaIdsEsperadas = examenesServidos.get(examKey) || [];
+    if (!preguntaIdsEsperadas.length) {
+      throw new AppError('Debés responder todas las preguntas antes de enviar', 400);
+    }
+
+    const respuestasNormalizadas = Object.fromEntries(
+      Object.entries(respuestas || {}).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : ''])
+    ) as Record<string, string>;
+
+    const idsRespondidas = Object.keys(respuestasNormalizadas).filter(
+      (id) => typeof respuestasNormalizadas[id] === 'string' && respuestasNormalizadas[id].length > 0
+    );
+    const idsEsperadasSet = new Set(preguntaIdsEsperadas);
+    const faltanPreguntas = preguntaIdsEsperadas.some((id) => !idsRespondidas.includes(id));
+    const hayIdsExtra = idsRespondidas.some((id) => !idsEsperadasSet.has(id));
+    if (faltanPreguntas || hayIdsExtra || idsRespondidas.length !== preguntaIdsEsperadas.length) {
+      throw new AppError('Debés responder todas las preguntas antes de enviar', 400);
+    }
+
+    // 3. Obtener respuestas correctas
+    const preguntaIds = preguntaIdsEsperadas;
 
     let preguntas: any[] | null = null;
     let preguntasError: any = null;
@@ -202,7 +231,7 @@ export class ExamenesService {
       throw new AppError('Error al validar las respuestas', 500);
     }
 
-    // 3. Calcular nota
+    // 4. Calcular nota
     const porcentajeAprobacion = (moduloData as any)?.porcentaje_aprobacion ?? NOTA_MINIMA_APROBACION_DEFAULT;
     const preguntasConMeta = (preguntas || []).map((p: any) => ({
       ...p,
@@ -229,7 +258,7 @@ export class ExamenesService {
     }[] = [];
 
     for (const pregunta of preguntasConMeta) {
-      const respuestaDada = respuestas[pregunta.id] || '';
+      const respuestaDada = respuestasNormalizadas[pregunta.id] || '';
       let esCorrecta = false;
       let puntosPregunta = 0;
 
@@ -277,17 +306,17 @@ export class ExamenesService {
       }
     }
 
-    // 4. Guardar el intento siempre, independientemente del resultado
+    // 5. Guardar el intento siempre, independientemente del resultado
     await supabase.from('intentos_examen').insert({
       user_id: userId,
       modulo_id: moduloId,
-      respuestas,
+      respuestas: respuestasNormalizadas,
       nota,
       aprobado,
       duracion_seg: duracionSeg || null,
     });
 
-    // 5. Actualizar progreso
+    // 6. Actualizar progreso
     const nuevaMejorNota = Math.max(nota, progreso.mejor_nota || 0);
 
     await supabase
@@ -302,7 +331,7 @@ export class ExamenesService {
       .eq('user_id', userId)
       .eq('modulo_id', moduloId);
 
-    // 6. Si aprobó, desbloquear el siguiente módulo
+    // 7. Si aprobó, desbloquear el siguiente módulo
     let siguienteModuloDesbloqueado = false;
     if (aprobado) {
       siguienteModuloDesbloqueado = await this.desbloquearSiguiente(
@@ -317,11 +346,12 @@ export class ExamenesService {
       }
     }
 
-    // 7. Si no aprobó y alcanzó el límite de intentos, notificar al admin
+    // 8. Si no aprobó y alcanzó el límite de intentos, notificar al admin
     const nuevosIntentos = (progreso.intentos || 0) + 1;
     if (!aprobado && nuevosIntentos >= MAX_INTENTOS) {
       await this.notificarAdminLimiteIntentos(userId, moduloId);
     }
+    examenesServidos.delete(examKey);
 
     return {
       nota,

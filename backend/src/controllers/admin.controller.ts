@@ -7,6 +7,19 @@ import { adminService } from '../services/admin.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class AdminController {
+  private escapeCsvCell(value: unknown): string {
+    const str = value == null ? '' : String(value);
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+
+  private toCsv(headers: string[], rows: Array<Array<unknown>>): string {
+    const lines = [
+      headers.map((h) => this.escapeCsvCell(h)).join(','),
+      ...rows.map((row) => row.map((cell) => this.escapeCsvCell(cell)).join(',')),
+    ];
+    return `\uFEFF${lines.join('\n')}`;
+  }
+
   /**
    * GET /api/admin/dashboard
    * Métricas globales del sistema
@@ -70,7 +83,10 @@ export class AdminController {
       const vendedorId = req.params.id as string;
       const { activo } = req.body;
 
-      const result = await adminService.updateVendedor(vendedorId, { activo });
+      const result = await adminService.updateVendedor(vendedorId, { activo }, {
+        id: req.user!.id,
+        rol: req.user!.rol,
+      });
       return res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -137,7 +153,10 @@ export class AdminController {
       if (nota_aprobacion !== undefined)       data.nota_aprobacion       = nota_aprobacion || null;
       if (porcentaje_aprobacion !== undefined) data.porcentaje_aprobacion = Number(porcentaje_aprobacion) || 80;
 
-      const result = await adminService.updateModulo(moduloId, data);
+      const result = await adminService.updateModulo(moduloId, data, {
+        id: req.user!.id,
+        rol: req.user!.rol,
+      });
       return res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -152,6 +171,91 @@ export class AdminController {
     try {
       const result = await adminService.getReportes();
       return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/admin/reportes/csv?tipo=progreso|calificaciones
+   * Exporta CSV listo para descargar.
+   */
+  async getReportesCsv(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const tipo = String(req.query.tipo || 'progreso');
+      if (tipo !== 'progreso' && tipo !== 'calificaciones') {
+        return res.status(400).json({ error: 'tipo debe ser progreso o calificaciones' });
+      }
+
+      const result = await adminService.getReportes();
+      const hoy = new Date().toISOString().split('T')[0];
+
+      if (tipo === 'progreso') {
+        const headers = [
+          'Vendedor',
+          'Email',
+          'Modulos aprobados',
+          'Total modulos',
+          'Porcentaje',
+          'Promedio notas',
+          'Total intentos',
+          'Ultima actividad',
+        ];
+        const rows = result.progreso.map((r) => [
+          r.vendedor,
+          r.email,
+          r.modulosAprobados,
+          r.totalModulos,
+          `${r.porcentaje}%`,
+          r.promedioNotas > 0 ? `${r.promedioNotas.toFixed(1)}%` : '—',
+          r.totalIntentos,
+          r.fechaUltimaActividad ? new Date(r.fechaUltimaActividad).toLocaleDateString('es-AR') : '—',
+        ]);
+
+        const csv = this.toCsv(headers, rows);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="reporte-progreso-${hoy}.csv"`);
+        return res.status(200).send(csv);
+      }
+
+      const headers = [
+        'Vendedor',
+        'Email',
+        'Promedio vendedor',
+        'Promedio empresa',
+        'Total calificaciones',
+        'Vendedor 5',
+        'Vendedor 4',
+        'Vendedor 3',
+        'Vendedor 2',
+        'Vendedor 1',
+        'Empresa 5',
+        'Empresa 4',
+        'Empresa 3',
+        'Empresa 2',
+        'Empresa 1',
+      ];
+      const rows = result.calificaciones.map((r) => [
+        r.vendedor,
+        r.email,
+        r.promedioVendedor.toFixed(1),
+        r.promedioEmpresa.toFixed(1),
+        r.totalCalificaciones,
+        r.vendedor5,
+        r.vendedor4,
+        r.vendedor3,
+        r.vendedor2,
+        r.vendedor1,
+        r.empresa5,
+        r.empresa4,
+        r.empresa3,
+        r.empresa2,
+        r.empresa1,
+      ]);
+      const csv = this.toCsv(headers, rows);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="reporte-calificaciones-${hoy}.csv"`);
+      return res.status(200).send(csv);
     } catch (error) {
       next(error);
     }
@@ -273,7 +377,10 @@ export class AdminController {
   async eliminarVendedor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const vendedorId = req.params.id as string;
-      const result = await adminService.eliminarVendedor(vendedorId);
+      const result = await adminService.eliminarVendedor(vendedorId, {
+        id: req.user!.id,
+        rol: req.user!.rol,
+      });
       return res.status(200).json(result);
     } catch (error) {
       next(error);

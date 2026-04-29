@@ -86,6 +86,17 @@ const NAV_SECONDARY = [
     ),
   },
   {
+    href: '/admin/auditoria',
+    label: 'Auditoría',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 2 4 5v6c0 5.25 3.5 10.74 8 12 4.5-1.26 8-6.75 8-12V5l-8-3z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    ),
+  },
+  {
     href: '/admin/niveles',
     label: 'Niveles',
     exactMatch: false,

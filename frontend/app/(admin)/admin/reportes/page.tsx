@@ -78,87 +78,39 @@ export default function ReportesPage() {
 
   // Exportar a CSV
   const exportarCSV = (tipo: 'progreso' | 'calificaciones') => {
-    if (!data) return;
+    const download = async () => {
+      try {
+        const authRaw = localStorage.getItem('martinez-auth');
+        const token = authRaw ? JSON.parse(authRaw)?.state?.token : null;
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+        const response = await fetch(`${baseUrl}/admin/reportes/csv?tipo=${tipo}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
 
-    let headers: string[];
-    let rows: string[][];
+        if (!response.ok) {
+          throw new Error('No se pudo exportar el CSV');
+        }
 
-    if (tipo === 'progreso') {
-      headers = [
-        'Vendedor',
-        'Email',
-        'Módulos aprobados',
-        'Total módulos',
-        'Porcentaje',
-        'Promedio notas',
-        'Total intentos',
-        'Última actividad',
-      ];
-      rows = data.progreso.map((r) => [
-        r.vendedor,
-        r.email,
-        r.modulosAprobados.toString(),
-        r.totalModulos.toString(),
-        `${r.porcentaje}%`,
-        r.promedioNotas > 0 ? `${r.promedioNotas.toFixed(1)}%` : '—',
-        r.totalIntentos.toString(),
-        r.fechaUltimaActividad
-          ? new Date(r.fechaUltimaActividad).toLocaleDateString('es-AR')
-          : '—',
-      ]);
-    } else {
-      headers = [
-        'Vendedor',
-        'Email',
-        'Promedio vendedor',
-        'Promedio empresa',
-        'Total calificaciones',
-        'Vendedor 5',
-        'Vendedor 4',
-        'Vendedor 3',
-        'Vendedor 2',
-        'Vendedor 1',
-        'Empresa 5',
-        'Empresa 4',
-        'Empresa 3',
-        'Empresa 2',
-        'Empresa 1',
-      ];
-      rows = data.calificaciones.map((r) => [
-        r.vendedor,
-        r.email,
-        r.promedioVendedor.toFixed(1),
-        r.promedioEmpresa.toFixed(1),
-        r.totalCalificaciones.toString(),
-        r.vendedor5.toString(),
-        r.vendedor4.toString(),
-        r.vendedor3.toString(),
-        r.vendedor2.toString(),
-        r.vendedor1.toString(),
-        r.empresa5.toString(),
-        r.empresa4.toString(),
-        r.empresa3.toString(),
-        r.empresa2.toString(),
-        r.empresa1.toString(),
-      ]);
-    }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const filename = match?.[1] || `reporte-${tipo}.csv`;
 
-    // Construir CSV
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-    ].join('\n');
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('[ReportesPage] Error exportando CSV', error);
+        setError('No se pudo exportar el CSV');
+      }
+    };
 
-    // Descargar
-    const blob = new Blob(['\uFEFF' + csvContent], {
-      type: 'text/csv;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `reporte-${tipo}-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    void download();
   };
 
   if (isLoading) {

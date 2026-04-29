@@ -32,6 +32,29 @@ if (pushDisponible && webpushLib) {
 
 const router = Router();
 
+const registrarAuditoria = async (
+  req: any,
+  payload: {
+    accion: string;
+    entidad: string;
+    entidadId?: string | null;
+    datosAnteriores?: unknown;
+    datosNuevos?: unknown;
+  }
+) => {
+  const user = req.user as { id?: string; rol?: string } | undefined;
+  if (!user?.id) return;
+  await supabase.rpc('registrar_auditoria_operacional', {
+    p_usuario_id: user.id,
+    p_rol: user.rol || 'admin',
+    p_accion: payload.accion,
+    p_entidad: payload.entidad,
+    p_entidad_id: payload.entidadId || null,
+    p_datos_anteriores: (payload.datosAnteriores ?? null) as any,
+    p_datos_nuevos: (payload.datosNuevos ?? null) as any,
+  });
+};
+
 // Todas las rutas admin requieren autenticación y rol admin
 router.use(authMiddleware);
 router.use(requireRole('admin'));
@@ -39,6 +62,48 @@ router.use(requireRole('admin'));
 // ─────────────────────────────────────────────────────
 // Dashboard
 // ─────────────────────────────────────────────────────
+
+// GET /api/admin/auditoria
+router.get('/auditoria', async (req, res, next) => {
+  try {
+    const desde = (req.query.desde as string) || '';
+    const hasta = (req.query.hasta as string) || '';
+    const rol = (req.query.rol as string) || '';
+    const accion = (req.query.accion as string) || '';
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    let query = supabase
+      .from('auditoria_operacional')
+      .select(`
+        id, usuario_id, rol, accion, entidad, entidad_id, datos_anteriores, datos_nuevos, created_at,
+        users!auditoria_operacional_usuario_id_fkey(nombre, apellido, email)
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (rol) query = query.eq('rol', rol);
+    if (accion) query = query.eq('accion', accion);
+    if (desde) {
+      query = query.gte('created_at', new Date(`${desde}T00:00:00.000Z`).toISOString());
+    }
+    if (hasta) {
+      query = query.lte('created_at', new Date(`${hasta}T23:59:59.999Z`).toISOString());
+    }
+
+    const { data, error, count } = await query;
+    if (error) throw new Error('Error al obtener auditoría operacional');
+
+    return res.status(200).json({
+      eventos: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/admin/dashboard
 router.get(
@@ -93,6 +158,12 @@ router.patch(
 // ─────────────────────────────────────────────────────
 // Reportes
 // ─────────────────────────────────────────────────────
+
+// GET /api/admin/reportes/csv?tipo=progreso|calificaciones
+router.get(
+  '/reportes/csv',
+  adminController.getReportesCsv.bind(adminController)
+);
 
 // GET /api/admin/reportes
 router.get(
@@ -173,23 +244,30 @@ router.delete(
 // GET /api/admin/notificaciones
 router.get('/notificaciones', async (_req, res, next) => {
   try {
+    const limit = Math.max(1, Math.min(100, Number(_req.query.limit) || 50));
+    const offset = Math.max(0, Number(_req.query.offset) || 0);
     const { data, error } = await supabase
       .from('notificaciones_admin')
       .select(`
-        *,
+        id, user_id, modulo_id, tipo, titulo, mensaje, leida, created_at,
         users (nombre, apellido, email),
         modulos (titulo, orden)
       `)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .range(offset, offset + limit - 1);
 
     if (error) throw new Error('Error al obtener notificaciones');
 
-    const noLeidas = (data || []).filter(n => !n.leida).length;
+    const { data: noLeidasRpc, error: noLeidasError } = await supabase.rpc('admin_notificaciones_no_leidas_count');
+    if (noLeidasError) throw new Error('Error al obtener conteo de no leídas');
+
+    const noLeidas = Number(noLeidasRpc || 0);
 
     return res.status(200).json({
       notificaciones: data || [],
       noLeidas,
+      limit,
+      offset,
     });
   } catch (error) {
     next(error);
@@ -412,7 +490,7 @@ router.get('/comunicados', async (_req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('comunicados')
-      .select('*')
+      .select('id, titulo, contenido, activo, created_at')
       .order('created_at', { ascending: false });
     if (error) throw new Error('Error al obtener comunicados');
     return res.status(200).json({ comunicados: data || [] });
@@ -437,6 +515,14 @@ router.post('/comunicados', async (req, res, next) => {
       .select()
       .single();
     if (error) throw new Error('Error al crear comunicado');
+
+    await registrarAuditoria(req, {
+      accion: 'publicar_comunicado',
+      entidad: 'comunicado',
+      entidadId: data?.id || null,
+      datosAnteriores: null,
+      datosNuevos: data || null,
+    });
 
     // Envío push automático (best effort, no rompe flujo principal)
     if (pushDisponible && webpushLib) {
@@ -476,6 +562,33 @@ router.post('/comunicados', async (req, res, next) => {
     }
 
     return res.status(201).json({ comunicado: data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/comunicados/:id
+router.delete('/comunicados/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('comunicados')
+      .select('id, titulo, contenido, activo, created_at')
+      .eq('id', id)
+      .maybeSingle();
+
+    const { error } = await supabase.from('comunicados').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar comunicado');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_comunicado',
+      entidad: 'comunicado',
+      entidadId: id,
+      datosAnteriores: anterior || null,
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({ mensaje: 'Comunicado eliminado' });
   } catch (error) {
     next(error);
   }
@@ -529,6 +642,8 @@ router.get('/visitas', async (req, res, next) => {
   try {
     const fecha = (req.query.fecha as string) || '';
     const mecanicoId = (req.query.mecanico_id as string) || '';
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
 
     let query = supabase
       .from('visitas_taller')
@@ -536,9 +651,9 @@ router.get('/visitas', async (req, res, next) => {
         id, created_at, estado, estado_visita, motivo, observaciones, updated_at, updated_by_admin_at, updated_by_admin_id,
         vehiculos(patente, marca, modelo, clientes(nombre, apellido)),
         users!visitas_taller_mecanico_id_fkey(id, nombre, apellido)
-      `)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(200);
+      .range(offset, offset + limit - 1);
 
     if (mecanicoId) {
       query = query.eq('mecanico_id', mecanicoId);
@@ -549,9 +664,14 @@ router.get('/visitas', async (req, res, next) => {
       query = query.gte('created_at', inicio).lte('created_at', fin);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw new Error('Error al obtener visitas');
-    return res.status(200).json({ visitas: data || [] });
+    return res.status(200).json({
+      visitas: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
   } catch (error) {
     next(error);
   }
@@ -564,9 +684,8 @@ router.get('/visitas/:id', async (req, res, next) => {
     const { data, error } = await supabase
       .from('visitas_taller')
       .select(`
-        *,
-        vehiculos(*, clientes(*)),
-        users!visitas_taller_mecanico_id_fkey(id, nombre, apellido, email)
+        id, created_at, estado_visita, motivo, observaciones, estado_neumaticos, estado_frenos, presion_psi, recomendacion, updated_by_admin_at,
+        vehiculos(patente, marca, modelo, clientes(nombre, apellido))
       `)
       .eq('id', id)
       .single();
@@ -591,6 +710,12 @@ router.patch('/visitas/:id', async (req, res, next) => {
       estado_visita,
     } = req.body;
 
+    const { data: antes } = await supabase
+      .from('visitas_taller')
+      .select('id, estado_visita, observaciones, estado_neumaticos, estado_frenos, presion_psi, recomendacion, updated_at')
+      .eq('id', id)
+      .single();
+
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
       updated_by_admin_at: new Date().toISOString(),
@@ -609,6 +734,20 @@ router.patch('/visitas/:id', async (req, res, next) => {
       .update(updates)
       .eq('id', id);
     if (error) throw new Error('Error al actualizar visita');
+
+    const { data: despues } = await supabase
+      .from('visitas_taller')
+      .select('id, estado_visita, observaciones, estado_neumaticos, estado_frenos, presion_psi, recomendacion, updated_at')
+      .eq('id', id)
+      .single();
+
+    await registrarAuditoria(req, {
+      accion: estado_visita === 'cerrada' ? 'cerrar_visita' : 'editar_visita',
+      entidad: 'visita',
+      entidadId: id,
+      datosAnteriores: antes || null,
+      datosNuevos: despues || null,
+    });
 
     return res.status(200).json({ mensaje: 'Visita actualizada' });
   } catch (error) {
@@ -675,12 +814,20 @@ router.get('/vendedores/:id/objetivo', async (req, res, next) => {
 // GET /api/admin/sugerencias
 router.get('/sugerencias', async (_req, res, next) => {
   try {
-    const { data, error } = await supabase
+    const limit = Math.max(1, Math.min(100, Number(_req.query.limit) || 20));
+    const offset = Math.max(0, Number(_req.query.offset) || 0);
+    const { data, error, count } = await supabase
       .from('sugerencias_dev')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, texto, estado, created_at', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) throw new Error('Error al obtener sugerencias');
-    return res.status(200).json({ sugerencias: data || [] });
+    return res.status(200).json({
+      sugerencias: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
   } catch (error) {
     next(error);
   }
@@ -764,6 +911,15 @@ router.delete('/sugerencias/:id', async (req, res, next) => {
 // ─────────────────────────────────────────────────────
 router.get('/estadisticas', async (_req, res, next) => {
   try {
+    const [{ data: ventasPorSemana, error: ventasPorSemanaError }, { data: montoPorMes, error: montoPorMesError }] =
+      await Promise.all([
+        supabase.rpc('admin_estadisticas_ventas_por_semana', { p_weeks: 8 }),
+        supabase.rpc('admin_estadisticas_monto_por_mes', { p_months: 6 }),
+      ]);
+
+    if (ventasPorSemanaError) throw new Error('Error al obtener ventas por semana');
+    if (montoPorMesError) throw new Error('Error al obtener monto por mes');
+
     const [
       { data: atenciones },
       { data: vendedores },
@@ -778,29 +934,6 @@ router.get('/estadisticas', async (_req, res, next) => {
 
     const todasAtenciones = atenciones || [];
     const todosVendedores = vendedores || [];
-
-    // ── 1. Ventas por semana (últimas 8 semanas) ──
-    const ventasPorSemana: { semana: string; ventas: number; monto: number }[] = [];
-    for (let i = 7; i >= 0; i--) {
-      const lunes = new Date();
-      lunes.setDate(lunes.getDate() - lunes.getDay() + 1 - i * 7);
-      lunes.setHours(0, 0, 0, 0);
-      const sabado = new Date(lunes);
-      sabado.setDate(lunes.getDate() + 6);
-      sabado.setHours(23, 59, 59, 999);
-
-      const ventasSemana = todasAtenciones.filter((a) => {
-        const fecha = new Date(a.created_at);
-        return a.resultado === 'venta_cerrada' && fecha >= lunes && fecha <= sabado;
-      });
-
-      const label = `${lunes.getDate()}/${lunes.getMonth() + 1}`;
-      ventasPorSemana.push({
-        semana: label,
-        ventas: ventasSemana.length,
-        monto: ventasSemana.reduce((acc, a) => acc + (a.monto || 0), 0),
-      });
-    }
 
     // ── 2. Módulos: aprobados vs reprobados ──
     const moduloStats = (modulos || []).map((m) => {
@@ -830,32 +963,11 @@ router.get('/estadisticas', async (_req, res, next) => {
       };
     }).sort((a, b) => b.tasa - a.tasa);
 
-    // ── 4. Monto acumulado por mes (últimos 6 meses) ──
-    const montoPorMes: { mes: string; monto: number; ventas: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const fecha = new Date();
-      fecha.setMonth(fecha.getMonth() - i);
-      const mes = fecha.getMonth();
-      const anio = fecha.getFullYear();
-
-      const ventasMes = todasAtenciones.filter((a) => {
-        const d = new Date(a.created_at);
-        return a.resultado === 'venta_cerrada' && d.getMonth() === mes && d.getFullYear() === anio;
-      });
-
-      const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-      montoPorMes.push({
-        mes: MESES[mes],
-        monto: ventasMes.reduce((acc, a) => acc + (a.monto || 0), 0),
-        ventas: ventasMes.length,
-      });
-    }
-
     return res.status(200).json({
-      ventasPorSemana,
+      ventasPorSemana: ventasPorSemana || [],
       moduloStats,
       conversionPorVendedor,
-      montoPorMes,
+      montoPorMes: montoPorMes || [],
     });
   } catch (error) {
     next(error);

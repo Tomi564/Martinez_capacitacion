@@ -99,13 +99,15 @@ export class QRController {
    * Lista de participantes del sorteo — solo admin
    */
   async getParticipantes(
-    _req: AuthRequest,
+    req: AuthRequest,
     res: Response,
     next: NextFunction
   ) {
     try {
-      const result = await qrService.getParticipantesSorteo();
-      return res.status(200).json({ participantes: result });
+      const limit = Number(req.query.limit) || 20;
+      const offset = Number(req.query.offset) || 0;
+      const result = await qrService.getParticipantesSorteo(limit, offset);
+      return res.status(200).json(result);
     } catch (error) {
       next(error);
     }

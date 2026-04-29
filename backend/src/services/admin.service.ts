@@ -13,95 +13,64 @@ import { AppError } from '../middleware/errorHandler';
 import { modulosService } from './modulos.service';
 import bcrypt from 'bcryptjs';
 
+interface ActorAuditoria {
+  id: string;
+  rol?: string;
+}
+
 export class AdminService {
+  private async registrarAuditoria(params: {
+    actor?: ActorAuditoria;
+    accion: string;
+    entidad: string;
+    entidadId?: string | null;
+    datosAnteriores?: unknown;
+    datosNuevos?: unknown;
+  }) {
+    if (!params.actor?.id) return;
+    await supabase.rpc('registrar_auditoria_operacional', {
+      p_usuario_id: params.actor.id,
+      p_rol: params.actor.rol || 'admin',
+      p_accion: params.accion,
+      p_entidad: params.entidad,
+      p_entidad_id: params.entidadId || null,
+      p_datos_anteriores: (params.datosAnteriores ?? null) as any,
+      p_datos_nuevos: (params.datosNuevos ?? null) as any,
+    });
+  }
   /**
    * Dashboard con métricas globales del sistema.
    */
   async getDashboard() {
-    // Total de vendedores activos
-    const { data: vendedores, error: vendedoresError } = await supabase
-      .from('users')
-      .select('id, nombre, apellido, email')
-      .eq('rol', 'vendedor')
-      .eq('activo', true);
+    const { data, error } = await supabase.rpc('admin_dashboard_resumen');
+    if (error) throw new AppError('Error al obtener dashboard', 500);
 
-    if (vendedoresError) throw new AppError('Error al obtener vendedores', 500);
+    const vendedores = (data || []).map((row: any) => ({
+      id: row.id,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      email: row.email,
+      modulosAprobados: Number(row.modulos_aprobados || 0),
+      totalModulos: Number(row.total_modulos || 0),
+      promedioNotas: Math.round(Number(row.promedio_notas || 0) * 10) / 10,
+      ultimaActividad: row.ultima_actividad || null,
+    }));
 
-    // Total de módulos activos
-    const { data: modulos, error: modulosError } = await supabase
-      .from('modulos')
-      .select('id')
-      .eq('activo', true);
-
-    if (modulosError) throw new AppError('Error al obtener módulos', 500);
-
-    const totalModulos = modulos?.length || 0;
-
-    // Progreso de todos los vendedores
-    const { data: progresos } = await supabase
-      .from('progreso')
-      .select('user_id, estado, mejor_nota, ultimo_intento')
-      .eq('estado', 'aprobado');
-
-    // Calcular métricas por vendedor
-    const vendedoresConProgreso = await Promise.all(
-      (vendedores || []).map(async (vendedor) => {
-        const progresoVendedor = (progresos || []).filter(
-          (p) => p.user_id === vendedor.id
-        );
-
-        const modulosAprobados = progresoVendedor.length;
-
-        const notasValidas = progresoVendedor
-          .map((p) => p.mejor_nota)
-          .filter((n) => n > 0);
-
-        const promedioNotas =
-          notasValidas.length > 0
-            ? notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length
-            : 0;
-
-        const ultimaActividad =
-          progresoVendedor
-            .map((p) => p.ultimo_intento)
-            .filter(Boolean)
-            .sort()
-            .reverse()[0] || null;
-
-        return {
-          id: vendedor.id,
-          nombre: vendedor.nombre,
-          apellido: vendedor.apellido,
-          email: vendedor.email,
-          modulosAprobados,
-          totalModulos,
-          promedioNotas: Math.round(promedioNotas * 10) / 10,
-          ultimaActividad,
-        };
-      })
-    );
-
-    // Vendedores que completaron todos los módulos
-    const vendedoresCompletos = vendedoresConProgreso.filter(
+    const totalModulos = vendedores[0]?.totalModulos || 0;
+    const vendedoresCompletos = vendedores.filter(
       (v) => v.modulosAprobados === totalModulos && totalModulos > 0
     ).length;
-
-    // Promedio general de notas
-    const todasLasNotas = vendedoresConProgreso
-      .map((v) => v.promedioNotas)
-      .filter((n) => n > 0);
-
     const promedioGeneral =
-      todasLasNotas.length > 0
-        ? todasLasNotas.reduce((a, b) => a + b, 0) / todasLasNotas.length
+      vendedores.length > 0
+        ? vendedores.reduce((acc, v) => acc + v.promedioNotas, 0) / vendedores.length
         : 0;
 
     return {
-      totalVendedores: vendedores?.length || 0,
+      totalVendedores: vendedores.length,
       totalModulos,
       vendedoresCompletos,
       promedioGeneral: Math.round(promedioGeneral * 10) / 10,
-      vendedores: vendedoresConProgreso,
+      vendedores,
     };
   }
 
@@ -215,8 +184,16 @@ export class AdminService {
    */
   async updateVendedor(
     vendedorId: string,
-    data: { activo?: boolean }
+    data: { activo?: boolean },
+    actor?: ActorAuditoria
   ) {
+    const { data: antes } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email, activo, updated_at')
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor')
+      .single();
+
     const { error } = await supabase
       .from('users')
       .update(data)
@@ -224,6 +201,22 @@ export class AdminService {
       .eq('rol', 'vendedor');
 
     if (error) throw new AppError('Error al actualizar el vendedor', 500);
+
+    const { data: despues } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email, activo, updated_at')
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor')
+      .single();
+
+    await this.registrarAuditoria({
+      actor,
+      accion: data.activo === false ? 'desactivar_vendedor' : 'editar_vendedor',
+      entidad: 'vendedor',
+      entidadId: vendedorId,
+      datosAnteriores: antes || null,
+      datosNuevos: despues || null,
+    });
 
     return { mensaje: 'Vendedor actualizado correctamente' };
   }
@@ -234,7 +227,7 @@ export class AdminService {
   async getModulos() {
     const { data: modulos, error } = await supabase
       .from('modulos')
-      .select('*')
+      .select('id, titulo, descripcion, orden, duracion_min, activo, video_url, pdf_url, nota_aprobacion, porcentaje_aprobacion, created_at')
       .order('orden', { ascending: true });
 
     if (error) throw new AppError('Error al obtener módulos', 500);
@@ -318,14 +311,36 @@ export class AdminService {
       activo: boolean;
       video_url: string;
       pdf_url: string;
-    }>
+    }>,
+    actor?: ActorAuditoria
   ) {
+    const { data: antes } = await supabase
+      .from('modulos')
+      .select('id, titulo, descripcion, duracion_min, activo, video_url, pdf_url, nota_aprobacion, porcentaje_aprobacion, updated_at')
+      .eq('id', moduloId)
+      .single();
+
     const { error } = await supabase
       .from('modulos')
       .update(data)
       .eq('id', moduloId);
 
     if (error) throw new AppError('Error al actualizar el módulo', 500);
+
+    const { data: despues } = await supabase
+      .from('modulos')
+      .select('id, titulo, descripcion, duracion_min, activo, video_url, pdf_url, nota_aprobacion, porcentaje_aprobacion, updated_at')
+      .eq('id', moduloId)
+      .single();
+
+    await this.registrarAuditoria({
+      actor,
+      accion: 'editar_modulo',
+      entidad: 'modulo',
+      entidadId: moduloId,
+      datosAnteriores: antes || null,
+      datosNuevos: despues || null,
+    });
 
     return { mensaje: 'Módulo actualizado correctamente' };
   }
@@ -334,121 +349,49 @@ export class AdminService {
    * Reportes completos de progreso y calificaciones.
    */
   async getReportes() {
-    // Obtener todos los vendedores
-    const { data: vendedores } = await supabase
-      .from('users')
-      .select('id, nombre, apellido, email')
-      .eq('rol', 'vendedor')
-      .order('apellido', { ascending: true });
+    const [{ data: progresoRows, error: progresoError }, { data: calificacionesRows, error: calificacionesError }] =
+      await Promise.all([
+        supabase.rpc('admin_reportes_progreso'),
+        supabase.rpc('admin_reportes_calificaciones'),
+      ]);
 
-    // Total módulos
-    const { data: modulos } = await supabase
-      .from('modulos')
-      .select('id')
-      .eq('activo', true);
+    if (progresoError) throw new AppError('Error al obtener reporte de progreso', 500);
+    if (calificacionesError) throw new AppError('Error al obtener reporte de calificaciones', 500);
 
-    const totalModulos = modulos?.length || 0;
+    const reporteProgreso = (progresoRows || []).map((row: any) => ({
+      vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
+      email: row.email,
+      modulosAprobados: Number(row.modulos_aprobados || 0),
+      totalModulos: Number(row.total_modulos || 0),
+      porcentaje: Number(row.porcentaje || 0),
+      promedioNotas: Math.round(Number(row.promedio_notas || 0) * 10) / 10,
+      totalIntentos: Number(row.total_intentos || 0),
+      fechaUltimaActividad: row.fecha_ultima_actividad || null,
+    }));
 
-    // Progreso de todos
-    const { data: progresos } = await supabase
-      .from('progreso')
-      .select('user_id, estado, mejor_nota, ultimo_intento, intentos');
-
-    // Calificaciones de todos
-    const { data: calificaciones } = await supabase
-      .from('calificaciones_qr')
-      .select('vendedor_id, estrellas, estrellas_vendedor, estrellas_empresa');
-
-    // Construir reporte de progreso
-    const reporteProgreso = (vendedores || []).map((vendedor) => {
-      const progresoVendedor = (progresos || []).filter(
-        (p) => p.user_id === vendedor.id
-      );
-
-      const aprobados = progresoVendedor.filter(
-        (p) => p.estado === 'aprobado'
-      );
-
-      const notasValidas = aprobados
-        .map((p) => p.mejor_nota)
-        .filter((n) => n > 0);
-
-      const promedioNotas =
-        notasValidas.length > 0
-          ? notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length
-          : 0;
-
-      const totalIntentos = progresoVendedor.reduce(
-        (acc, p) => acc + (p.intentos || 0),
-        0
-      );
-
-      const ultimaActividad =
-        progresoVendedor
-          .map((p) => p.ultimo_intento)
-          .filter(Boolean)
-          .sort()
-          .reverse()[0] || null;
-
-      return {
-        vendedor: `${vendedor.nombre} ${vendedor.apellido}`,
-        email: vendedor.email,
-        modulosAprobados: aprobados.length,
-        totalModulos,
-        porcentaje:
-          totalModulos > 0
-            ? Math.round((aprobados.length / totalModulos) * 100)
-            : 0,
-        promedioNotas: Math.round(promedioNotas * 10) / 10,
-        totalIntentos,
-        fechaUltimaActividad: ultimaActividad,
-      };
-    });
-
-    // Construir reporte de calificaciones
-    const reporteCalificaciones = (vendedores || []).map((vendedor) => {
-      const calificacionesVendedor = (calificaciones || []).filter(
-        (c) => c.vendedor_id === vendedor.id
-      );
-
-      const total = calificacionesVendedor.length;
-      const suma = calificacionesVendedor.reduce(
-        (acc, c: any) => acc + (c.estrellas_vendedor ?? c.estrellas),
-        0
-      );
-
-      const sumaEmpresa = calificacionesVendedor.reduce(
-        (acc, c: any) => acc + (c.estrellas_empresa ?? c.estrellas),
-        0
-      );
-
-      const contarEstrellas = (n: number) =>
-        calificacionesVendedor.filter((c) => c.estrellas === n).length;
-
-      return {
-        vendedor: `${vendedor.nombre} ${vendedor.apellido}`,
-        email: vendedor.email,
-        promedio: total > 0 ? Math.round((suma / total) * 10) / 10 : 0,
-        promedioVendedor: total > 0 ? Math.round((suma / total) * 10) / 10 : 0,
-        promedioEmpresa: total > 0 ? Math.round((sumaEmpresa / total) * 10) / 10 : 0,
-        totalCalificaciones: total,
-        estrellas5: contarEstrellas(5),
-        estrellas4: contarEstrellas(4),
-        estrellas3: contarEstrellas(3),
-        estrellas2: contarEstrellas(2),
-        estrellas1: contarEstrellas(1),
-        vendedor5: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 5).length,
-        vendedor4: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 4).length,
-        vendedor3: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 3).length,
-        vendedor2: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 2).length,
-        vendedor1: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 1).length,
-        empresa5: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 5).length,
-        empresa4: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 4).length,
-        empresa3: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 3).length,
-        empresa2: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 2).length,
-        empresa1: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 1).length,
-      };
-    });
+    const reporteCalificaciones = (calificacionesRows || []).map((row: any) => ({
+      vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
+      email: row.email,
+      promedio: Math.round(Number(row.promedio || 0) * 10) / 10,
+      promedioVendedor: Math.round(Number(row.promedio_vendedor || 0) * 10) / 10,
+      promedioEmpresa: Math.round(Number(row.promedio_empresa || 0) * 10) / 10,
+      totalCalificaciones: Number(row.total_calificaciones || 0),
+      estrellas5: Number(row.estrellas5 || 0),
+      estrellas4: Number(row.estrellas4 || 0),
+      estrellas3: Number(row.estrellas3 || 0),
+      estrellas2: Number(row.estrellas2 || 0),
+      estrellas1: Number(row.estrellas1 || 0),
+      vendedor5: Number(row.vendedor5 || 0),
+      vendedor4: Number(row.vendedor4 || 0),
+      vendedor3: Number(row.vendedor3 || 0),
+      vendedor2: Number(row.vendedor2 || 0),
+      vendedor1: Number(row.vendedor1 || 0),
+      empresa5: Number(row.empresa5 || 0),
+      empresa4: Number(row.empresa4 || 0),
+      empresa3: Number(row.empresa3 || 0),
+      empresa2: Number(row.empresa2 || 0),
+      empresa1: Number(row.empresa1 || 0),
+    }));
 
     return {
       progreso: reporteProgreso,
@@ -674,7 +617,14 @@ export class AdminService {
   /**
    * Desactiva un vendedor (soft delete — preserva historial).
    */
-  async eliminarVendedor(vendedorId: string) {
+  async eliminarVendedor(vendedorId: string, actor?: ActorAuditoria) {
+    const { data: antes } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email, activo, updated_at')
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor')
+      .single();
+
     const { error } = await supabase
       .from('users')
       .update({ activo: false })
@@ -682,6 +632,22 @@ export class AdminService {
       .eq('rol', 'vendedor');
 
     if (error) throw new AppError('Error al desactivar el vendedor', 500);
+
+    const { data: despues } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email, activo, updated_at')
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor')
+      .single();
+
+    await this.registrarAuditoria({
+      actor,
+      accion: 'desactivar_vendedor',
+      entidad: 'vendedor',
+      entidadId: vendedorId,
+      datosAnteriores: antes || null,
+      datosNuevos: despues || null,
+    });
 
     return { mensaje: 'Vendedor desactivado correctamente' };
   }
