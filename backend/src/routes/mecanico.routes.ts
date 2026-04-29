@@ -7,7 +7,6 @@ import { Resend } from 'resend';
 
 const router = Router();
 router.use(authMiddleware);
-router.use(requireRole('mecanico', 'admin', 'vendedor'));
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -26,7 +25,7 @@ router.get('/clientes', requireRole('admin', 'vendedor'), async (_req, res: Resp
 });
 
 // POST /api/mecanico/clientes — crear cliente
-router.post('/clientes', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/clientes', requireRole('admin', 'vendedor', 'mecanico'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { nombre, apellido, dni, telefono, email } = req.body;
     if (!nombre || !apellido) throw new AppError('Nombre y apellido requeridos', 400);
@@ -41,8 +40,28 @@ router.post('/clientes', async (req: AuthRequest, res: Response, next: NextFunct
 
 // ─── Vehículos ──────────────────────────────────────────────────────────────
 
+// GET /api/mecanico/vehiculos/sugerencias?q=ABC
+router.get('/vehiculos/sugerencias', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 3) {
+      return res.json({ vehiculos: [] });
+    }
+
+    const { data, error } = await supabase
+      .from('vehiculos')
+      .select(`id, patente, marca, modelo, anio, medida_rueda, clientes(id, nombre, apellido, telefono, email)`)
+      .or(`patente.ilike.%${q}%,marca.ilike.%${q}%,modelo.ilike.%${q}%`)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    if (error) throw new AppError('Error al buscar sugerencias de vehículos', 500);
+    return res.json({ vehiculos: data || [] });
+  } catch (e) { next(e); }
+});
+
 // GET /api/mecanico/vehiculos/buscar/:patente
-router.get('/vehiculos/buscar/:patente', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/vehiculos/buscar/:patente', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const patente = (req.params.patente as string).toUpperCase();
     const { data, error } = await supabase
@@ -56,7 +75,7 @@ router.get('/vehiculos/buscar/:patente', async (req: AuthRequest, res: Response,
 });
 
 // POST /api/mecanico/vehiculos — crear vehículo (y cliente si viene)
-router.post('/vehiculos', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/vehiculos', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { patente, marca, modelo, anio, medida_rueda, cliente_id, cliente } = req.body;
     if (!patente || !marca || !modelo) throw new AppError('Patente, marca y modelo requeridos', 400);
@@ -92,7 +111,7 @@ router.post('/vehiculos', async (req: AuthRequest, res: Response, next: NextFunc
 // ─── Visitas ─────────────────────────────────────────────────────────────────
 
 // GET /api/mecanico/visitas — visitas de hoy del mecánico
-router.get('/visitas', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const mecanicoId = req.user!.id;
     const hoy = new Date();
@@ -109,14 +128,59 @@ router.get('/visitas', async (req: AuthRequest, res: Response, next: NextFunctio
   } catch (e) { next(e); }
 });
 
-// POST /api/mecanico/visitas — crear visita
-router.post('/visitas', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// GET /api/mecanico/visitas/historial — historial paginado (sin filtro de fecha)
+router.get('/visitas/historial', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { vehiculo_id, motivo, km } = req.body;
+    const mecanicoId = req.user!.id;
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const { data, error, count } = await supabase
+      .from('visitas_taller')
+      .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' })
+      .eq('mecanico_id', mecanicoId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw new AppError('Error al obtener historial de visitas', 500);
+    return res.json({
+      visitas: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
+  } catch (e) { next(e); }
+});
+
+// POST /api/mecanico/visitas — crear visita
+router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const {
+      vehiculo_id,
+      motivo,
+      km,
+      observaciones,
+      estado_neumaticos,
+      estado_frenos,
+      presion_psi,
+      recomendacion,
+    } = req.body;
     if (!vehiculo_id) throw new AppError('Vehículo requerido', 400);
     const { data, error } = await supabase
       .from('visitas_taller')
-      .insert({ vehiculo_id, mecanico_id: req.user!.id, motivo: motivo || null, km: km || null, estado: 'en_revision' })
+      .insert({
+        vehiculo_id,
+        mecanico_id: req.user!.id,
+        motivo: motivo || null,
+        observaciones: observaciones || null,
+        estado_neumaticos: estado_neumaticos || null,
+        estado_frenos: estado_frenos || null,
+        presion_psi: presion_psi != null ? Number(presion_psi) : null,
+        recomendacion: recomendacion || null,
+        estado_visita: 'abierta',
+        km: km || null,
+        estado: 'en_revision'
+      })
       .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido, email))`)
       .single();
     if (error) throw new AppError('Error al crear visita', 500);
@@ -125,7 +189,7 @@ router.post('/visitas', async (req: AuthRequest, res: Response, next: NextFuncti
 });
 
 // GET /api/mecanico/visitas/:id — detalle de visita con checklist
-router.get('/visitas/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { data: visita, error } = await supabase
       .from('visitas_taller')
@@ -150,12 +214,25 @@ router.get('/visitas/:id', async (req: AuthRequest, res: Response, next: NextFun
 });
 
 // PATCH /api/mecanico/visitas/:id — actualizar estado/observaciones
-router.patch('/visitas/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, observaciones } = req.body;
+    const {
+      estado,
+      observaciones,
+      estado_neumaticos,
+      estado_frenos,
+      presion_psi,
+      recomendacion,
+      estado_visita,
+    } = req.body;
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (estado) updates.estado = estado;
     if (observaciones !== undefined) updates.observaciones = observaciones;
+    if (estado_neumaticos !== undefined) updates.estado_neumaticos = estado_neumaticos || null;
+    if (estado_frenos !== undefined) updates.estado_frenos = estado_frenos || null;
+    if (presion_psi !== undefined) updates.presion_psi = presion_psi != null ? Number(presion_psi) : null;
+    if (recomendacion !== undefined) updates.recomendacion = recomendacion || null;
+    if (estado_visita !== undefined) updates.estado_visita = estado_visita;
     const { error } = await supabase.from('visitas_taller').update(updates).eq('id', req.params.id);
     if (error) throw new AppError('Error al actualizar visita', 500);
     return res.json({ ok: true });
@@ -163,7 +240,7 @@ router.patch('/visitas/:id', async (req: AuthRequest, res: Response, next: NextF
 });
 
 // POST /api/mecanico/visitas/:id/checklist — guardar respuestas
-router.post('/visitas/:id/checklist', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/visitas/:id/checklist', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { respuestas } = req.body as { respuestas: { item_id: string; estado: string; nota?: string }[] };
     if (!respuestas?.length) throw new AppError('Respuestas requeridas', 400);
@@ -180,7 +257,7 @@ router.post('/visitas/:id/checklist', async (req: AuthRequest, res: Response, ne
 });
 
 // POST /api/mecanico/visitas/:id/diagnostico — enviar email
-router.post('/visitas/:id/diagnostico', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/visitas/:id/diagnostico', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { data: visita } = await supabase
       .from('visitas_taller')

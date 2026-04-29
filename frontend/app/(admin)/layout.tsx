@@ -15,6 +15,8 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { InstallPWA } from '@/components/ui/InstallPWA';
 import { apiClient } from '@/lib/api';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { BottomNav } from '@/components/layout/BottomNav';
 
 // Ítems siempre visibles en el nav inferior (mobile)
 const NAV_PRIMARY = [
@@ -131,6 +133,19 @@ const NAV_SECONDARY = [
     ),
   },
   {
+    href: '/admin/visitas',
+    label: 'Visitas',
+    exactMatch: false,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    ),
+  },
+  {
     href: '/admin/participantes',
     label: 'Participantes',
     exactMatch: false,
@@ -178,7 +193,6 @@ export default function AdminLayout({
   const pathname = usePathname();
   const { isAuthenticated, isAdmin, nombreCompleto, logout, refreshUser } = useAuth();
   const [notificaciones, setNotificaciones] = useState(0);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Guard: solo admins
   useEffect(() => {
@@ -202,7 +216,9 @@ export default function AdminLayout({
           '/admin/notificaciones'
         );
         setNotificaciones(res.noLeidas);
-      } catch {}
+      } catch (error) {
+        console.error('[AdminLayout] Error cargando notificaciones', error);
+      }
     };
     fetchNotificaciones();
     // Revisar cada 2 minutos
@@ -294,140 +310,30 @@ export default function AdminLayout({
       {/* Contenido principal */}
       <div className="flex-1 lg:ml-64 flex flex-col w-0 min-w-0 overflow-x-hidden">
 
-        {/* Header mobile */}
-        <header className="lg:hidden bg-[#1F1F1F] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">🔧</span>
-            <p className="text-sm font-bold">Panel Admin</p>
-          </div>
-          <button
-            onClick={logout}
-            className="p-2 rounded-lg hover:bg-gray-800"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-          </button>
-        </header>
+        <div className="lg:hidden">
+          <AppHeader
+            title="Panel Admin"
+            onLogout={logout}
+            titleIcon={<span className="text-sm">🔧</span>}
+          />
+        </div>
 
         {/* Página */}
         <main className="flex-1 pb-20 lg:pb-0 overflow-x-hidden">
           {children}
         </main>
 
-        {/* Bottom nav — solo mobile */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20">
-
-          {/* Overlay oscuro al abrir el sheet */}
-          <div
-            onClick={() => setSheetOpen(false)}
-            className={`fixed inset-0 bg-black transition-opacity duration-300 ${
-              sheetOpen ? 'opacity-40 pointer-events-auto' : 'opacity-0 pointer-events-none'
-            }`}
+        <div className="lg:hidden">
+          <BottomNav
+            pathname={pathname}
+            primaryItems={[
+              { ...NAV_PRIMARY[0], badgeCount: notificaciones },
+              NAV_PRIMARY[1],
+            ]}
+            fabItems={NAV_SECONDARY}
+            fabGridColumns={3}
           />
-
-          {/* Sheet de ítems secundarios */}
-          <div
-            className={`absolute bottom-full left-0 right-0 bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out ${
-              sheetOpen ? 'translate-y-0' : 'translate-y-full'
-            }`}
-          >
-            {/* Handle visual */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 bg-gray-200 rounded-full" />
-            </div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-6 py-2">
-              Navegación
-            </p>
-            <div className="grid grid-cols-3 gap-1 px-4 pb-6 pt-1">
-              {NAV_SECONDARY.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSheetOpen(false)}
-                  className={`flex flex-col items-center gap-1.5 px-2 py-4 rounded-2xl transition-colors active:scale-95 ${
-                    isActive(item)
-                      ? 'bg-[#C8102E] text-white'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {item.icon}
-                  <span className="text-xs font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Barra inferior fija */}
-          <div className="relative bg-white border-t border-gray-200 grid grid-cols-3 items-center py-2">
-
-            {/* Ítem izquierdo — Dashboard */}
-            {NAV_PRIMARY.slice(0, 1).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center gap-0.5 py-1 rounded-xl transition-colors ${
-                  isActive(item) ? 'text-[#C8102E]' : 'text-gray-400'
-                }`}
-              >
-                {item.icon}
-                <span className={`text-xs ${isActive(item) ? 'font-semibold' : 'font-normal'}`}>
-                  {item.label}
-                </span>
-                {/* Badge de notificaciones */}
-                {item.href === '/admin' && notificaciones > 0 && (
-                  <span className="absolute top-2 ml-4 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                    {notificaciones > 9 ? '9+' : notificaciones}
-                  </span>
-                )}
-              </Link>
-            ))}
-
-            {/* Botón central FAB */}
-            <button
-              onClick={() => setSheetOpen((v) => !v)}
-              className={`relative -top-5 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
-                sheetOpen
-                  ? 'bg-[#C8102E] shadow-red-400'
-                  : NAV_SECONDARY.some((item) => isActive(item))
-                  ? 'bg-[#C8102E] shadow-red-300'
-                  : 'bg-[#1F1F1F] shadow-gray-400'
-              }`}
-              aria-label="Más opciones"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`w-6 h-6 text-white transition-transform duration-300 ${sheetOpen ? 'rotate-45' : ''}`}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </button>
-
-            {/* Ítem derecho — Ventas */}
-            {NAV_PRIMARY.slice(1).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center gap-0.5 py-1 rounded-xl transition-colors ${
-                  isActive(item) ? 'text-[#C8102E]' : 'text-gray-400'
-                }`}
-              >
-                {item.icon}
-                <span className={`text-xs ${isActive(item) ? 'font-semibold' : 'font-normal'}`}>
-                  {item.label}
-                </span>
-              </Link>
-            ))}
-
-          </div>
-        </nav>
+        </div>
 
       </div>
       <InstallPWA />

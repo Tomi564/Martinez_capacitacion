@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { PageState } from '@/components/ui/PageState';
 
 interface Visita {
   id: string; estado: string; motivo: string | null; observaciones: string | null;
@@ -34,15 +35,28 @@ export default function ClientesAdminPage() {
   const [busqueda, setBusqueda] = useState('');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [tab, setTab] = useState<'taller' | 'qr'>('taller');
+  const [hasError, setHasError] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
+  const cargarClientes = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    try {
+      const [vRes, pRes] = await Promise.all([
       apiClient.get<{ vehiculos: Vehiculo[] }>('/mecanico/clientes'),
       apiClient.get<{ participantes: Participante[] }>('/qr/participantes'),
-    ]).then(([vRes, pRes]) => {
+      ]);
       setVehiculos(vRes.vehiculos);
       setParticipantes(pRes.participantes);
-    }).catch(() => {}).finally(() => setIsLoading(false));
+    } catch (error) {
+      console.error('[ClientesAdminPage] Error cargando clientes/participantes', error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarClientes();
   }, []);
 
   const filtradosVehiculos = vehiculos.filter(v => {
@@ -58,8 +72,6 @@ export default function ClientesAdminPage() {
     return p.nombre.toLowerCase().includes(q) || p.apellido.toLowerCase().includes(q) ||
       p.dni.includes(q) || p.contacto.toLowerCase().includes(q);
   });
-
-  if (isLoading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin"/></div>;
 
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-5 max-w-4xl mx-auto">
@@ -101,14 +113,13 @@ export default function ClientesAdminPage() {
         </button>
       </div>
 
+      <PageState state={isLoading ? 'loading' : hasError ? 'error' : 'content'} onRetry={cargarClientes}>
       {/* ── Tab Taller ── */}
       {tab === 'taller' && (
-        filtradosVehiculos.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-2xl mb-2">🚗</p>
-            <p className="text-gray-500 text-sm">{busqueda ? 'Sin resultados' : 'Aún no hay vehículos registrados'}</p>
-          </div>
-        ) : (
+        <PageState
+          state={filtradosVehiculos.length === 0 ? 'empty' : 'content'}
+          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Aún no hay vehículos registrados.'}
+        >
           <div className="flex flex-col gap-3">
             {filtradosVehiculos.map(v => {
               const abierto = expandido === v.id;
@@ -167,17 +178,15 @@ export default function ClientesAdminPage() {
               );
             })}
           </div>
-        )
+        </PageState>
       )}
 
       {/* ── Tab QR ── */}
       {tab === 'qr' && (
-        filtradosParticipantes.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-2xl mb-2">📱</p>
-            <p className="text-gray-500 text-sm">{busqueda ? 'Sin resultados' : 'Sin participantes registrados'}</p>
-          </div>
-        ) : (
+        <PageState
+          state={filtradosParticipantes.length === 0 ? 'empty' : 'content'}
+          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Sin participantes registrados.'}
+        >
           <div className="flex flex-col gap-2">
             {filtradosParticipantes.map(p => (
               <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-1">
@@ -195,8 +204,9 @@ export default function ClientesAdminPage() {
               </div>
             ))}
           </div>
-        )
+        </PageState>
       )}
+      </PageState>
     </div>
   );
 }

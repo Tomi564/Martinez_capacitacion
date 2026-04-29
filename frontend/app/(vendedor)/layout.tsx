@@ -16,9 +16,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { InstallPWA } from '@/components/ui/InstallPWA';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { BottomNav } from '@/components/layout/BottomNav';
 
 // Ítems siempre visibles
 const NAV_PRIMARY = [
@@ -132,7 +133,6 @@ export default function VendedorLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isAdmin, user, nombreCompleto, logout, refreshUser } = useAuth();
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace('/login'); return; }
@@ -146,144 +146,26 @@ export default function VendedorLayout({
   useEffect(() => setMounted(true), []);
   if (!mounted || !isAuthenticated()) return null;
 
-  const isActive = (item: { href: string; exactMatch: boolean }) =>
-    item.exactMatch
-      ? pathname === item.href
-      : pathname.startsWith(item.href);
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
-      {/* Header superior */}
-      <header className="bg-[#1F1F1F] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div>
-          <p className="text-xs text-gray-400">Bienvenido</p>
-          <p className="text-sm font-bold truncate max-w-[200px]">
-            {nombreCompleto()}
-          </p>
-        </div>
-        <button
-          onClick={logout}
-          className="p-2 rounded-lg hover:bg-[#2F2F2F] transition-colors"
-          aria-label="Cerrar sesión"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-        </button>
-      </header>
+      <AppHeader
+        subtitle="Bienvenido"
+        title={nombreCompleto()}
+        onLogout={logout}
+      />
 
       {/* Contenido principal */}
       <main className="flex-1 pb-20">
         {children}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-20">
-
-        {/* Overlay */}
-        <div
-          onClick={() => setSheetOpen(false)}
-          className={`fixed inset-0 bg-black transition-opacity duration-300 ${
-            sheetOpen ? 'opacity-40 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
-        />
-
-        {/* Sheet de ítems secundarios */}
-        <div
-          className={`absolute bottom-full left-0 right-0 bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out ${
-            sheetOpen ? 'translate-y-0' : 'translate-y-full'
-          }`}
-        >
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1 bg-gray-200 rounded-full" />
-          </div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-6 py-2">
-            Navegación
-          </p>
-          <div className="grid grid-cols-2 gap-2 px-4 pb-6 pt-1">
-            {NAV_SECONDARY.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSheetOpen(false)}
-                className={`flex items-center gap-3 px-4 py-4 rounded-2xl transition-colors active:scale-95 ${
-                  isActive(item)
-                    ? 'bg-[#C8102E] text-white'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {item.icon}
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Barra inferior fija */}
-        <div className="relative bg-white border-t border-gray-200 grid grid-cols-3 items-center py-2">
-
-          {/* Inicio — izquierda */}
-          {NAV_PRIMARY.slice(0, 1).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-0.5 py-1 transition-colors ${
-                isActive(item) ? 'text-[#C8102E]' : 'text-gray-400'
-              }`}
-            >
-              {item.icon}
-              <span className={`text-xs ${isActive(item) ? 'font-semibold' : 'font-normal'}`}>
-                {item.label}
-              </span>
-            </Link>
-          ))}
-
-          {/* FAB central */}
-          <button
-            onClick={() => setSheetOpen((v) => !v)}
-            className={`relative -top-5 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 active:scale-90 ${
-              sheetOpen
-                ? 'bg-[#C8102E] shadow-red-400'
-                : NAV_SECONDARY.some((item) => isActive(item))
-                ? 'bg-[#C8102E] shadow-red-300'
-                : 'bg-[#1F1F1F] shadow-gray-400'
-            }`}
-            aria-label="Más opciones"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`w-6 h-6 text-white transition-transform duration-300 ${sheetOpen ? 'rotate-45' : ''}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
-
-          {/* Módulos — derecha */}
-          {NAV_PRIMARY.slice(1).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-0.5 py-1 transition-colors ${
-                isActive(item) ? 'text-[#C8102E]' : 'text-gray-400'
-              }`}
-            >
-              {item.icon}
-              <span className={`text-xs ${isActive(item) ? 'font-semibold' : 'font-normal'}`}>
-                {item.label}
-              </span>
-            </Link>
-          ))}
-
-        </div>
-      </nav>
+      <BottomNav
+        pathname={pathname}
+        primaryItems={[NAV_PRIMARY[0], NAV_PRIMARY[1]]}
+        fabItems={NAV_SECONDARY}
+        fabGridColumns={2}
+      />
 
       <InstallPWA />
     </div>

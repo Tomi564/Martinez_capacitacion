@@ -32,8 +32,16 @@ interface VendedorDetalle {
   }[];
   calificaciones: {
     promedio: number;
+    promedioVendedor: number;
+    promedioEmpresa: number;
     total: number;
     distribucion: Record<number, number>;
+    ultimas5: {
+      fecha: string;
+      estrellasVendedor: number;
+      estrellasEmpresa: number;
+      comentario: string | null;
+    }[];
   };
 }
 
@@ -436,6 +444,71 @@ export default function VendedorDetallePage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Desglose de valoraciones QR */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Desglose de valoraciones (QR)
+        </p>
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-gray-200 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900">
+                {vendedor.calificaciones.promedioVendedor > 0
+                  ? vendedor.calificaciones.promedioVendedor.toFixed(1)
+                  : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Promedio como vendedor</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900">
+                {vendedor.calificaciones.promedioEmpresa > 0
+                  ? vendedor.calificaciones.promedioEmpresa.toFixed(1)
+                  : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Promedio a la empresa</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900">
+                {vendedor.calificaciones.total}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Valoraciones totales</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-gray-900 mb-2">Últimas 5 valoraciones</p>
+            {vendedor.calificaciones.ultimas5?.length ? (
+              <div className="flex flex-col gap-2">
+                {vendedor.calificaciones.ultimas5.map((item, idx) => (
+                  <div
+                    key={`${item.fecha}-${idx}`}
+                    className="rounded-xl border border-gray-200 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-gray-500">
+                        {new Date(item.fecha).toLocaleDateString('es-AR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <p className="text-xs font-medium text-gray-700">
+                        Vendedor: {item.estrellasVendedor}★ · Empresa: {item.estrellasEmpresa}★
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-700 mt-1">
+                      {item.comentario?.trim() || 'Sin comentario'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">Sin valoraciones registradas aún</p>
+            )}
+          </div>
         </div>
       </div>
 

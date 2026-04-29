@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import Image from 'next/image';
 
 interface VendedorPublico {
   nombre: string;
@@ -32,14 +33,15 @@ export default function EncuestaPage() {
 
   const [estado, setEstado] = useState<EstadoEncuesta>('cargando');
   const [vendedor, setVendedor] = useState<VendedorPublico | null>(null);
-  const [estrellas, setEstrellas] = useState<number>(0);
-  const [estrellasHover, setEstrellasHover] = useState<number>(0);
+  const [estrellasVendedor, setEstrellasVendedor] = useState<number>(0);
+  const [estrellasEmpresa, setEstrellasEmpresa] = useState<number>(0);
   const [comentario, setComentario] = useState('');
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [dni, setDni] = useState('');
   const [contacto, setContacto] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [participanteYaRegistrado, setParticipanteYaRegistrado] = useState(false);
 
   useEffect(() => {
     const fetchVendedor = async () => {
@@ -59,18 +61,20 @@ export default function EncuestaPage() {
   }, [codigo]);
 
   const handleSubmit = async () => {
-    if (estrellas === 0) return;
+    if (estrellasVendedor === 0 || estrellasEmpresa === 0) return;
 
     setEstado('enviando');
     try {
-      await apiClient.post(`/qr/calificar/${codigo}`, {
-        estrellas,
+      const res = await apiClient.post<{ participanteYaRegistrado?: boolean }>(`/qr/calificar/${codigo}`, {
+        estrellasVendedor,
+        estrellasEmpresa,
         comentario: comentario.trim() || null,
         nombre: nombre.trim() || undefined,
         apellido: apellido.trim() || undefined,
         dni: dni.trim() || undefined,
         contacto: contacto.trim() || undefined,
       });
+      setParticipanteYaRegistrado(!!res.participanteYaRegistrado);
       setEstado('gracias');
     } catch {
       setEstado('respondiendo');
@@ -103,7 +107,7 @@ export default function EncuestaPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
         <div className="max-w-sm w-full text-center">
-          <p className="text-5xl mb-4">❌</p>
+          <Image src="/icons/martinez-logo.svg" alt="Martínez Neumáticos" width={72} height={72} className="mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">
             QR inválido
           </h1>
@@ -118,39 +122,30 @@ export default function EncuestaPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
         <div className="max-w-sm w-full text-center flex flex-col gap-4">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          </div>
+          <Image src="/icons/martinez-logo.svg" alt="Martínez Neumáticos" width={80} height={80} className="mx-auto" />
 
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               ¡Muchas gracias!
             </h1>
             <p className="text-gray-500 text-sm mt-2">
-              Tu opinión nos ayuda a mejorar el servicio.
+              Gracias por ayudarnos a mejorar en Martínez Neumáticos.
             </p>
           </div>
 
-          {/* Estrellas enviadas */}
-          <div className="flex justify-center gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <span
-                key={star}
-                className={`text-3xl ${
-                  star <= estrellas ? 'text-amber-400' : 'text-gray-200'
-                }`}
-              >
-                ★
-              </span>
-            ))}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 text-left">
+            <p className="text-sm font-semibold text-gray-900">Tu valoración del vendedor: {estrellasVendedor}/5</p>
+            <p className="text-sm font-semibold text-gray-900 mt-1">Tu valoración de Martínez: {estrellasEmpresa}/5</p>
           </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
-            <p className="text-sm font-semibold text-amber-800">🎁 ¡Ya estás participando!</p>
+            <p className="text-sm font-semibold text-amber-800">
+              {participanteYaRegistrado ? '🎁 Ya estabas registrado en el sorteo' : '🎁 ¡Ya estás participando!'}
+            </p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Tu calificación te inscribió automáticamente en el sorteo mensual de Martínez Neumáticos.
+              {participanteYaRegistrado
+                ? 'Mantenemos tu participación vigente para el próximo sorteo mensual.'
+                : 'Tu calificación te inscribió automáticamente en el sorteo mensual de Martínez Neumáticos.'}
             </p>
           </div>
 
@@ -167,15 +162,18 @@ export default function EncuestaPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* Header */}
-      <div className="bg-[#C8102E] text-white px-6 pt-12 pb-8">
+      <div className="bg-[#111111] text-white px-6 pt-10 pb-6 border-b-4 border-[#C8102E]">
         <div className="max-w-sm mx-auto">
-          {/* Avatar del vendedor */}
-          <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mb-4 text-xl font-bold">
-            {vendedor?.nombre.charAt(0)}{vendedor?.apellido.charAt(0)}
+          <div className="flex items-center gap-3 mb-4">
+            <Image src="/icons/martinez-logo.svg" alt="Martínez Neumáticos" width={44} height={44} />
+            <div>
+              <p className="text-xs text-gray-300 uppercase tracking-wide">Encuesta oficial</p>
+              <p className="text-sm font-bold">Martínez Neumáticos</p>
+            </div>
           </div>
 
-          <p className="text-gray-400 text-sm mb-1">Calificá la atención de</p>
-          <h1 className="text-2xl font-bold">
+          <p className="text-gray-300 text-sm mb-1">Te atendió</p>
+          <h1 className="text-2xl font-bold text-white">
             {vendedor?.nombre} {vendedor?.apellido}
           </h1>
 
@@ -208,7 +206,7 @@ export default function EncuestaPage() {
       </div>
 
       {/* Formulario */}
-      <div className="flex-1 px-6 py-8">
+      <div className="flex-1 px-6 py-8 bg-[#FAFAFA]">
         <div className="max-w-sm mx-auto flex flex-col gap-6">
 
           {/* Error */}
@@ -218,41 +216,19 @@ export default function EncuestaPage() {
             </div>
           )}
 
-          {/* Selección de estrellas */}
-          <div>
-            <p className="text-base font-semibold text-gray-900 mb-4 text-center">
-              ¿Cómo fue tu experiencia?
-            </p>
+          <StarsBlock
+            title={`Tu experiencia con ${vendedor?.nombre || 'el vendedor'}`}
+            value={estrellasVendedor}
+            onChange={setEstrellasVendedor}
+            labels={labelEstrellas}
+          />
 
-            <div className="flex justify-center gap-3 mb-3">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setEstrellas(star)}
-                  onMouseEnter={() => setEstrellasHover(star)}
-                  onMouseLeave={() => setEstrellasHover(0)}
-                  className="text-5xl transition-transform active:scale-110 hover:scale-110"
-                >
-                  <span className={
-                    star <= (estrellasHover || estrellas)
-                      ? 'text-amber-400'
-                      : 'text-gray-200'
-                  }>
-                    ★
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Label de la selección */}
-            <p className="text-center text-sm font-medium text-gray-600 h-5">
-              {estrellasHover > 0
-                ? labelEstrellas[estrellasHover]
-                : estrellas > 0
-                ? labelEstrellas[estrellas]
-                : ''}
-            </p>
-          </div>
+          <StarsBlock
+            title="Tu experiencia en Martínez Neumáticos"
+            value={estrellasEmpresa}
+            onChange={setEstrellasEmpresa}
+            labels={labelEstrellas}
+          />
 
           {/* Comentario opcional */}
           <div>
@@ -274,7 +250,7 @@ export default function EncuestaPage() {
           </div>
 
           {/* Datos para el sorteo */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xl">🎁</span>
               <p className="text-sm font-bold text-gray-900">
@@ -333,7 +309,7 @@ export default function EncuestaPage() {
           {/* Botón enviar */}
           <button
             onClick={handleSubmit}
-            disabled={estrellas === 0 || estado === 'enviando'}
+            disabled={estrellasVendedor === 0 || estrellasEmpresa === 0 || estado === 'enviando'}
             className="w-full py-4 bg-[#C8102E] text-white font-bold rounded-2xl disabled:opacity-40 active:scale-95 transition-transform flex items-center justify-center gap-2"
           >
             {estado === 'enviando' ? (
@@ -342,7 +318,7 @@ export default function EncuestaPage() {
                 Enviando...
               </>
             ) : (
-              'Enviar calificación'
+              'Enviar valoración'
             )}
           </button>
 
@@ -353,6 +329,44 @@ export default function EncuestaPage() {
         </div>
       </div>
 
+    </div>
+  );
+}
+
+function StarsBlock({
+  title,
+  value,
+  onChange,
+  labels,
+}: {
+  title: string;
+  value: number;
+  onChange: (n: number) => void;
+  labels: Record<number, string>;
+}) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <p className="text-sm font-semibold text-gray-900 mb-3">{title}</p>
+      <div className="flex justify-center gap-2 mb-2">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            onClick={() => onChange(star)}
+            onMouseEnter={() => setHover(star)}
+            onMouseLeave={() => setHover(0)}
+            className="text-5xl leading-none active:scale-110 transition-transform"
+            aria-label={`Valorar ${star} estrellas`}
+          >
+            <span className={star <= (hover || value) ? 'text-[#F5C400]' : 'text-gray-200'}>
+              ★
+            </span>
+          </button>
+        ))}
+      </div>
+      <p className="text-center text-xs text-gray-500 h-4">
+        {(hover || value) ? labels[hover || value] : ''}
+      </p>
     </div>
   );
 }

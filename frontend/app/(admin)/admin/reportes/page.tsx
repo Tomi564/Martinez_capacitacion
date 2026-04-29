@@ -27,12 +27,24 @@ interface ReporteCalificaciones {
   vendedor: string;
   email: string;
   promedio: number;
+  promedioVendedor: number;
+  promedioEmpresa: number;
   totalCalificaciones: number;
   estrellas5: number;
   estrellas4: number;
   estrellas3: number;
   estrellas2: number;
   estrellas1: number;
+  vendedor5: number;
+  vendedor4: number;
+  vendedor3: number;
+  vendedor2: number;
+  vendedor1: number;
+  empresa5: number;
+  empresa4: number;
+  empresa3: number;
+  empresa2: number;
+  empresa1: number;
 }
 
 interface ReportesData {
@@ -98,24 +110,36 @@ export default function ReportesPage() {
       headers = [
         'Vendedor',
         'Email',
-        'Promedio',
+        'Promedio vendedor',
+        'Promedio empresa',
         'Total calificaciones',
-        '5 estrellas',
-        '4 estrellas',
-        '3 estrellas',
-        '2 estrellas',
-        '1 estrella',
+        'Vendedor 5',
+        'Vendedor 4',
+        'Vendedor 3',
+        'Vendedor 2',
+        'Vendedor 1',
+        'Empresa 5',
+        'Empresa 4',
+        'Empresa 3',
+        'Empresa 2',
+        'Empresa 1',
       ];
       rows = data.calificaciones.map((r) => [
         r.vendedor,
         r.email,
-        r.promedio.toFixed(1),
+        r.promedioVendedor.toFixed(1),
+        r.promedioEmpresa.toFixed(1),
         r.totalCalificaciones.toString(),
-        r.estrellas5.toString(),
-        r.estrellas4.toString(),
-        r.estrellas3.toString(),
-        r.estrellas2.toString(),
-        r.estrellas1.toString(),
+        r.vendedor5.toString(),
+        r.vendedor4.toString(),
+        r.vendedor3.toString(),
+        r.vendedor2.toString(),
+        r.vendedor1.toString(),
+        r.empresa5.toString(),
+        r.empresa4.toString(),
+        r.empresa3.toString(),
+        r.empresa2.toString(),
+        r.empresa1.toString(),
       ]);
     }
 
@@ -281,18 +305,18 @@ export default function ReportesPage() {
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-amber-400">★</span>
                   <span className="text-sm font-bold text-gray-900">
-                    {row.promedio > 0 ? row.promedio.toFixed(1) : '—'}
+                    Vendedor {row.promedioVendedor > 0 ? row.promedioVendedor.toFixed(1) : '—'}
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">
+                    · Empresa {row.promedioEmpresa > 0 ? row.promedioEmpresa.toFixed(1) : '—'}
                   </span>
                   <span className="text-xs text-gray-400">
                     · {row.totalCalificaciones} calificaciones
                   </span>
                 </div>
                 <div className="flex gap-3 text-xs text-gray-500 mt-0.5">
-                  <span>★★★★★ {row.estrellas5}</span>
-                  <span>★★★★ {row.estrellas4}</span>
-                  <span>★★★ {row.estrellas3}</span>
-                  <span>★★ {row.estrellas2}</span>
-                  <span>★ {row.estrellas1}</span>
+                  <span>Vend. ★★★★★ {row.vendedor5}</span>
+                  <span>Emp. ★★★★★ {row.empresa5}</span>
                 </div>
               </div>
             ))}
@@ -304,13 +328,11 @@ export default function ReportesPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio vendedor</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio empresa</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★★★★</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★★★</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★★</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★★</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">★</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Vend. ★★★★★</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Emp. ★★★★★</th>
                 </tr>
               </thead>
               <tbody>
@@ -323,15 +345,18 @@ export default function ReportesPage() {
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <span className="text-amber-400 text-sm">★</span>
-                        <span className="font-semibold text-gray-900">{row.promedio > 0 ? row.promedio.toFixed(1) : '—'}</span>
+                        <span className="font-semibold text-gray-900">{row.promedioVendedor > 0 ? row.promedioVendedor.toFixed(1) : '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-amber-400 text-sm">★</span>
+                        <span className="font-semibold text-gray-900">{row.promedioEmpresa > 0 ? row.promedioEmpresa.toFixed(1) : '—'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-700">{row.totalCalificaciones}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas5}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas4}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas3}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas2}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{row.estrellas1}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.vendedor5}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">{row.empresa5}</td>
                   </tr>
                 ))}
               </tbody>

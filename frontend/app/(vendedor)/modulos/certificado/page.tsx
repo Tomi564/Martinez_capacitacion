@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
+import { Award } from 'lucide-react';
 
 export default function CertificadoPage() {
   const { nombreCompleto } = useAuth();
@@ -43,7 +44,7 @@ export default function CertificadoPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 py-10">
 
       {/* Tarjeta certificado */}
-      <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100">
+      <div className="w-full max-w-sm bg-white rounded-xl overflow-hidden border border-gray-200">
 
         {/* Header oscuro con logo */}
         <div className="bg-[#1F1F1F] px-6 pt-8 pb-6 flex flex-col items-center gap-3">
@@ -64,8 +65,8 @@ export default function CertificadoPage() {
         <div className="px-6 py-7 flex flex-col items-center gap-5 text-center">
 
           {/* Medalla */}
-          <div className="w-16 h-16 bg-amber-50 border-2 border-amber-200 rounded-full flex items-center justify-center text-3xl">
-            🏆
+          <div className="w-16 h-16 bg-[#FFF7CC] border border-[#F5C400] rounded-full flex items-center justify-center">
+            <Award className="w-8 h-8 text-[#B38700]" />
           </div>
 
           <div>
@@ -82,7 +83,7 @@ export default function CertificadoPage() {
           {/* Separador decorativo */}
           <div className="flex items-center gap-3 w-full">
             <div className="flex-1 h-px bg-gray-100"/>
-            <div className="w-2 h-2 rounded-full bg-[#C8102E]"/>
+            <div className="w-2 h-2 rounded-full bg-[#F5C400]"/>
             <div className="flex-1 h-px bg-gray-100"/>
           </div>
 

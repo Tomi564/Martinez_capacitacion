@@ -92,14 +92,18 @@ export class QRService {
    */
   async guardarCalificacion(
     codigo: string,
-    estrellas: number,
+    estrellasVendedor: number,
+    estrellasEmpresa: number,
     comentario: string | null,
     ipCliente: string,
     participante?: { nombre: string; apellido: string; dni: string; contacto: string }
   ) {
-    // Validar estrellas
-    if (estrellas < 1 || estrellas > 5) {
-      throw new AppError('Las estrellas deben ser entre 1 y 5', 400);
+    // Validar estrellas vendedor y empresa
+    if (
+      estrellasVendedor < 1 || estrellasVendedor > 5 ||
+      estrellasEmpresa < 1 || estrellasEmpresa > 5
+    ) {
+      throw new AppError('Las valoraciones deben ser entre 1 y 5', 400);
     }
 
     // Obtener el vendedor por código QR
@@ -136,7 +140,9 @@ export class QRService {
     // Guardar calificación
     const { error } = await supabase.from('calificaciones_qr').insert({
       vendedor_id: qr.user_id,
-      estrellas,
+      estrellas: estrellasVendedor, // compatibilidad con analíticas existentes
+      estrellas_vendedor: estrellasVendedor,
+      estrellas_empresa: estrellasEmpresa,
       comentario: comentario || null,
       ip_cliente: ipCliente,
     });
@@ -145,18 +151,34 @@ export class QRService {
       throw new AppError('Error al guardar la calificación', 500);
     }
 
+    let participanteYaRegistrado = false;
+
     // Guardar datos del participante para el sorteo (si los proporcionó)
     if (participante?.nombre && participante?.apellido && participante?.dni && participante?.contacto) {
-      await supabase.from('participantes_sorteo').insert({
-        nombre: participante.nombre.trim(),
-        apellido: participante.apellido.trim(),
-        dni: participante.dni.trim(),
-        contacto: participante.contacto.trim(),
-        vendedor_id: qr.user_id,
-      });
+      const dniNormalizado = participante.dni.trim();
+      const { data: existentes } = await supabase
+        .from('participantes_sorteo')
+        .select('id')
+        .eq('dni', dniNormalizado)
+        .limit(1);
+
+      if (existentes && existentes.length > 0) {
+        participanteYaRegistrado = true;
+      } else {
+        await supabase.from('participantes_sorteo').insert({
+          nombre: participante.nombre.trim(),
+          apellido: participante.apellido.trim(),
+          dni: dniNormalizado,
+          contacto: participante.contacto.trim(),
+          vendedor_id: qr.user_id,
+        });
+      }
     }
 
-    return { mensaje: '¡Gracias por tu calificación!' };
+    return {
+      mensaje: '¡Gracias por tu calificación!',
+      participanteYaRegistrado,
+    };
   }
 
   async getParticipantesSorteo() {

@@ -178,7 +178,7 @@ export class AdminController {
   async crearPregunta(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const moduloId = req.params.id as string;
-      const { enunciado, opciones, respuesta_correcta, explicacion } = req.body;
+      const { enunciado, opciones, respuesta_correcta, explicacion, tipo, puntaje } = req.body;
 
       if (!enunciado || !opciones || !respuesta_correcta) {
         return res.status(400).json({
@@ -191,6 +191,8 @@ export class AdminController {
         opciones,
         respuesta_correcta,
         explicacion,
+        tipo,
+        puntaje: puntaje != null ? Number(puntaje) : undefined,
       });
 
       return res.status(201).json(result);
@@ -201,14 +203,31 @@ export class AdminController {
 
   /**
    * PATCH /api/admin/modulos/:id/preguntas/:preguntaId
-   * Actualiza una pregunta (activo/inactivo)
+   * Actualiza una pregunta
    */
   async updatePregunta(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const preguntaId = req.params.preguntaId as string;
-      const { activo } = req.body;
+      const {
+        activo,
+        enunciado,
+        opciones,
+        respuesta_correcta,
+        explicacion,
+        tipo,
+        puntaje,
+      } = req.body;
 
-      const result = await adminService.updatePregunta(preguntaId, { activo });
+      const payload: Record<string, unknown> = {};
+      if (activo !== undefined) payload.activo = activo;
+      if (enunciado !== undefined) payload.enunciado = enunciado;
+      if (opciones !== undefined) payload.opciones = opciones;
+      if (respuesta_correcta !== undefined) payload.respuesta_correcta = respuesta_correcta;
+      if (explicacion !== undefined) payload.explicacion = explicacion || null;
+      if (tipo !== undefined) payload.tipo = tipo;
+      if (puntaje !== undefined) payload.puntaje = Number(puntaje);
+
+      const result = await adminService.updatePregunta(preguntaId, payload);
       return res.status(200).json(result);
     } catch (error) {
       next(error);

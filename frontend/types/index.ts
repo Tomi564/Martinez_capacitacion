@@ -69,6 +69,8 @@ export interface Pregunta {
   id: string;
   enunciado: string;
   opciones: OpcionPregunta[];
+  tipo?: 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+  puntaje?: number;
   // respuesta_correcta NUNCA viene del backend al frontend
 }
 
@@ -82,6 +84,9 @@ export interface RetroalimentacionPregunta {
   respuesta_dada: string;
   respuesta_correcta: string;
   explicacion: string | null;
+  puntaje_obtenido?: number;
+  puntaje_maximo?: number;
+  tipo?: 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
 }
 
 export interface ResultadoExamen {
@@ -89,8 +94,12 @@ export interface ResultadoExamen {
   aprobado: boolean;
   respuestasCorrectas: number;
   totalPreguntas: number;
+  puntajeObtenido?: number;
+  puntajeTotal?: number;
+  puntajeMinimoAprobacion?: number;
   siguienteModuloDesbloqueado: boolean;
   capacitacionCompleta?: boolean;
+  mostrarRetroalimentacionDetallada?: boolean;
   retroalimentacion: RetroalimentacionPregunta[];
   mensaje: string;
 }

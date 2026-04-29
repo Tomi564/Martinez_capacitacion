@@ -22,7 +22,8 @@ function getToken(): string | null {
     if (!stored) return null;
     const parsed = JSON.parse(stored);
     return parsed?.state?.token || null;
-  } catch {
+  } catch (error) {
+    console.error('[api.getToken] Error leyendo token de localStorage', error);
     return null;
   }
 }
@@ -60,7 +61,9 @@ async function request<T>(
     if (response.status === 401) {
       try {
         localStorage.removeItem('martinez-auth');
-      } catch {}
+      } catch (error) {
+        console.error('[api.request] Error limpiando sesión tras 401', error);
+      }
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }

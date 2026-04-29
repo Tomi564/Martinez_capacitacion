@@ -188,7 +188,7 @@ export default function StockAdminPage() {
             {/* CSV upload */}
             <div className="flex items-center gap-3">
               <label className="h-10 px-4 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:border-gray-400 transition-colors cursor-pointer flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="17 8 12 3 7 8"/>
                   <line x1="12" y1="3" x2="12" y2="15"/>
@@ -261,14 +261,14 @@ export default function StockAdminPage() {
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={() => abrirEditar(p)} className="p-1.5 text-gray-400 hover:text-gray-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <button aria-label={`Editar ${p.nombre}`} onClick={() => abrirEditar(p)} className="p-1.5 text-gray-400 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
                       </button>
-                      <button onClick={() => handleEliminar(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <button aria-label={`Eliminar ${p.nombre}`} onClick={() => handleEliminar(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="3 6 5 6 21 6"/>
                           <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                           <path d="M10 11v6"/><path d="M14 11v6"/>
@@ -319,14 +319,14 @@ export default function StockAdminPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2 justify-end">
-                            <button onClick={() => abrirEditar(p)} className="p-1.5 text-gray-400 hover:text-gray-700">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <button aria-label={`Editar ${p.nombre}`} onClick={() => abrirEditar(p)} className="p-1.5 text-gray-400 hover:text-gray-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                               </svg>
                             </button>
-                            <button onClick={() => handleEliminar(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <button aria-label={`Eliminar ${p.nombre}`} onClick={() => handleEliminar(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="3 6 5 6 21 6"/>
                                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                                 <path d="M10 11v6"/><path d="M14 11v6"/>

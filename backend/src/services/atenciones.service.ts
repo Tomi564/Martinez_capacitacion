@@ -4,6 +4,7 @@
 
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { procesarCambioRankingPorVenta } from './ranking-notificaciones.service';
 
 /** Envía push a todos los admins activos */
 async function notificarAdmins(titulo: string, cuerpo: string) {
@@ -82,7 +83,12 @@ export class AtencionesService {
 
     // Chequear hitos de objetivo si fue una venta cerrada
     if (data.resultado === 'venta_cerrada') {
-      this.checkObjetivoHito(userId).catch(() => {});
+      this.checkObjetivoHito(userId).catch((error) => {
+        console.error('[AtencionesService] Error verificando hitos de objetivo', { userId, error });
+      });
+      procesarCambioRankingPorVenta().catch((error) => {
+        console.error('[AtencionesService] Error procesando cambio de ranking por venta', { userId, error });
+      });
     }
 
     return { mensaje: 'Atención registrada correctamente' };

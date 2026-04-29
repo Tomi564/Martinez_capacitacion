@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
+import { Crown } from 'lucide-react';
 
 interface VendedorNivel {
   id: string;
@@ -62,7 +63,7 @@ const PREMIOS: Record<string, {
 const COLORES_NIVEL: Record<string, {
   bg: string; text: string; border: string; badge: string;
 }> = {
-  sin_inicio: { bg: 'bg-gray-50',    text: 'text-gray-600',   border: 'border-gray-200',   badge: 'bg-gray-100 text-gray-600' },
+  sin_inicio: { bg: 'bg-gray-50',    text: 'text-gray-700',   border: 'border-gray-200',   badge: 'bg-gray-100 text-gray-700' },
   aprendiz:   { bg: 'bg-blue-50',    text: 'text-blue-700',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700' },
   vendedor:   { bg: 'bg-amber-50',   text: 'text-amber-700',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700' },
   profesional:{ bg: 'bg-green-50',   text: 'text-green-700',  border: 'border-green-200',  badge: 'bg-green-100 text-green-700' },
@@ -157,7 +158,13 @@ export default function NivelesPage() {
                 }
               `}
             >
-              <p className="text-xl mb-1">{item.icono}</p>
+              <div className="mb-1 flex justify-center">
+                {item.nivel === 'elite' ? (
+                  <Crown className="w-5 h-5 text-[#F5C400]" />
+                ) : (
+                  <p className="text-xl">{item.icono}</p>
+                )}
+              </div>
               <p className={`text-2xl font-black ${
                 filtroNivel === item.nivel ? colores.text : 'text-gray-900'
               }`}>

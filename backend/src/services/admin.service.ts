@@ -357,7 +357,7 @@ export class AdminService {
     // Calificaciones de todos
     const { data: calificaciones } = await supabase
       .from('calificaciones_qr')
-      .select('vendedor_id, estrellas');
+      .select('vendedor_id, estrellas, estrellas_vendedor, estrellas_empresa');
 
     // Construir reporte de progreso
     const reporteProgreso = (vendedores || []).map((vendedor) => {
@@ -413,7 +413,12 @@ export class AdminService {
 
       const total = calificacionesVendedor.length;
       const suma = calificacionesVendedor.reduce(
-        (acc, c) => acc + c.estrellas,
+        (acc, c: any) => acc + (c.estrellas_vendedor ?? c.estrellas),
+        0
+      );
+
+      const sumaEmpresa = calificacionesVendedor.reduce(
+        (acc, c: any) => acc + (c.estrellas_empresa ?? c.estrellas),
         0
       );
 
@@ -424,12 +429,24 @@ export class AdminService {
         vendedor: `${vendedor.nombre} ${vendedor.apellido}`,
         email: vendedor.email,
         promedio: total > 0 ? Math.round((suma / total) * 10) / 10 : 0,
+        promedioVendedor: total > 0 ? Math.round((suma / total) * 10) / 10 : 0,
+        promedioEmpresa: total > 0 ? Math.round((sumaEmpresa / total) * 10) / 10 : 0,
         totalCalificaciones: total,
         estrellas5: contarEstrellas(5),
         estrellas4: contarEstrellas(4),
         estrellas3: contarEstrellas(3),
         estrellas2: contarEstrellas(2),
         estrellas1: contarEstrellas(1),
+        vendedor5: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 5).length,
+        vendedor4: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 4).length,
+        vendedor3: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 3).length,
+        vendedor2: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 2).length,
+        vendedor1: calificacionesVendedor.filter((c: any) => (c.estrellas_vendedor ?? c.estrellas) === 1).length,
+        empresa5: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 5).length,
+        empresa4: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 4).length,
+        empresa3: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 3).length,
+        empresa2: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 2).length,
+        empresa1: calificacionesVendedor.filter((c: any) => (c.estrellas_empresa ?? c.estrellas) === 1).length,
       };
     });
 
@@ -456,7 +473,7 @@ export class AdminService {
     // Obtener preguntas incluyendo respuesta_correcta (solo para admin)
     const { data: preguntas } = await supabase
       .from('preguntas')
-      .select('id, enunciado, opciones, respuesta_correcta')
+      .select('id, enunciado, opciones, respuesta_correcta, explicacion, tipo, puntaje')
       .eq('modulo_id', moduloId)
       .eq('activo', true)
       .order('created_at', { ascending: true });
@@ -474,6 +491,8 @@ export class AdminService {
       opciones: { id: string; texto: string }[];
       respuesta_correcta: string;
       explicacion?: string;
+      tipo?: 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+      puntaje?: number;
     }
   ) {
     // Verificar que el módulo existe
@@ -486,15 +505,16 @@ export class AdminService {
     if (!modulo) throw new AppError('Módulo no encontrado', 404);
 
     // Verificar que la respuesta correcta corresponde a una opción válida
-    const opcionValida = data.opciones.find(
-      (o) => o.id === data.respuesta_correcta
-    );
-
-    if (!opcionValida) {
-      throw new AppError(
-        'La respuesta correcta debe corresponder a una de las opciones',
-        400
+    if (data.tipo !== 'desarrollo') {
+      const opcionValida = data.opciones.find(
+        (o) => o.id === data.respuesta_correcta
       );
+      if (!opcionValida) {
+        throw new AppError(
+          'La respuesta correcta debe corresponder a una de las opciones',
+          400
+        );
+      }
     }
 
     const { error } = await supabase.from('preguntas').insert({
@@ -503,6 +523,8 @@ export class AdminService {
       opciones: data.opciones,
       respuesta_correcta: data.respuesta_correcta,
       explicacion: data.explicacion?.trim() || null,
+      tipo: data.tipo || 'opcion_unica',
+      puntaje: data.puntaje ?? 1,
       activo: true,
     });
 
@@ -512,12 +534,27 @@ export class AdminService {
   }
 
   /**
-   * Desactiva una pregunta del banco.
+   * Actualiza una pregunta del banco.
    */
   async updatePregunta(
     preguntaId: string,
-    data: { activo: boolean }
+    data: Partial<{
+      activo: boolean;
+      enunciado: string;
+      opciones: { id: string; texto: string }[];
+      respuesta_correcta: string;
+      explicacion: string | null;
+      tipo: 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+      puntaje: number;
+    }>
   ) {
+    if (data.tipo && data.tipo !== 'desarrollo' && data.opciones && data.respuesta_correcta) {
+      const opcionValida = data.opciones.find((o) => o.id === data.respuesta_correcta);
+      if (!opcionValida) {
+        throw new AppError('La respuesta correcta debe corresponder a una opción válida', 400);
+      }
+    }
+
     const { error } = await supabase
       .from('preguntas')
       .update(data)
@@ -573,28 +610,45 @@ export class AdminService {
     // Calificaciones
     const { data: calificaciones } = await supabase
       .from('calificaciones_qr')
-      .select('estrellas')
+      .select('estrellas, estrellas_vendedor, estrellas_empresa, comentario, created_at')
       .eq('vendedor_id', vendedorId);
 
     const total = calificaciones?.length || 0;
-    const suma = (calificaciones || []).reduce(
-      (acc, c) => acc + c.estrellas, 0
+    const sumaVendedor = (calificaciones || []).reduce(
+      (acc, c: any) => acc + (c.estrellas_vendedor ?? c.estrellas), 0
+    );
+    const sumaEmpresa = (calificaciones || []).reduce(
+      (acc, c: any) => acc + (c.estrellas_empresa ?? c.estrellas), 0
     );
     const distribucion: Record<number, number> = {
       1: 0, 2: 0, 3: 0, 4: 0, 5: 0,
     };
-    (calificaciones || []).forEach((c) => {
-      distribucion[c.estrellas] = (distribucion[c.estrellas] || 0) + 1;
+    (calificaciones || []).forEach((c: any) => {
+      const estrellaVendedor = c.estrellas_vendedor ?? c.estrellas;
+      distribucion[estrellaVendedor] = (distribucion[estrellaVendedor] || 0) + 1;
     });
+
+    const ultimas5 = [...(calificaciones || [])]
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5)
+      .map((c: any) => ({
+        fecha: c.created_at,
+        estrellasVendedor: c.estrellas_vendedor ?? c.estrellas,
+        estrellasEmpresa: c.estrellas_empresa ?? c.estrellas,
+        comentario: c.comentario || null,
+      }));
 
     return {
       vendedor: {
         ...vendedor,
         progreso,
         calificaciones: {
-          promedio: total > 0 ? Math.round((suma / total) * 10) / 10 : 0,
+          promedio: total > 0 ? Math.round((sumaVendedor / total) * 10) / 10 : 0,
+          promedioVendedor: total > 0 ? Math.round((sumaVendedor / total) * 10) / 10 : 0,
+          promedioEmpresa: total > 0 ? Math.round((sumaEmpresa / total) * 10) / 10 : 0,
           total,
           distribucion,
+          ultimas5,
         },
       },
     };

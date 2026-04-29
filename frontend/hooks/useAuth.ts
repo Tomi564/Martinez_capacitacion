@@ -89,7 +89,9 @@ export const useAuth = create<AuthState>()(
       logout: () => {
         // Llamada al backend de forma silenciosa (sin await)
         // para que el logout sea instantáneo en la UI
-        apiClient.post('/auth/logout').catch(() => {});
+        apiClient.post('/auth/logout').catch((error) => {
+          console.error('[useAuth.logout] Error cerrando sesión en backend', error);
+        });
 
         set({
           user: null,
@@ -109,7 +111,9 @@ export const useAuth = create<AuthState>()(
         try {
           const response = await apiClient.get<{ user: User }>('/auth/me');
           set({ user: response.user });
-        } catch {
+        } catch (error) {
+          console.error('[useAuth.refreshUser] Error refrescando usuario', error);
+          set({ error: 'La sesión venció. Iniciá sesión nuevamente.' });
           // Si falla (token expirado), hacer logout
           get().logout();
         }
@@ -136,7 +140,10 @@ export const useAuth = create<AuthState>()(
             get().logout();
             return false;
           }
-        } catch {}
+        } catch (error) {
+          console.error('[useAuth.isAuthenticated] Error leyendo token JWT', error);
+          set({ error: 'No pudimos validar tu sesión. Iniciá sesión nuevamente.' });
+        }
         return true;
       },
 

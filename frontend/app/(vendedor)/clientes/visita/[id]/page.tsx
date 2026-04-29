@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { PageState } from '@/components/ui/PageState';
 
 interface ChecklistItem { id: string; descripcion: string; orden: number; }
 interface Respuesta { item_id: string; estado: string; nota: string | null; }
@@ -27,22 +28,41 @@ export default function VisitaVendedorDetalle() {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  useEffect(() => {
-    apiClient.get<{ visita: Visita; items: ChecklistItem[]; respuestas: Respuesta[] }>(`/mecanico/visitas/${id}`)
-      .then(r => {
+  const cargarVisita = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    try {
+      const r = await apiClient.get<{ visita: Visita; items: ChecklistItem[]; respuestas: Respuesta[] }>(`/mecanico/visitas/${id}`);
         setVisita(r.visita);
         setItems(r.items);
         const map: Record<string, Respuesta> = {};
         r.respuestas.forEach(rr => { map[rr.item_id] = rr; });
         setRespuestas(map);
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
+    } catch (error) {
+      console.error('[VisitaVendedorDetalle] Error cargando visita', error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarVisita();
   }, [id]);
 
-  if (isLoading) return <div className="flex justify-center py-20"><div className="w-7 h-7 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin"/></div>;
-  if (!visita) return <p className="text-center py-10 text-gray-400">Visita no encontrada</p>;
+  if (isLoading || hasError || !visita) {
+    return (
+      <div className="px-4 py-5 max-w-lg mx-auto">
+        <PageState
+          state={isLoading ? 'loading' : hasError ? 'error' : 'empty'}
+          onRetry={cargarVisita}
+          emptyMessage="Visita no encontrada."
+        />
+      </div>
+    );
+  }
 
   const v = visita.vehiculos;
   const c = v?.clientes;

@@ -11,8 +11,18 @@ interface Comunicado {
   created_at: string;
 }
 
+interface NotificacionRanking {
+  id: string;
+  tipo: 'te_superaron' | 'subiste_posicion' | 'cierre_semanal' | 'reinicio_lunes';
+  titulo: string;
+  cuerpo: string;
+  created_at: string;
+  users?: { nombre: string; apellido: string } | null;
+}
+
 export default function ComunicadosPage() {
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
+  const [notificacionesRanking, setNotificacionesRanking] = useState<NotificacionRanking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [titulo, setTitulo] = useState('');
@@ -22,8 +32,12 @@ export default function ComunicadosPage() {
 
   const fetchComunicados = async () => {
     try {
-      const res = await apiClient.get<{ comunicados: Comunicado[] }>('/admin/comunicados');
+      const [res, logsRes] = await Promise.all([
+        apiClient.get<{ comunicados: Comunicado[] }>('/admin/comunicados'),
+        apiClient.get<{ notificaciones: NotificacionRanking[] }>('/admin/notificaciones-ranking?limit=40'),
+      ]);
       setComunicados(res.comunicados);
+      setNotificacionesRanking(logsRes.notificaciones || []);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +91,7 @@ export default function ComunicadosPage() {
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 h-10 px-4 bg-[#C8102E] text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors shrink-0"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Nuevo
@@ -148,6 +162,39 @@ export default function ComunicadosPage() {
         </div>
       )}
 
+      {/* Notificaciones de ranking enviadas */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Notificaciones de ranking enviadas
+        </p>
+        <div className="bg-white border border-gray-200 rounded-2xl p-3">
+          {notificacionesRanking.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">
+              Todavía no se enviaron notificaciones de ranking
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {notificacionesRanking.map((n) => (
+                <div key={n.id} className="rounded-xl border border-gray-200 p-3">
+                  <p className="text-sm font-semibold text-gray-900">{n.titulo}</p>
+                  <p className="text-sm text-gray-700 mt-0.5">{n.cuerpo}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {n.users?.nombre ? `${n.users.nombre} ${n.users.apellido} · ` : ''}
+                    {new Date(n.created_at).toLocaleDateString('es-AR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {comunicados.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
           <p className="text-3xl mb-2">📣</p>
@@ -162,8 +209,8 @@ export default function ComunicadosPage() {
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Nuevo comunicado</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <button aria-label="Cerrar formulario" onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>

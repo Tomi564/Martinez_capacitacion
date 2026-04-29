@@ -14,6 +14,13 @@ import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import { NotificacionesAdmin } from '@/components/admin/NotificacionesAdmin';
 import { VendedoresInactivos } from '@/components/admin/VendedoresInactivos';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ClienteIcon, ModuloIcon, RankingIcon } from '@/components/ui/icons';
 
 interface RankingEntry {
   id: string;
@@ -49,6 +56,37 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
 
+  const alertaCritica = (() => {
+    if (!data?.vendedores?.length) return null;
+
+    const ahora = new Date();
+    const vendedorConPromedioBajo = data.vendedores.find(
+      (v) => v.promedioNotas > 0 && v.promedioNotas < 60
+    );
+    if (vendedorConPromedioBajo) {
+      return {
+        titulo: 'Alerta de rendimiento',
+        descripcion: `${vendedorConPromedioBajo.nombre} ${vendedorConPromedioBajo.apellido} tiene promedio bajo (${vendedorConPromedioBajo.promedioNotas.toFixed(1)}%).`,
+      };
+    }
+
+    const vendedorInactivoConPendientes = data.vendedores.find((v) => {
+      if (!v.ultimaActividad || v.modulosAprobados >= v.totalModulos) return false;
+      const ultimaActividad = new Date(v.ultimaActividad);
+      const diffDias = (ahora.getTime() - ultimaActividad.getTime()) / (1000 * 60 * 60 * 24);
+      return diffDias > 7;
+    });
+
+    if (vendedorInactivoConPendientes) {
+      return {
+        titulo: 'Alerta de seguimiento',
+        descripcion: `${vendedorInactivoConPendientes.nombre} ${vendedorInactivoConPendientes.apellido} lleva más de 7 días sin completar módulos pendientes.`,
+      };
+    }
+
+    return null;
+  })();
+
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
@@ -71,8 +109,15 @@ export default function AdminDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+      <div className="px-4 lg:px-8 py-6 flex flex-col gap-4 max-w-6xl mx-auto">
+        <Skeleton className="h-7 w-40" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-44 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -80,9 +125,14 @@ export default function AdminDashboardPage() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-center justify-between gap-3">
+            <p className="text-sm text-red-700">{error}</p>
+            <Button variant="danger" onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -98,62 +148,104 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
-      {/* Métricas globales */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* First fold: KPI principal */}
+      <Card className="rounded-xl bg-white">
+        <CardContent>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            KPI principal
+          </p>
+          <p className="mt-1 text-3xl font-bold text-gray-900">
+            {data?.promedioGeneral ? `${data.promedioGeneral.toFixed(1)}%` : '—'}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Promedio general del equipo</p>
+        </CardContent>
+      </Card>
+
+      {/* First fold: alerta crítica */}
+      {alertaCritica ? (
+        <Card className="rounded-xl border-amber-200 bg-amber-50">
+          <CardContent>
+            <p className="text-sm font-semibold text-amber-900">{alertaCritica.titulo}</p>
+            <p className="text-sm text-amber-800 mt-1">{alertaCritica.descripcion}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="rounded-xl border-green-200 bg-green-50">
+          <CardContent>
+            <p className="text-sm font-semibold text-green-800">
+              No hay alertas críticas en este momento.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* First fold: accesos rápidos */}
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { href: '/admin/vendedores', icon: ClienteIcon, label: 'Vendedores', sub: 'Creá, editá y desactivá' },
+          { href: '/admin/reportes', icon: RankingIcon, label: 'Reportes', sub: 'Progreso y calificaciones' },
+        ].map((item) => (
+          <Link key={item.href} href={item.href} className="h-full">
+            <Card
+              className="text-white rounded-xl h-full active:scale-[0.99] transition-transform"
+              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }}
+            >
+              <CardContent className="flex flex-col gap-2">
+              <item.icon className="w-5 h-5" />
+              <p className="font-semibold mt-2 text-sm">{item.label}</p>
+              <p className="text-xs text-white/90 mt-0.5">{item.sub}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      {/* Debajo del fold */}
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Más detalles
+        </p>
+      </div>
+
+      {/* Métricas secundarias */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
           {
             label: 'Vendedores',
             value: data?.totalVendedores || 0,
             color: 'text-gray-900',
-            bg: 'bg-white',
           },
           {
             label: 'Módulos',
             value: data?.totalModulos || 0,
             color: 'text-gray-900',
-            bg: 'bg-white',
           },
           {
             label: 'Completaron todo',
             value: data?.vendedoresCompletos || 0,
             color: 'text-green-600',
-            bg: 'bg-white',
-          },
-          {
-            label: 'Promedio general',
-            value: data?.promedioGeneral
-              ? `${data.promedioGeneral.toFixed(1)}%`
-              : '—',
-            color: 'text-blue-600',
-            bg: 'bg-white',
           },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className={`${stat.bg} border border-gray-200 rounded-2xl p-4`}
-          >
-            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
-          </div>
+          <Card key={stat.label} className="bg-white rounded-xl">
+            <CardContent>
+              <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Accesos rápidos */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {[
-          { href: '/admin/vendedores', emoji: '👥', label: 'Vendedores', sub: 'Crear, editar, desactivar' },
-          { href: '/admin/modulos',    emoji: '📚', label: 'Módulos',    sub: 'Contenido y preguntas' },
-          { href: '/admin/reportes',   emoji: '📊', label: 'Reportes',   sub: 'Progreso y calificaciones' },
-        ].map((item) => (
-          <Link key={item.href} href={item.href} className="h-full">
-            <div className="bg-[#C8102E] text-white rounded-2xl p-4 h-full active:scale-95 transition-transform flex flex-col">
-              <span className="text-2xl">{item.emoji}</span>
-              <p className="font-semibold mt-2 text-sm">{item.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{item.sub}</p>
+      <Link href="/admin/modulos" className="block">
+        <Card className="rounded-xl active:scale-[0.99] transition-transform">
+          <CardContent className="flex items-center gap-3">
+            <ModuloIcon className="w-5 h-5 text-[#C8102E]" />
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Módulos</p>
+              <p className="text-xs text-gray-500">Contenido y preguntas</p>
             </div>
-          </Link>
-        ))}
-      </div>
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* Tabla de progreso de vendedores */}
       <div>
@@ -169,7 +261,7 @@ export default function AdminDashboardPage() {
           </Link>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+        <Card className="overflow-hidden rounded-xl">
           {/* Header de tabla — solo desktop */}
           <div className="hidden lg:grid grid-cols-5 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
             <span className="col-span-2">Vendedor</span>
@@ -198,9 +290,11 @@ export default function AdminDashboardPage() {
                   }`}
                 >
                   {/* Avatar */}
-                  <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
-                    {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
-                  </div>
+                  <Avatar className="w-9 h-9">
+                    <AvatarFallback>
+                      {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
 
                   {/* Nombre y email */}
                   <div className="flex-1 min-w-0">
@@ -219,12 +313,7 @@ export default function AdminDashboardPage() {
                       <p className="text-sm font-semibold text-gray-900">
                         {vendedor.modulosAprobados}/{vendedor.totalModulos}
                       </p>
-                      <div className="w-full h-1 bg-gray-100 rounded-full mt-1">
-                        <div
-                          className="h-full bg-gray-900 rounded-full"
-                          style={{ width: `${porcentaje}%` }}
-                        />
-                      </div>
+                      <Progress value={porcentaje} className="w-full mt-1 h-1" indicatorClassName="bg-gray-900" />
                     </div>
 
                     {/* Promedio */}
@@ -238,19 +327,9 @@ export default function AdminDashboardPage() {
 
                     {/* Badge de estado */}
                     <div className="w-24 text-center">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        porcentaje === 100
-                          ? 'bg-green-100 text-green-700'
-                          : porcentaje > 0
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {porcentaje === 100
-                          ? '✓ Completo'
-                          : porcentaje > 0
-                          ? 'En progreso'
-                          : 'Sin iniciar'}
-                      </span>
+                      <Badge variant={porcentaje === 100 ? 'success' : porcentaje > 0 ? 'warning' : 'muted'}>
+                        {porcentaje === 100 ? 'Completo' : porcentaje > 0 ? 'En progreso' : 'Sin iniciar'}
+                      </Badge>
                     </div>
                   </div>
 
@@ -275,13 +354,11 @@ export default function AdminDashboardPage() {
                 No hay vendedores registrados aún
               </p>
               <Link href="/admin/vendedores">
-                <button className="mt-3 px-4 py-2 bg-[#C8102E] text-white text-sm rounded-xl">
-                  Agregar vendedor
-                </button>
+                <Button className="mt-3">Agregar vendedor</Button>
               </Link>
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
       {/* Ranking top 5 */}
@@ -290,22 +367,25 @@ export default function AdminDashboardPage() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Top del equipo
           </p>
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <Card className="overflow-hidden rounded-xl">
             {ranking.map((entry, i) => {
-              const MEDALLAS = ['🥇', '🥈', '🥉'];
+              const MEDALLAS = ['#1', '#2', '#3'];
               const maxVentas = ranking[0]?.totalVentas || 1;
               const pct = Math.round((entry.totalVentas / maxVentas) * 100);
               return (
                 <div key={entry.id} className={`px-4 py-3 flex items-center gap-3 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
-                  <span className="text-lg w-7 text-center shrink-0">
-                    {i < 3 ? MEDALLAS[i] : <span className="text-sm font-bold text-gray-400">#{i + 1}</span>}
-                  </span>
+                  <Badge
+                    variant={i < 3 ? 'default' : 'muted'}
+                    className={`w-9 justify-center px-0 py-1 text-xs font-medium ${
+                      i === 0 ? 'bg-[#FFF7CC] text-[#7A5A00]' : i < 3 ? 'text-red-800' : 'text-gray-700'
+                    }`}
+                  >
+                    {i < 3 ? MEDALLAS[i] : `#${i + 1}`}
+                  </Badge>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{entry.nombre}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gray-900 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
+                      <Progress value={pct} className="flex-1 h-1.5" indicatorClassName="bg-gray-900" />
                       <span className="text-xs text-gray-400 shrink-0">{entry.totalVentas} ventas</span>
                     </div>
                   </div>
@@ -320,7 +400,7 @@ export default function AdminDashboardPage() {
                 </div>
               );
             })}
-          </div>
+          </Card>
         </div>
       )}
 

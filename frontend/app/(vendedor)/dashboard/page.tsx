@@ -18,6 +18,13 @@ import type { ModuloConProgreso, ResumenCalificaciones } from '@/types';
 import { NivelBadge, type InfoNivel } from '@/components/ui/NivelBadge';
 import { Insignias } from '@/components/ui/Insignias';
 import { suscribirPush } from '@/hooks/usePushNotifications';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Bell, Megaphone } from 'lucide-react';
+import { ModuloIcon, QrIcon } from '@/components/ui/icons';
 
 interface Comunicado {
   id: string;
@@ -103,8 +110,11 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+      <div className="px-4 py-6 flex flex-col gap-4 max-w-lg mx-auto">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-28 w-full rounded-xl" />
       </div>
     );
   }
@@ -112,9 +122,14 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-center justify-between gap-3">
+            <p className="text-sm text-red-700">{error}</p>
+            <Button variant="danger" onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -132,32 +147,53 @@ export default function DashboardPage() {
             return 'Buenas noches,';
           })()}
         </p>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {user?.nombre} 👋
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900">{user?.nombre}</h1>
+      </div>
+
+      {/* First fold: nivel actual */}
+      {data?.nivel && <NivelBadge info={data.nivel} size="md" />}
+
+      {/* First fold: CTA principal */}
+      {resumen?.disponible && (
+        <Link href={`/modulos/${resumen.disponible.id}`}>
+          <Card className="rounded-2xl border-2 border-gray-900 active:scale-95 transition-transform">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-500">Módulo {resumen.disponible.orden}</span>
+                {resumen.disponible.estado === 'en_curso' && <Badge variant="warning">En curso</Badge>}
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">
+                {resumen.disponible.estado === 'en_curso' ? 'Continuar módulo' : 'Empezar módulo'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{resumen.disponible.titulo}</p>
+              <p className="text-xs text-gray-400 mt-2">⏱ {resumen.disponible.duracion_min} min</p>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
+
+      {/* Debajo del fold */}
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Más información</p>
       </div>
 
       {/* Banner de comunicado activo */}
       {comunicado && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-xl shrink-0">📣</span>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-amber-900">{comunicado.titulo}</p>
-              <p className="text-sm text-amber-800 mt-0.5 whitespace-pre-wrap">{comunicado.contenido}</p>
+        <Card className="bg-amber-50 border-amber-200 rounded-xl">
+          <CardContent>
+            <div className="flex items-start gap-3">
+              <Megaphone className="w-5 h-5 text-amber-700 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-amber-900">{comunicado.titulo}</p>
+                <p className="text-sm text-amber-800 mt-0.5 whitespace-pre-wrap">{comunicado.contenido}</p>
+              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Nivel actual */}
-      {data?.nivel && (
-        <NivelBadge info={data.nivel} size="md" />
-      )}
-
-      {/* Tarjeta de progreso unificada */}
+      {/* Progreso y objetivo */}
       <div className="bg-[#C8102E] text-white rounded-2xl p-5 flex flex-col gap-4">
-        {/* Módulos */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-gray-400">Capacitación</p>
@@ -165,16 +201,10 @@ export default function DashboardPage() {
               {resumen?.aprobados} / {resumen?.total} módulos
             </p>
           </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${porcentaje}%` }}
-            />
-          </div>
+          <Progress value={porcentaje} className="h-2 bg-red-900/30" indicatorClassName="bg-white" />
           <p className="text-xs text-gray-400 mt-1.5">{porcentaje}% completado</p>
         </div>
 
-        {/* Objetivo del mes — integrado si existe */}
         {objetivo && progresoObjetivo && (objetivo.meta_ventas > 0 || objetivo.meta_conversion > 0) && (
           <div className="border-t border-gray-700 pt-4 flex flex-col gap-3">
             <p className="text-sm text-gray-400">Objetivo del mes</p>
@@ -218,54 +248,18 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Módulo actual — acción principal */}
-      {resumen?.disponible && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Continuar capacitación
-          </p>
-          <Link href={`/modulos/${resumen.disponible.id}`}>
-            <div className="bg-white border-2 border-gray-900 rounded-2xl p-4 active:scale-95 transition-transform">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">
-                  Módulo {resumen.disponible.orden}
-                </span>
-                {resumen.disponible.estado === 'en_curso' && (
-                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                    En curso
-                  </span>
-                )}
-              </div>
-              <h3 className="font-bold text-gray-900 mb-1">
-                {resumen.disponible.titulo}
-              </h3>
-              <p className="text-sm text-gray-500 line-clamp-2">
-                {resumen.disponible.descripcion}
-              </p>
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-gray-400">
-                  ⏱ {resumen.disponible.duracion_min} min
-                </span>
-                <span className="text-sm font-semibold text-gray-900">
-                  Ir al módulo →
-                </span>
-              </div>
-            </div>
-          </Link>
-        </div>
-      )}
-
       {/* Todos los módulos completados */}
       {resumen && resumen.aprobados === resumen.total && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
-          <p className="text-2xl mb-2">🎉</p>
+        <Card className="bg-green-50 border-green-200 rounded-xl text-center">
+          <CardContent className="p-5">
           <p className="font-bold text-green-800">
             ¡Capacitación completada!
           </p>
           <p className="text-sm text-green-600 mt-1">
             Aprobaste todos los módulos
           </p>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Calificaciones QR */}
@@ -274,7 +268,8 @@ export default function DashboardPage() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Mis calificaciones
           </p>
-          <div className="bg-white border border-gray-200 rounded-2xl p-4">
+          <Card className="rounded-xl">
+            <CardContent>
             <div className="flex items-center gap-3">
               <div className="text-3xl font-bold text-gray-900">
                 {data.calificaciones.promedio.toFixed(1)}
@@ -299,7 +294,8 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -310,38 +306,39 @@ export default function DashboardPage() {
 
       {/* Activar notificaciones push */}
       {pushPermiso === 'default' && (
-        <button
+        <Button
           onClick={async () => {
             const ok = await suscribirPush();
             setPushPermiso(ok ? 'granted' : 'denied');
           }}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          variant="outline"
+          className="w-full justify-start rounded-xl"
         >
-          <span className="text-xl">🔔</span>
+          <Bell className="w-5 h-5 text-gray-500" />
           <div className="text-left">
             <p className="font-semibold">Activar notificaciones</p>
             <p className="text-xs text-gray-400">Recibí avisos de comunicados y novedades</p>
           </div>
-        </button>
+        </Button>
       )}
 
       {/* Accesos rápidos */}
       <div className="grid grid-cols-2 gap-3">
         <Link href="/modulos">
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
-            <span className="text-2xl">📚</span>
+          <Card className="rounded-xl p-4 active:scale-[0.99] transition-transform">
+            <ModuloIcon className="w-5 h-5 text-[#C8102E]" />
             <p className="font-semibold text-gray-900 mt-2 text-sm">
               Ver módulos
             </p>
-          </div>
+          </Card>
         </Link>
         <Link href="/mi-qr">
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
-            <span className="text-2xl">📱</span>
+          <Card className="rounded-xl p-4 active:scale-[0.99] transition-transform">
+            <QrIcon className="w-5 h-5 text-[#C8102E]" />
             <p className="font-semibold text-gray-900 mt-2 text-sm">
               Mi código QR
             </p>
-          </div>
+          </Card>
         </Link>
       </div>
 

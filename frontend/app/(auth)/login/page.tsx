@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error, clearError, isAuthenticated, isAdmin, user } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +35,10 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.replace(getRedirect());
-    } catch {}
+    } catch (error) {
+      console.error('[LoginPage] Error al iniciar sesión', error);
+      // El mensaje visible lo maneja useAuth.error
+    }
   };
 
   return (
@@ -114,7 +117,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Tu contraseña"
+                  placeholder="Ingresá tu clave"
                   autoComplete="current-password"
                   required
                   disabled={isLoading}

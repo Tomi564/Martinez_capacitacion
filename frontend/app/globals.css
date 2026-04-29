@@ -2,11 +2,16 @@
 @plugin "@tailwindcss/typography";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --brand: #C8102E;
+  --background: #fafafa;
+  --foreground: #111827;
+  --brand: #c41e3a;
   --brand-dark: #A30D25;
-  --accent: #F0A500;
+  --accent: #d97706;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --text-secondary: #6b7280;
+  --success: #16a34a;
+  --danger: #dc2626;
 }
 
 @theme inline {
@@ -15,12 +20,25 @@
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);
   --color-accent: var(--accent);
-  --font-sans: var(--font-montserrat);
+  --font-sans: var(--font-exo);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.text-gray-400 {
+  color: #6b7280 !important;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #c8102e, 0 0 0 4px #ffffff;
 }
 
 input::placeholder,

@@ -17,6 +17,8 @@ import type { Modulo, Pregunta, OpcionPregunta } from '@/types';
 interface PreguntaCompleta extends Pregunta {
   respuesta_correcta: string;
   explicacion: string | null;
+  tipo?: 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+  puntaje?: number;
 }
 
 interface ModuloDetalle extends Modulo {
@@ -28,6 +30,8 @@ interface NuevaPregunta {
   opciones: OpcionPregunta[];
   respuesta_correcta: string;
   explicacion: string;
+  tipo: 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+  puntaje: number;
 }
 
 const OPCIONES_INICIALES: OpcionPregunta[] = [
@@ -66,9 +70,21 @@ export default function ModuloEditPage() {
     opciones: OPCIONES_INICIALES,
     respuesta_correcta: '',
     explicacion: '',
+    tipo: 'opcion_unica',
+    puntaje: 1,
   });
   const [isCreatingPregunta, setIsCreatingPregunta] = useState(false);
   const [preguntaError, setPreguntaError] = useState<string | null>(null);
+  const [editingPregunta, setEditingPregunta] = useState<PreguntaCompleta | null>(null);
+  const [editPregunta, setEditPregunta] = useState<NuevaPregunta>({
+    enunciado: '',
+    opciones: OPCIONES_INICIALES,
+    respuesta_correcta: '',
+    explicacion: '',
+    tipo: 'opcion_unica',
+    puntaje: 1,
+  });
+  const [isUpdatingPregunta, setIsUpdatingPregunta] = useState(false);
 
   const fetchModulo = async () => {
     try {
@@ -131,15 +147,13 @@ export default function ModuloEditPage() {
       return;
     }
 
-    const opcionesValidas = nuevaPregunta.opciones.filter(
-      (o) => o.texto.trim()
-    );
-    if (opcionesValidas.length < 2) {
+    const opcionesValidas = nuevaPregunta.opciones.filter((o) => o.texto.trim());
+    if (nuevaPregunta.tipo !== 'desarrollo' && opcionesValidas.length < 2) {
       setPreguntaError('Necesitás al menos 2 opciones');
       return;
     }
 
-    if (!nuevaPregunta.respuesta_correcta) {
+    if (!nuevaPregunta.respuesta_correcta.trim()) {
       setPreguntaError('Seleccioná la respuesta correcta');
       return;
     }
@@ -153,6 +167,8 @@ export default function ModuloEditPage() {
         opciones: nuevaPregunta.opciones.filter((o) => o.texto.trim()),
         respuesta_correcta: nuevaPregunta.respuesta_correcta,
         explicacion: nuevaPregunta.explicacion.trim() || null,
+        tipo: nuevaPregunta.tipo,
+        puntaje: Number(nuevaPregunta.puntaje) || 1,
       });
 
       setShowPreguntaModal(false);
@@ -161,6 +177,8 @@ export default function ModuloEditPage() {
         opciones: OPCIONES_INICIALES.map((o) => ({ ...o, texto: '' })),
         respuesta_correcta: '',
         explicacion: '',
+        tipo: 'opcion_unica',
+        puntaje: 1,
       });
       fetchModulo();
     } catch (err) {
@@ -169,6 +187,55 @@ export default function ModuloEditPage() {
       );
     } finally {
       setIsCreatingPregunta(false);
+    }
+  };
+
+  const abrirEditarPregunta = (pregunta: PreguntaCompleta) => {
+    setEditingPregunta(pregunta);
+    setPreguntaError(null);
+    setEditPregunta({
+      enunciado: pregunta.enunciado,
+      opciones: (pregunta.opciones?.length ? pregunta.opciones : OPCIONES_INICIALES).map((o) => ({ ...o })),
+      respuesta_correcta: pregunta.respuesta_correcta || '',
+      explicacion: pregunta.explicacion || '',
+      tipo: pregunta.tipo || 'opcion_unica',
+      puntaje: Number(pregunta.puntaje ?? 1),
+    });
+  };
+
+  const handleActualizarPregunta = async () => {
+    if (!editingPregunta) return;
+    if (!editPregunta.enunciado.trim()) {
+      setPreguntaError('El enunciado es requerido');
+      return;
+    }
+    const opcionesValidas = editPregunta.opciones.filter((o) => o.texto.trim());
+    if (editPregunta.tipo !== 'desarrollo' && opcionesValidas.length < 2) {
+      setPreguntaError('Necesitás al menos 2 opciones');
+      return;
+    }
+    if (!editPregunta.respuesta_correcta.trim()) {
+      setPreguntaError('Seleccioná o cargá la respuesta correcta');
+      return;
+    }
+
+    setIsUpdatingPregunta(true);
+    setPreguntaError(null);
+    try {
+      await apiClient.patch(`/admin/modulos/${moduloId}/preguntas/${editingPregunta.id}`, {
+        enunciado: editPregunta.enunciado.trim(),
+        opciones: editPregunta.tipo === 'desarrollo' ? [] : opcionesValidas,
+        respuesta_correcta: editPregunta.respuesta_correcta.trim(),
+        explicacion: editPregunta.explicacion.trim() || null,
+        tipo: editPregunta.tipo,
+        puntaje: Number(editPregunta.puntaje) || 1,
+      });
+      setEditingPregunta(null);
+      fetchModulo();
+    } catch (err) {
+      setPreguntaError(err instanceof Error ? err.message : 'Error al actualizar la pregunta');
+    } finally {
+      setIsUpdatingPregunta(false);
     }
   };
 
@@ -403,6 +470,12 @@ export default function ModuloEditPage() {
               >
                 Eliminar
               </button>
+              <button
+                onClick={() => abrirEditarPregunta(pregunta)}
+                className="text-xs px-2 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 flex-shrink-0"
+              >
+                Editar
+              </button>
             </div>
 
             {/* Opciones */}
@@ -471,6 +544,40 @@ export default function ModuloEditPage() {
             )}
 
             <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Tipo</label>
+                  <select
+                    value={nuevaPregunta.tipo}
+                    onChange={(e) =>
+                      setNuevaPregunta({
+                        ...nuevaPregunta,
+                        tipo: e.target.value as NuevaPregunta['tipo'],
+                        opciones: e.target.value === 'desarrollo' ? [] : OPCIONES_INICIALES.map((o) => ({ ...o, texto: '' })),
+                        respuesta_correcta: '',
+                      })
+                    }
+                    className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+                  >
+                    <option value="opcion_unica">Opción única</option>
+                    <option value="verdadero_falso">Verdadero/Falso</option>
+                    <option value="caso_practico">Caso práctico</option>
+                    <option value="desarrollo">Desarrollo</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Puntaje</label>
+                  <input
+                    type="number"
+                    min={0.5}
+                    step={0.5}
+                    value={nuevaPregunta.puntaje}
+                    onChange={(e) => setNuevaPregunta({ ...nuevaPregunta, puntaje: Number(e.target.value) })}
+                    className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+
               {/* Enunciado */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-gray-700">
@@ -491,6 +598,7 @@ export default function ModuloEditPage() {
               </div>
 
               {/* Opciones */}
+              {nuevaPregunta.tipo !== 'desarrollo' ? (
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-gray-700">
                   Opciones de respuesta
@@ -537,6 +645,25 @@ export default function ModuloEditPage() {
                   Seleccioná el radio de la respuesta correcta
                 </p>
               </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    Claves de corrección automática (separadas por | )
+                  </label>
+                  <input
+                    type="text"
+                    value={nuevaPregunta.respuesta_correcta}
+                    onChange={(e) =>
+                      setNuevaPregunta({
+                        ...nuevaPregunta,
+                        respuesta_correcta: e.target.value,
+                      })
+                    }
+                    placeholder="ej: alineacion|balanceo|frenos|seguimiento"
+                    className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+              )}
 
               {/* Explicación */}
               <div className="flex flex-col gap-1.5">
@@ -585,6 +712,120 @@ export default function ModuloEditPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar pregunta */}
+      {editingPregunta && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end lg:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Editar pregunta</h2>
+              <button onClick={() => setEditingPregunta(null)} className="p-2 hover:bg-gray-100 rounded-lg">✕</button>
+            </div>
+            {preguntaError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-600">{preguntaError}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Tipo</label>
+                <select
+                  value={editPregunta.tipo}
+                  onChange={(e) =>
+                    setEditPregunta({
+                      ...editPregunta,
+                      tipo: e.target.value as NuevaPregunta['tipo'],
+                      opciones: e.target.value === 'desarrollo' ? [] : OPCIONES_INICIALES.map((o) => ({ ...o, texto: '' })),
+                      respuesta_correcta: '',
+                    })
+                  }
+                  className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+                >
+                  <option value="opcion_unica">Opción única</option>
+                  <option value="verdadero_falso">Verdadero/Falso</option>
+                  <option value="caso_practico">Caso práctico</option>
+                  <option value="desarrollo">Desarrollo</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Puntaje</label>
+                <input
+                  type="number"
+                  min={0.5}
+                  step={0.5}
+                  value={editPregunta.puntaje}
+                  onChange={(e) => setEditPregunta({ ...editPregunta, puntaje: Number(e.target.value) })}
+                  className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+                />
+              </div>
+            </div>
+            <textarea
+              value={editPregunta.enunciado}
+              onChange={(e) => setEditPregunta({ ...editPregunta, enunciado: e.target.value })}
+              rows={3}
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm"
+            />
+            {editPregunta.tipo !== 'desarrollo' ? (
+              <div className="flex flex-col gap-2">
+                {editPregunta.opciones.map((opcion) => (
+                  <div key={opcion.id} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="respuesta_correcta_edit"
+                      checked={editPregunta.respuesta_correcta === opcion.id}
+                      onChange={() => setEditPregunta({ ...editPregunta, respuesta_correcta: opcion.id })}
+                    />
+                    <span className="text-xs font-bold uppercase w-4">{opcion.id}</span>
+                    <input
+                      type="text"
+                      value={opcion.texto}
+                      onChange={(e) =>
+                        setEditPregunta({
+                          ...editPregunta,
+                          opciones: editPregunta.opciones.map((o) =>
+                            o.id === opcion.id ? { ...o, texto: e.target.value } : o
+                          ),
+                        })
+                      }
+                      className="flex-1 h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={editPregunta.respuesta_correcta}
+                onChange={(e) => setEditPregunta({ ...editPregunta, respuesta_correcta: e.target.value })}
+                placeholder="Claves separadas por |"
+                className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm"
+              />
+            )}
+            <textarea
+              value={editPregunta.explicacion}
+              onChange={(e) => setEditPregunta({ ...editPregunta, explicacion: e.target.value })}
+              rows={2}
+              placeholder="Explicación (opcional)"
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEditingPregunta(null)}
+                className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleActualizarPregunta}
+                disabled={isUpdatingPregunta}
+                className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50"
+              >
+                {isUpdatingPregunta ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
           </div>
         </div>
       )}

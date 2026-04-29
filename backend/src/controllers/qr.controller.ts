@@ -43,11 +43,11 @@ export class QRController {
   async calificar(req: Request, res: Response, next: NextFunction) {
     try {
       const codigo = req.params.codigo as string;
-      const { estrellas, comentario, nombre, apellido, dni, contacto } = req.body;
+      const { estrellasVendedor, estrellasEmpresa, comentario, nombre, apellido, dni, contacto } = req.body;
 
-      if (!estrellas) {
+      if (!estrellasVendedor || !estrellasEmpresa) {
         return res.status(400).json({
-          error: 'Las estrellas son requeridas',
+          error: 'Las dos valoraciones son requeridas',
         });
       }
 
@@ -63,7 +63,8 @@ export class QRController {
 
       const result = await qrService.guardarCalificacion(
         codigo,
-        Number(estrellas),
+        Number(estrellasVendedor),
+        Number(estrellasEmpresa),
         comentario || null,
         ipCliente,
         participante

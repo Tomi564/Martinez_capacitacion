@@ -38,6 +38,10 @@ import {
   recordatorioObjetivoMitadMes,
   recordatorioCierreRanking,
 } from './services/recordatorios.service';
+import {
+  enviarCierreSemanalRanking,
+  enviarReinicioLunesRanking,
+} from './services/ranking-notificaciones.service';
 const app = express();
 
 // ─────────────────────────────────────────────────────
@@ -157,6 +161,16 @@ app.listen(PORT, () => {
   // Viernes a las 17:00 — cierre de ranking mañana (sábado)
   cron.schedule('0 17 * * 5', () => {
     recordatorioCierreRanking().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  // Sábado a las 18:00 — cierre semanal y posición final
+  cron.schedule('0 18 * * 6', () => {
+    enviarCierreSemanalRanking().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  // Lunes a las 08:00 — reinicio simbólico de semana
+  cron.schedule('0 8 * * 1', () => {
+    enviarReinicioLunesRanking().catch(console.error);
   }, { timezone: 'America/Argentina/Salta' });
 
   console.log('   ⏰ Cron jobs activos: módulos, objetivos, ranking');

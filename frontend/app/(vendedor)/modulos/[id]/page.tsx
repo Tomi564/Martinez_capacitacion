@@ -5,6 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Award, CircleAlert, Download, FileText, PlayCircle, Video } from 'lucide-react';
 
 export default function ModuloDetallePage() {
   const params = useParams();
@@ -31,8 +35,10 @@ export default function ModuloDetallePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin" />
+      <div className="px-4 py-6 flex flex-col gap-4 max-w-lg mx-auto">
+        <Skeleton className="h-12 w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-36 w-full rounded-xl" />
       </div>
     );
   }
@@ -60,10 +66,11 @@ export default function ModuloDetallePage() {
       {/* Header */}
       <div className="px-4 py-4 flex items-center gap-3 sticky top-[52px] bg-gray-50 z-10 border-b border-gray-100">
         <button
+          aria-label="Volver"
           onClick={() => router.back()}
           className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
@@ -71,15 +78,9 @@ export default function ModuloDetallePage() {
           <p className="text-xs text-gray-500">Módulo {modulo.orden}</p>
           <h1 className="text-base font-bold text-gray-900 truncate">{modulo.titulo}</h1>
         </div>
-        <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
-          modulo.estado === 'aprobado' ? 'bg-green-100 text-green-700'
-          : modulo.estado === 'en_curso' ? 'bg-amber-100 text-amber-700'
-          : 'bg-blue-100 text-blue-700'
-        }`}>
-          {modulo.estado === 'aprobado' ? '✓ Aprobado'
-            : modulo.estado === 'en_curso' ? 'En curso'
-            : 'Disponible'}
-        </span>
+        <Badge variant={modulo.estado === 'aprobado' ? 'success' : modulo.estado === 'en_curso' ? 'warning' : 'warning'}>
+          {modulo.estado === 'aprobado' ? 'Completado' : modulo.estado === 'en_curso' ? 'En progreso' : 'Disponible'}
+        </Badge>
       </div>
 
       <div className="px-4 py-6 flex flex-col gap-5">
@@ -93,7 +94,7 @@ export default function ModuloDetallePage() {
         {/* Nota de aprobación */}
         {(modulo as any).nota_aprobacion && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2">
-            <span className="text-amber-500 text-base mt-0.5">📋</span>
+            <CircleAlert className="w-4 h-4 text-amber-600 mt-0.5" />
             <p className="text-sm text-amber-800 font-medium">{(modulo as any).nota_aprobacion}</p>
           </div>
         )}
@@ -122,33 +123,21 @@ export default function ModuloDetallePage() {
 
           {modulo.pdf_url ? (
             <Link href={modulo.pdf_url} target="_blank">
-              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
+              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 active:scale-[0.99] transition-transform">
                 <div className="w-11 h-11 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#C8102E]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="18" x2="12" y2="12"/>
-                    <line x1="9" y1="15" x2="15" y2="15"/>
-                  </svg>
+                  <FileText className="w-5 h-5 text-[#C8102E]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">Descargar material PDF</p>
                   <p className="text-xs text-gray-500">Módulo {modulo.orden} — {modulo.titulo}</p>
                 </div>
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+                <Download className="w-4 h-4 text-gray-400 shrink-0" />
               </div>
             </Link>
           ) : (
-            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl p-4 opacity-50">
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-4 opacity-60">
               <div className="w-11 h-11 bg-gray-200 rounded-xl flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
+                <FileText className="w-5 h-5 text-gray-400" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-500">Material PDF</p>
@@ -159,29 +148,21 @@ export default function ModuloDetallePage() {
 
           {modulo.video_url ? (
             <Link href={modulo.video_url} target="_blank">
-              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-4 active:scale-95 transition-transform">
+              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 active:scale-[0.99] transition-transform">
                 <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3"/>
-                  </svg>
+                  <PlayCircle className="w-5 h-5 text-gray-700" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">Ver video</p>
                   <p className="text-xs text-gray-500">Módulo {modulo.orden} — {modulo.titulo}</p>
                 </div>
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                  <polyline points="15 3 21 3 21 9"/>
-                  <line x1="10" y1="14" x2="21" y2="3"/>
-                </svg>
+                <Video className="w-4 h-4 text-gray-400 shrink-0" />
               </div>
             </Link>
           ) : (
-            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl p-4 opacity-50">
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-4 opacity-60">
               <div className="w-11 h-11 bg-gray-200 rounded-xl flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="5 3 19 12 5 21 5 3"/>
-                </svg>
+                <Video className="w-5 h-5 text-gray-400" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-500">Video</p>
@@ -193,11 +174,9 @@ export default function ModuloDetallePage() {
 
         {/* Aprobado */}
         {modulo.estado === 'aprobado' && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              <Award className="w-5 h-5 text-white" />
             </div>
             <div>
               <p className="font-semibold text-green-800">Módulo aprobado</p>
@@ -216,9 +195,9 @@ export default function ModuloDetallePage() {
               </p>
             )}
             <Link href={`/modulos/${modulo.id}/examen`}>
-              <button className="w-full py-4 bg-[#C8102E] text-white font-bold rounded-2xl text-base active:scale-95 transition-transform">
+              <Button className="w-full py-4 text-base">
                 {modulo.intentos === 0 ? 'Rendir examen' : 'Volver a rendir'} →
-              </button>
+              </Button>
             </Link>
             <p className="text-xs text-center text-gray-400">Necesitás 80% o más para aprobar</p>
           </div>
@@ -237,9 +216,9 @@ export default function ModuloDetallePage() {
         {/* Repasar si aprobó */}
         {modulo.estado === 'aprobado' && (
           <Link href={`/modulos/${modulo.id}/examen`}>
-            <button className="w-full py-3 border-2 border-gray-200 text-gray-700 font-semibold rounded-2xl text-sm active:scale-95 transition-transform">
+            <Button variant="outline" className="w-full py-3 text-sm">
               Repasar examen
-            </button>
+            </Button>
           </Link>
         )}
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { PageState } from '@/components/ui/PageState';
 
 interface Visita {
   id: string; estado: string; motivo: string | null; observaciones: string | null;
@@ -33,15 +34,28 @@ export default function ClientesVendedorPage() {
   const [busqueda, setBusqueda] = useState('');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [tab, setTab] = useState<'taller' | 'qr'>('taller');
+  const [hasError, setHasError] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
+  const cargarClientes = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    try {
+      const [vRes, pRes] = await Promise.all([
       apiClient.get<{ vehiculos: Vehiculo[] }>('/mecanico/clientes'),
       apiClient.get<{ participantes: Participante[] }>('/qr/participantes'),
-    ]).then(([vRes, pRes]) => {
+      ]);
       setVehiculos(vRes.vehiculos);
       setParticipantes(pRes.participantes);
-    }).catch(() => {}).finally(() => setIsLoading(false));
+    } catch (error) {
+      console.error('[ClientesVendedorPage] Error cargando clientes/participantes', error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarClientes();
   }, []);
 
   const filtradosVehiculos = vehiculos.filter(v => {
@@ -57,8 +71,6 @@ export default function ClientesVendedorPage() {
     return p.nombre.toLowerCase().includes(q) || p.apellido.toLowerCase().includes(q) ||
       p.dni.includes(q) || p.contacto.toLowerCase().includes(q);
   });
-
-  if (isLoading) return <div className="flex justify-center py-20"><div className="w-7 h-7 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin"/></div>;
 
   return (
     <div className="px-4 py-5 pb-24 flex flex-col gap-4 max-w-lg mx-auto">
@@ -82,13 +94,12 @@ export default function ClientesVendedorPage() {
         </button>
       </div>
 
+      <PageState state={isLoading ? 'loading' : hasError ? 'error' : 'content'} onRetry={cargarClientes}>
       {tab === 'taller' && (
-        filtradosVehiculos.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-3xl mb-2">🚗</p>
-            <p className="text-gray-500 text-sm">{busqueda ? 'Sin resultados' : 'Sin vehículos registrados'}</p>
-          </div>
-        ) : (
+        <PageState
+          state={filtradosVehiculos.length === 0 ? 'empty' : 'content'}
+          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Sin vehículos registrados.'}
+        >
           <div className="flex flex-col gap-3">
             {filtradosVehiculos.map(v => {
               const abierto = expandido === v.id;
@@ -133,16 +144,14 @@ export default function ClientesVendedorPage() {
               );
             })}
           </div>
-        )
+        </PageState>
       )}
 
       {tab === 'qr' && (
-        filtradosParticipantes.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-3xl mb-2">📱</p>
-            <p className="text-gray-500 text-sm">{busqueda ? 'Sin resultados' : 'Sin participantes del QR'}</p>
-          </div>
-        ) : (
+        <PageState
+          state={filtradosParticipantes.length === 0 ? 'empty' : 'content'}
+          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Sin participantes del QR.'}
+        >
           <div className="flex flex-col gap-2">
             {filtradosParticipantes.map(p => (
               <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-1">
@@ -160,8 +169,9 @@ export default function ClientesVendedorPage() {
               </div>
             ))}
           </div>
-        )
+        </PageState>
       )}
+      </PageState>
     </div>
   );
 }

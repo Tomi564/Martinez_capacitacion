@@ -10,13 +10,13 @@
  */
 
 import type { Metadata, Viewport } from 'next';
-import { Montserrat } from 'next/font/google';
+import { Exo } from 'next/font/google';
 import './globals.css';
 
-const montserrat = Montserrat({
+const exo = Exo({
   subsets: ['latin'],
-  variable: '--font-montserrat',
-  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-exo',
+  weight: ['400', '500', '700'],
 });
 
 // ─────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={montserrat.variable}>
+    <html lang="es" className={exo.variable}>
       <head>
         {/* PWA — iOS necesita estos tags adicionales */}
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />

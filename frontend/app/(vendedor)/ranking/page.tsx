@@ -8,7 +8,6 @@ interface RankingEntry {
   id: string;
   nombre: string;
   cantidadVentas: number;
-  montoTotal: number;
 }
 
 interface Semana {

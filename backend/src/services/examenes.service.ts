@@ -9,6 +9,36 @@ import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 
 const NOTA_MINIMA_APROBACION_DEFAULT = 80;
+type TipoPregunta = 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+
+function normalizarTexto(texto: string): string {
+  return (texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function puntuarDesarrollo(respuesta: string, clave: string, puntajeMaximo: number) {
+  const respuestaNorm = normalizarTexto(respuesta);
+  const keywords = clave
+    .split('|')
+    .map((k) => normalizarTexto(k))
+    .filter(Boolean);
+
+  if (!keywords.length || !respuestaNorm) {
+    return { puntaje: 0, ratio: 0 };
+  }
+
+  const hits = keywords.filter((k) => respuestaNorm.includes(k)).length;
+  const ratio = hits / keywords.length;
+
+  if (ratio >= 0.6) return { puntaje: puntajeMaximo, ratio };
+  if (ratio >= 0.35) return { puntaje: Number((puntajeMaximo * 0.5).toFixed(2)), ratio };
+  return { puntaje: 0, ratio };
+}
 
 export class ExamenesService {
   /**
@@ -43,11 +73,25 @@ export class ExamenesService {
     }
 
     // Obtener preguntas activas del módulo — SIN respuesta_correcta
-    const { data: preguntas, error } = await supabase
+    // Compatibilidad: si la BD aún no tiene tipo/puntaje, reintenta con el select básico.
+    let preguntas: any[] | null = null;
+    let error: any = null;
+    const primerIntento = await supabase
       .from('preguntas')
-      .select('id, enunciado, opciones')
+      .select('id, enunciado, opciones, tipo, puntaje')
       .eq('modulo_id', moduloId)
       .eq('activo', true);
+    if (primerIntento.error) {
+      const fallback = await supabase
+        .from('preguntas')
+        .select('id, enunciado, opciones')
+        .eq('modulo_id', moduloId)
+        .eq('activo', true);
+      preguntas = fallback.data as any[] | null;
+      error = fallback.error;
+    } else {
+      preguntas = primerIntento.data as any[] | null;
+    }
 
     if (error || !preguntas?.length) {
       throw new AppError(
@@ -71,7 +115,13 @@ export class ExamenesService {
         .eq('modulo_id', moduloId);
     }
 
-    return { preguntas: preguntasExamen };
+    return {
+      preguntas: preguntasExamen.map((p) => ({
+        ...p,
+        tipo: (p.tipo as TipoPregunta | undefined) || 'opcion_unica',
+        puntaje: Number(p.puntaje ?? 1),
+      })),
+    };
   }
 
   /**
@@ -127,12 +177,26 @@ export class ExamenesService {
     // 2. Obtener respuestas correctas
     const preguntaIds = Object.keys(respuestas);
 
-    const { data: preguntas, error: preguntasError } = await supabase
+    let preguntas: any[] | null = null;
+    let preguntasError: any = null;
+    const preguntasConNuevoSchema = await supabase
       .from('preguntas')
-      .select('id, enunciado, opciones, respuesta_correcta, explicacion')
+      .select('id, enunciado, opciones, respuesta_correcta, explicacion, tipo, puntaje')
       .in('id', preguntaIds)
       .eq('modulo_id', moduloId)
       .eq('activo', true);
+    if (preguntasConNuevoSchema.error) {
+      const fallback = await supabase
+        .from('preguntas')
+        .select('id, enunciado, opciones, respuesta_correcta, explicacion')
+        .in('id', preguntaIds)
+        .eq('modulo_id', moduloId)
+        .eq('activo', true);
+      preguntas = fallback.data as any[] | null;
+      preguntasError = fallback.error;
+    } else {
+      preguntas = preguntasConNuevoSchema.data as any[] | null;
+    }
 
     if (preguntasError || !preguntas?.length) {
       throw new AppError('Error al validar las respuestas', 500);
@@ -140,41 +204,75 @@ export class ExamenesService {
 
     // 3. Calcular nota
     const porcentajeAprobacion = (moduloData as any)?.porcentaje_aprobacion ?? NOTA_MINIMA_APROBACION_DEFAULT;
-    const minimasCorrectas = Math.ceil(preguntas.length * porcentajeAprobacion / 100);
-    const tolerancia = preguntas.length - minimasCorrectas;
+    const preguntasConMeta = (preguntas || []).map((p: any) => ({
+      ...p,
+      tipo: (p.tipo as TipoPregunta | undefined) || 'opcion_unica',
+      puntaje: Number(p.puntaje ?? 1),
+    }));
+    const puntajeTotal = preguntasConMeta.reduce((acc, p) => acc + p.puntaje, 0);
+    const puntajeMinimoAprobacion = Number(
+      ((puntajeTotal * porcentajeAprobacion) / 100).toFixed(2)
+    );
+    const toleranciaPuntos = Number((puntajeTotal - puntajeMinimoAprobacion).toFixed(2));
 
-    let correctas = 0;
+    let correctas = 0; // compat para UI
+    let puntajeObtenido = 0;
     const retroalimentacion: {
       pregunta_id: string;
       correcta: boolean;
       respuesta_dada: string;
       respuesta_correcta: string;
       explicacion: string | null;
+      puntaje_obtenido?: number;
+      puntaje_maximo?: number;
+      tipo?: TipoPregunta;
     }[] = [];
 
-    for (const pregunta of preguntas) {
-      const esCorrecta = respuestas[pregunta.id] === pregunta.respuesta_correcta;
+    for (const pregunta of preguntasConMeta) {
+      const respuestaDada = respuestas[pregunta.id] || '';
+      let esCorrecta = false;
+      let puntosPregunta = 0;
+
+      if (pregunta.tipo === 'desarrollo') {
+        const desarrollo = puntuarDesarrollo(
+          respuestaDada,
+          String(pregunta.respuesta_correcta || ''),
+          pregunta.puntaje
+        );
+        puntosPregunta = desarrollo.puntaje;
+        esCorrecta = puntosPregunta >= pregunta.puntaje;
+      } else {
+        esCorrecta = respuestaDada === pregunta.respuesta_correcta;
+        puntosPregunta = esCorrecta ? pregunta.puntaje : 0;
+      }
       if (esCorrecta) correctas++;
+      puntajeObtenido += puntosPregunta;
 
       retroalimentacion.push({
         pregunta_id: pregunta.id,
         correcta: esCorrecta,
-        respuesta_dada: respuestas[pregunta.id] || '',
+        respuesta_dada: respuestaDada,
         respuesta_correcta: pregunta.respuesta_correcta,
         explicacion: null, // se asigna abajo según tolerancia
+        puntaje_obtenido: Number(puntosPregunta.toFixed(2)),
+        puntaje_maximo: pregunta.puntaje,
+        tipo: pregunta.tipo,
       });
     }
 
-    const errores = preguntas.length - correctas;
-    const nota = (correctas / preguntas.length) * 100;
-    const aprobado = correctas >= minimasCorrectas;
+    const puntajePerdido = Number((puntajeTotal - puntajeObtenido).toFixed(2));
+    const nota = puntajeTotal > 0 ? (puntajeObtenido / puntajeTotal) * 100 : 0;
+    const aprobado = puntajeObtenido >= puntajeMinimoAprobacion;
 
-    // Mostrar explicación solo si los errores están dentro de la tolerancia
-    const mostrarExplicacion = errores > 0 && errores <= tolerancia;
-    if (mostrarExplicacion) {
+    // Mostrar retroalimentación detallada solo si el vendedor falló
+    // dentro de la tolerancia del módulo. Si supera la tolerancia,
+    // no se muestra feedback pregunta por pregunta para forzar repaso.
+    const mostrarRetroalimentacionDetallada =
+      puntajePerdido > 0 && puntajePerdido <= toleranciaPuntos;
+    if (mostrarRetroalimentacionDetallada) {
       for (let i = 0; i < retroalimentacion.length; i++) {
         if (!retroalimentacion[i].correcta) {
-          retroalimentacion[i].explicacion = (preguntas[i] as any).explicacion || null;
+          retroalimentacion[i].explicacion = (preguntasConMeta[i] as any).explicacion || null;
         }
       }
     }
@@ -213,7 +311,9 @@ export class ExamenesService {
       );
       // Si no hay siguiente módulo = completó toda la capacitación
       if (!siguienteModuloDesbloqueado) {
-        await this.notificarAdminCapacitacionCompleta(userId).catch(() => {});
+        await this.notificarAdminCapacitacionCompleta(userId).catch((error) => {
+          console.error('[ExamenesService] Error notificando capacitación completa', { userId, error });
+        });
       }
     }
 
@@ -228,16 +328,22 @@ export class ExamenesService {
       aprobado,
       respuestasCorrectas: correctas,
       totalPreguntas: preguntas.length,
+      puntajeObtenido: Number(puntajeObtenido.toFixed(2)),
+      puntajeTotal: Number(puntajeTotal.toFixed(2)),
+      puntajeMinimoAprobacion,
       siguienteModuloDesbloqueado,
       capacitacionCompleta: aprobado && !siguienteModuloDesbloqueado,
       retroalimentacion,
+      mostrarRetroalimentacionDetallada,
       mensaje: aprobado
         ? `¡Aprobaste con ${nota.toFixed(1)}%! ${
             siguienteModuloDesbloqueado
               ? 'Se desbloqueó el siguiente módulo.'
               : '¡Completaste todos los módulos!'
           }`
-        : `Obtuviste ${nota.toFixed(1)}%. Necesitás ${porcentajeAprobacion}% para aprobar. ¡Podés volver a intentarlo!`,
+        : mostrarRetroalimentacionDetallada
+        ? `Obtuviste ${nota.toFixed(1)}%. Necesitás ${porcentajeAprobacion}% para aprobar. ¡Podés volver a intentarlo!`
+        : `No alcanzaste el mínimo para aprobar. Repasá el contenido completo del módulo y volvé a intentarlo.`,
     };
   }
 
@@ -337,21 +443,26 @@ export class ExamenesService {
 
     const { data: subs } = await supabase
       .from('push_subscriptions')
-      .select('subscription')
+      .select('endpoint, p256dh, auth')
       .in('user_id', admins.map((a: { id: string }) => a.id));
 
     if (!subs?.length) return;
 
     const webpush = await import('web-push');
+    webpush.default.setVapidDetails(
+      'mailto:admin@martinez.com',
+      process.env.VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!,
+    );
     const payload = JSON.stringify({
       title: `🎓 ${nombre} completó la capacitación`,
       body: 'Aprobó todos los módulos. Coordiná la entrega del premio.',
     });
 
     await Promise.allSettled(
-      subs.map((s: { subscription: string }) =>
+      subs.map((s: { endpoint: string; p256dh: string; auth: string }) =>
         webpush.default.sendNotification(
-          typeof s.subscription === 'string' ? JSON.parse(s.subscription) : s.subscription,
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           payload
         )
       )

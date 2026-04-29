@@ -29,7 +29,8 @@ export function NotificacionesAdmin() {
         '/admin/notificaciones'
       );
       setNotificaciones(res.notificaciones.filter(n => !n.leida));
-    } catch {
+    } catch (error) {
+      console.error('[NotificacionesAdmin] Error cargando notificaciones', error);
     } finally {
       setIsLoading(false);
     }
@@ -43,14 +44,18 @@ export function NotificacionesAdmin() {
     try {
       await apiClient.patch(`/admin/notificaciones/${id}/leer`, {});
       setNotificaciones(prev => prev.filter(n => n.id !== id));
-    } catch {}
+    } catch (error) {
+      console.error(`[NotificacionesAdmin] Error marcando notificación ${id} como leída`, error);
+    }
   };
 
   const handleLeerTodas = async () => {
     try {
       await apiClient.patch('/admin/notificaciones/leer-todas', {});
       setNotificaciones([]);
-    } catch {}
+    } catch (error) {
+      console.error('[NotificacionesAdmin] Error marcando todas como leídas', error);
+    }
   };
 
   if (isLoading || notificaciones.length === 0) return null;

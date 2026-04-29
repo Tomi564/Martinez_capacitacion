@@ -23,6 +23,11 @@ export default function SugerenciasPage() {
   const [texto, setTexto] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [whatsappFallback, setWhatsappFallback] = useState<{
+    mensaje: string;
+    whatsappUrl: string | null;
+  } | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const fetchSugerencias = async () => {
     try {
@@ -42,19 +47,29 @@ export default function SugerenciasPage() {
     setGuardando(true);
     setError(null);
     try {
-      await apiClient.post('/admin/sugerencias', { texto });
+      const res = await apiClient.post<{
+        whatsappUrl: string | null;
+        mensajeWhatsapp: string;
+      }>('/admin/sugerencias', { texto });
       setTexto('');
+      setWhatsappFallback({
+        mensaje: res.mensajeWhatsapp,
+        whatsappUrl: res.whatsappUrl,
+      });
+      if (res.whatsappUrl) {
+        const opened = window.open(res.whatsappUrl, '_blank');
+        if (!opened) {
+          setError('No se pudo abrir WhatsApp automáticamente. Podés copiar el mensaje.');
+        }
+      } else {
+        setError('Falta configurar el número de WhatsApp en el backend. Podés copiar el mensaje.');
+      }
       fetchSugerencias();
     } catch {
       setError('Error al guardar la sugerencia');
     } finally {
       setGuardando(false);
     }
-  };
-
-  const handleCambiarEstado = async (id: string, estado: Sugerencia['estado']) => {
-    await apiClient.patch(`/admin/sugerencias/${id}`, { estado });
-    setSugerencias((prev) => prev.map((s) => s.id === id ? { ...s, estado } : s));
   };
 
   const handleEliminar = async (id: string) => {
@@ -111,6 +126,39 @@ export default function SugerenciasPage() {
             'Enviar sugerencia'
           )}
         </button>
+
+        {whatsappFallback && (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex flex-col gap-2">
+            <p className="text-xs font-medium text-gray-700">
+              Si WhatsApp no se abrió, copiá este mensaje:
+            </p>
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans bg-white border border-gray-200 rounded-lg p-2">
+              {whatsappFallback.mensaje}
+            </pre>
+            <div className="flex items-center gap-2">
+              {whatsappFallback.whatsappUrl && (
+                <a
+                  href={whatsappFallback.whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-2 rounded-lg bg-[#C8102E] text-white text-xs font-semibold"
+                >
+                  Abrir WhatsApp
+                </a>
+              )}
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(whatsappFallback.mensaje);
+                  setCopiado(true);
+                  setTimeout(() => setCopiado(false), 1500);
+                }}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold"
+              >
+                {copiado ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lista activas */}

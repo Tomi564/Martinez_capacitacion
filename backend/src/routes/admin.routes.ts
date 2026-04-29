@@ -8,11 +8,27 @@ import { Router } from 'express';
 import { adminController } from '../controllers/admin.controller';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 import { supabase } from '../config/database';
-import { Resend } from 'resend';
+import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+const pushDisponible =
+  !!process.env.VAPID_PUBLIC_KEY && !!process.env.VAPID_PRIVATE_KEY;
+
+let webpushLib: typeof import('web-push') | null = null;
+if (pushDisponible) {
+  try {
+    webpushLib = require('web-push');
+  } catch {
+    webpushLib = null;
+  }
+}
+
+if (pushDisponible && webpushLib) {
+  webpushLib.setVapidDetails(
+    'mailto:admin@martinez.com',
+    process.env.VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!,
+  );
+}
 
 const router = Router();
 
@@ -242,12 +258,12 @@ router.get('/niveles', async (_req, res, next) => {
     // Calificaciones QR promedio por vendedor (para determinar nivel élite)
     const { data: calificaciones } = await supabase
       .from('calificaciones_qr')
-      .select('vendedor_id, calificacion');
+      .select('vendedor_id, estrellas, estrellas_vendedor');
 
     const getPromedioQR = (userId: string) => {
       const cals = (calificaciones || []).filter(c => c.vendedor_id === userId);
       if (!cals.length) return 0;
-      return cals.reduce((acc, c) => acc + c.calificacion, 0) / cals.length;
+      return cals.reduce((acc, c: any) => acc + (c.estrellas_vendedor ?? c.estrellas ?? 0), 0) / cals.length;
     };
 
     const getNivel = (userId: string) => {
@@ -421,6 +437,44 @@ router.post('/comunicados', async (req, res, next) => {
       .select()
       .single();
     if (error) throw new Error('Error al crear comunicado');
+
+    // Envío push automático (best effort, no rompe flujo principal)
+    if (pushDisponible && webpushLib) {
+      try {
+        const preview = contenido.trim().slice(0, 100);
+        const cuerpo = contenido.trim().length > 100 ? `${preview}...` : preview;
+
+        const { data: suscripciones } = await supabase
+          .from('push_subscriptions')
+          .select('endpoint, p256dh, auth');
+
+        if (suscripciones?.length) {
+          const payload = JSON.stringify({
+            titulo: titulo.trim(),
+            cuerpo,
+          });
+
+          await Promise.allSettled(
+            suscripciones.map(async (s) => {
+              try {
+                await webpushLib.sendNotification(
+                  { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                  payload
+                );
+              } catch {
+                await supabase
+                  .from('push_subscriptions')
+                  .delete()
+                  .eq('endpoint', s.endpoint);
+              }
+            })
+          );
+        }
+      } catch {
+        // Silencioso: no debe romper la creación del comunicado
+      }
+    }
+
     return res.status(201).json({ comunicado: data });
   } catch (error) {
     next(error);
@@ -442,9 +496,125 @@ router.patch('/comunicados/:id', async (req, res, next) => {
   }
 });
 
+// GET /api/admin/notificaciones-ranking
+router.get('/notificaciones-ranking', async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 50), 200);
+    const { data, error } = await supabase
+      .from('ranking_notificaciones_log')
+      .select(`
+        id, tipo, titulo, cuerpo, payload, created_at,
+        users!ranking_notificaciones_log_user_id_fkey(nombre, apellido)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw new Error('Error al obtener notificaciones de ranking');
+    return res.status(200).json({ notificaciones: data || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ─────────────────────────────────────────────────────
 // Objetivos
 // ─────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────
+// Visitas de mecánicos (admin)
+// ─────────────────────────────────────────────────────
+
+// GET /api/admin/visitas?fecha=YYYY-MM-DD&mecanico_id=uuid
+router.get('/visitas', async (req, res, next) => {
+  try {
+    const fecha = (req.query.fecha as string) || '';
+    const mecanicoId = (req.query.mecanico_id as string) || '';
+
+    let query = supabase
+      .from('visitas_taller')
+      .select(`
+        id, created_at, estado, estado_visita, motivo, observaciones, updated_at, updated_by_admin_at, updated_by_admin_id,
+        vehiculos(patente, marca, modelo, clientes(nombre, apellido)),
+        users!visitas_taller_mecanico_id_fkey(id, nombre, apellido)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (mecanicoId) {
+      query = query.eq('mecanico_id', mecanicoId);
+    }
+    if (fecha) {
+      const inicio = new Date(`${fecha}T00:00:00.000Z`).toISOString();
+      const fin = new Date(`${fecha}T23:59:59.999Z`).toISOString();
+      query = query.gte('created_at', inicio).lte('created_at', fin);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error('Error al obtener visitas');
+    return res.status(200).json({ visitas: data || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/visitas/:id
+router.get('/visitas/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from('visitas_taller')
+      .select(`
+        *,
+        vehiculos(*, clientes(*)),
+        users!visitas_taller_mecanico_id_fkey(id, nombre, apellido, email)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw new Error('Error al obtener visita');
+    return res.status(200).json({ visita: data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/visitas/:id
+router.patch('/visitas/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      observaciones,
+      estado_neumaticos,
+      estado_frenos,
+      presion_psi,
+      recomendacion,
+      estado_visita,
+    } = req.body;
+
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      updated_by_admin_at: new Date().toISOString(),
+      updated_by_admin_id: (req as any).user?.id,
+    };
+
+    if (observaciones !== undefined) updates.observaciones = observaciones || null;
+    if (estado_neumaticos !== undefined) updates.estado_neumaticos = estado_neumaticos || null;
+    if (estado_frenos !== undefined) updates.estado_frenos = estado_frenos || null;
+    if (presion_psi !== undefined) updates.presion_psi = presion_psi != null ? Number(presion_psi) : null;
+    if (recomendacion !== undefined) updates.recomendacion = recomendacion || null;
+    if (estado_visita !== undefined) updates.estado_visita = estado_visita;
+
+    const { error } = await supabase
+      .from('visitas_taller')
+      .update(updates)
+      .eq('id', id);
+    if (error) throw new Error('Error al actualizar visita');
+
+    return res.status(200).json({ mensaje: 'Visita actualizada' });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // POST /api/admin/vendedores/:id/objetivo
 router.post('/vendedores/:id/objetivo', async (req, res, next) => {
@@ -530,17 +700,32 @@ router.post('/sugerencias', async (req, res, next) => {
       .single();
     if (error) throw new Error('Error al guardar sugerencia');
 
-    // Notificar al dev por email (fire-and-forget)
-    if (resend && process.env.DEV_EMAIL) {
-      resend.emails.send({
-        from: 'Martinez App <onboarding@resend.dev>',
-        to: process.env.DEV_EMAIL,
-        subject: '💡 Nueva sugerencia del cliente',
-        html: `<p style="font-family:sans-serif"><strong>Nueva sugerencia:</strong></p><blockquote style="border-left:3px solid #888;padding-left:12px;color:#444">${texto.trim()}</blockquote><p style="color:#888;font-size:12px">Podés cambiar el estado desde el panel de admin.</p>`,
-      }).catch(() => {});
-    }
+    const usuario = (req as any).user as { nombre?: string; apellido?: string } | undefined;
+    const nombre = usuario ? `${usuario.nombre || ''} ${usuario.apellido || ''}`.trim() : 'Usuario';
+    const fechaHora = new Date().toLocaleString('es-AR', {
+      timeZone: 'America/Argentina/Salta',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const mensajeWhatsapp = [
+      'Nueva sugerencia desde Martínez Capacitación',
+      `Vendedor: ${nombre}`,
+      `Fecha: ${fechaHora}`,
+      '',
+      `Sugerencia: ${texto.trim()}`,
+    ].join('\n');
+    const whatsappUrl = WHATSAPP_SUGERENCIAS
+      ? `https://wa.me/${WHATSAPP_SUGERENCIAS}?text=${encodeURIComponent(mensajeWhatsapp)}`
+      : null;
 
-    return res.status(201).json({ sugerencia: data });
+    return res.status(201).json({
+      sugerencia: data,
+      whatsappUrl,
+      mensajeWhatsapp,
+    });
   } catch (error) {
     next(error);
   }
