@@ -121,21 +121,34 @@ export default function VentasAdminPage() {
 
       {/* Métricas rápidas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Total registradas', value: filtradas.length, color: 'text-gray-900' },
-          { label: 'Ventas cerradas',   value: filtradas.filter(a => a.resultado === 'venta_cerrada').length, color: 'text-green-600' },
-          { label: 'Pendientes',        value: filtradas.filter(a => a.resultado === 'pendiente').length,       color: 'text-amber-600' },
+        {([
+          { label: 'Total registradas', value: filtradas.length, accent: 'bg-gray-900', color: 'text-gray-900' },
+          {
+            label: 'Ventas cerradas',
+            value: filtradas.filter(a => a.resultado === 'venta_cerrada').length,
+            accent: 'bg-green-600',
+            color: 'text-green-600',
+          },
+          {
+            label: 'Pendientes',
+            value: filtradas.filter(a => a.resultado === 'pendiente').length,
+            accent: 'bg-amber-500',
+            color: 'text-amber-600',
+          },
           {
             label: 'Monto total',
-            value: totalMonto > 0
-              ? `$${totalMonto.toLocaleString('es-AR')}`
-              : '—',
+            value: totalMonto > 0 ? `$${totalMonto.toLocaleString('es-AR')}` : '—',
+            accent: 'bg-blue-600',
             color: 'text-blue-600',
           },
-        ].map(stat => (
-          <div key={stat.label} className="bg-white border border-gray-200 rounded-2xl p-4">
-            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
+        ] as const).map(stat => (
+          <div
+            key={stat.label}
+            className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 border border-gray-200/90"
+          >
+            <span className={`absolute left-0 top-0 bottom-0 w-1 ${stat.accent}`} aria-hidden />
+            <p className={`text-2xl font-bold tracking-tight pl-2 ${stat.color}`}>{stat.value}</p>
+            <p className="text-xs font-medium text-gray-600 mt-1 pl-2">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -146,7 +159,7 @@ export default function VentasAdminPage() {
         <select
           value={filtroVendedor}
           onChange={e => setFiltroVendedor(e.target.value)}
-          className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] flex-1"
+          className="h-10 px-3 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/40 focus:border-[#C8102E] flex-1"
         >
           <option value="todos">Todos los vendedores</option>
           {vendedores.map(v => (
@@ -158,7 +171,7 @@ export default function VentasAdminPage() {
         <select
           value={filtroResultado}
           onChange={e => setFiltroResultado(e.target.value)}
-          className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] sm:w-52"
+          className="h-10 px-3 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/40 focus:border-[#C8102E] sm:w-52"
         >
           <option value="todos">Todos los resultados</option>
           <option value="venta_cerrada">Venta cerrada</option>
@@ -177,7 +190,7 @@ export default function VentasAdminPage() {
           {/* Cards — mobile */}
           <div className="flex flex-col gap-3 lg:hidden">
             {filtradas.map(a => (
-              <div key={a.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-2">
+              <div key={a.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm ring-1 ring-gray-900/5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-gray-900">
                     {a.users ? `${a.users.nombre} ${a.users.apellido}` : '—'}
@@ -186,15 +199,15 @@ export default function VentasAdminPage() {
                     {RESULTADO_LABEL[a.resultado] || a.resultado}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
                   <span>{CANAL_LABEL[a.canal] || a.canal}</span>
                   {a.producto && <span>{a.producto}</span>}
                   {a.monto && <span className="text-green-600 font-semibold">${a.monto.toLocaleString('es-AR')}</span>}
                 </div>
                 {a.observaciones && (
-                  <p className="text-xs text-gray-400 italic">{a.observaciones}</p>
+                  <p className="text-xs text-gray-700 italic">{a.observaciones}</p>
                 )}
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-500">
                   {new Date(a.created_at).toLocaleDateString('es-AR', {
                     day: 'numeric', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit',

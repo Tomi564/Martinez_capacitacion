@@ -9,6 +9,7 @@ interface Comunicado {
   contenido: string;
   activo: boolean;
   created_at: string;
+  programado_para?: string | null;
 }
 
 interface NotificacionRanking {
@@ -25,10 +26,14 @@ export default function ComunicadosPage() {
   const [notificacionesRanking, setNotificacionesRanking] = useState<NotificacionRanking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editando, setEditando] = useState<Comunicado | null>(null);
   const [titulo, setTitulo] = useState('');
   const [contenido, setContenido] = useState('');
+  const [programadoLocal, setProgramadoLocal] = useState(''); // datetime-local vacío = publicar ya
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [comunicadoAEliminar, setComunicadoAEliminar] = useState<Comunicado | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const fetchComunicados = async () => {
     try {
@@ -45,28 +50,113 @@ export default function ComunicadosPage() {
 
   useEffect(() => { fetchComunicados(); }, []);
 
+  const cerrarFormulario = () => {
+    setShowForm(false);
+    setEditando(null);
+    setTitulo('');
+    setContenido('');
+    setProgramadoLocal('');
+  };
+
+  const abrirNuevo = () => {
+    setEditando(null);
+    setTitulo('');
+    setContenido('');
+    setProgramadoLocal('');
+    setShowForm(true);
+  };
+
+  const abrirEditar = (c: Comunicado) => {
+    setEditando(c);
+    setTitulo(c.titulo);
+    setContenido(c.contenido);
+    if (c.programado_para) {
+      const d = new Date(c.programado_para);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setProgramadoLocal(
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      );
+    } else {
+      setProgramadoLocal('');
+    }
+    setShowForm(true);
+  };
+
   const handleGuardar = async () => {
     if (!titulo.trim() || !contenido.trim()) return;
     setGuardando(true);
     setMsg(null);
+
+    let programadoIso: string | null = null;
+    if (programadoLocal.trim()) {
+      const cuando = new Date(programadoLocal);
+      if (Number.isNaN(cuando.getTime())) {
+        setMsg({ tipo: 'error', texto: 'La fecha programada no es válida.' });
+        setGuardando(false);
+        return;
+      }
+      programadoIso = cuando.toISOString();
+    }
+
     try {
-      await apiClient.post('/admin/comunicados', { titulo, contenido });
-      setTitulo('');
-      setContenido('');
-      setShowForm(false);
-      setMsg({ tipo: 'ok', texto: 'Comunicado publicado y enviado a todos los vendedores' });
+      if (editando) {
+        const body: Record<string, unknown> = { titulo, contenido };
+        if (!editando.activo) {
+          body.programado_para = programadoIso;
+        }
+        await apiClient.patch(`/admin/comunicados/${editando.id}`, body);
+        setMsg({ tipo: 'ok', texto: 'Comunicado actualizado' });
+      } else {
+        if (programadoIso && new Date(programadoIso).getTime() > Date.now()) {
+          await apiClient.post('/admin/comunicados', { titulo, contenido, programado_para: programadoIso });
+          setMsg({ tipo: 'ok', texto: 'Comunicado programado correctamente' });
+        } else {
+          await apiClient.post('/admin/comunicados', { titulo, contenido });
+          setMsg({ tipo: 'ok', texto: 'Comunicado publicado y enviado a todos los vendedores' });
+        }
+      }
+      cerrarFormulario();
       fetchComunicados();
       setTimeout(() => setMsg(null), 4000);
     } catch {
-      setMsg({ tipo: 'error', texto: 'Error al publicar el comunicado' });
+      setMsg({ tipo: 'error', texto: editando ? 'Error al guardar cambios' : 'Error al publicar el comunicado' });
     } finally {
       setGuardando(false);
     }
   };
 
+  const confirmarEliminar = async () => {
+    const c = comunicadoAEliminar;
+    if (!c) return;
+    setEliminando(true);
+    setMsg(null);
+    try {
+      await apiClient.delete(`/admin/comunicados/${c.id}`);
+      setComunicadoAEliminar(null);
+      setMsg({ tipo: 'ok', texto: 'Comunicado eliminado' });
+      fetchComunicados();
+      setTimeout(() => setMsg(null), 4000);
+    } catch {
+      setMsg({ tipo: 'error', texto: 'No se pudo eliminar el comunicado' });
+    } finally {
+      setEliminando(false);
+    }
+  };
+
   const handleToggle = async (id: string, activo: boolean) => {
     await apiClient.patch(`/admin/comunicados/${id}`, { activo: !activo });
-    setComunicados(prev => prev.map(c => c.id === id ? { ...c, activo: !activo } : c));
+    await fetchComunicados();
+  };
+
+  const textoProgramacion = (iso: string | null | undefined) => {
+    if (!iso) return null;
+    return new Date(iso).toLocaleString('es-AR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (isLoading) {
@@ -88,7 +178,7 @@ export default function ComunicadosPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={abrirNuevo}
           className="flex items-center gap-2 h-10 px-4 bg-[#C8102E] text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors shrink-0"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -117,16 +207,33 @@ export default function ComunicadosPage() {
                 <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">Activo ahora</span>
               </div>
               <p className="font-bold text-lg">{c.titulo}</p>
-              <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{c.contenido}</p>
+              <p className="text-sm text-red-50 mt-1 whitespace-pre-wrap">{c.contenido}</p>
             </div>
-            <button
-              onClick={() => handleToggle(c.id, c.activo)}
-              className="shrink-0 text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors font-medium"
-            >
-              Desactivar
-            </button>
+            <div className="flex flex-col gap-1.5 shrink-0 items-stretch">
+              <button
+                type="button"
+                onClick={() => abrirEditar(c)}
+                className="text-xs px-3 py-1.5 bg-white/15 hover:bg-white/25 text-white rounded-xl transition-colors font-medium"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setComunicadoAEliminar(c)}
+                className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors font-medium"
+              >
+                Eliminar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggle(c.id, c.activo)}
+                className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors font-medium"
+              >
+                Desactivar
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-red-100/90">
             Publicado el {new Date(c.created_at).toLocaleDateString('es-AR', {
               day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
             })}
@@ -140,7 +247,7 @@ export default function ComunicadosPage() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Historial</p>
           <div className="flex flex-col gap-2">
             {comunicados.filter(c => !c.activo).map(c => (
-              <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-start gap-3">
+              <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{c.titulo}</p>
                   <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{c.contenido}</p>
@@ -149,13 +256,35 @@ export default function ComunicadosPage() {
                       day: 'numeric', month: 'short', year: 'numeric'
                     })}
                   </p>
+                  {c.programado_para && new Date(c.programado_para).getTime() > Date.now() && (
+                    <p className="text-xs font-medium text-amber-700 mt-1">
+                      Programado para {textoProgramacion(c.programado_para)}
+                    </p>
+                  )}
                 </div>
-                <button
-                  onClick={() => handleToggle(c.id, c.activo)}
-                  className="shrink-0 text-xs px-3 py-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors font-medium"
-                >
-                  Reactivar
-                </button>
+                <div className="flex flex-wrap gap-1.5 sm:flex-col sm:items-stretch shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => abrirEditar(c)}
+                    className="text-xs px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors font-medium"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComunicadoAEliminar(c)}
+                    className="text-xs px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium"
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(c.id, c.activo)}
+                    className="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors font-medium"
+                  >
+                    Reactivar
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -203,20 +332,24 @@ export default function ComunicadosPage() {
         </div>
       )}
 
-      {/* Modal nuevo comunicado */}
-      {showForm && (
+      {/* Modal nuevo / editar */}
+      {(showForm) && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 flex flex-col gap-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Nuevo comunicado</h2>
-              <button aria-label="Cerrar formulario" onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <h2 className="text-lg font-bold text-gray-900">{editando ? 'Editar comunicado' : 'Nuevo comunicado'}</h2>
+              <button aria-label="Cerrar formulario" onClick={cerrarFormulario} className="p-2 hover:bg-gray-100 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
             <p className="text-sm text-gray-500">
-              Al publicar, este comunicado reemplazará al activo actual y aparecerá en el inicio de todos los vendedores.
+              {editando?.activo
+                ? 'Los cambios se aplican de inmediato al banner de inicio.'
+                : editando
+                  ? 'Podés cambiar texto o la fecha programada antes de que se publique.'
+                  : 'Al publicar ahora, reemplaza al comunicado activo. Si definís fecha, se publicará solo y sin notificar hasta esa hora (revisión minuto a minuto por el servidor).'}
             </p>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-gray-700">Título</label>
@@ -238,16 +371,69 @@ export default function ComunicadosPage() {
                 className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
               />
             </div>
+
+            {(!editando || !editando.activo) && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Publicar el (opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={programadoLocal}
+                  onChange={e => setProgramadoLocal(e.target.value)}
+                  className="h-11 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                />
+                <p className="text-xs text-gray-400">Vacío = publicación inmediata (si es nuevo).</p>
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button onClick={() => setShowForm(false)} className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-medium text-gray-700">
+              <button type="button" onClick={cerrarFormulario} className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-medium text-gray-700">
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={handleGuardar}
                 disabled={guardando || !titulo.trim() || !contenido.trim()}
                 className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
               >
-                {guardando ? 'Publicando...' : 'Publicar'}
+                {guardando ? 'Guardando...' : editando ? 'Guardar' : (programadoLocal && new Date(programadoLocal).getTime() > Date.now() ? 'Programar' : 'Publicar')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación eliminar (no usar alert del navegador) */}
+      {comunicadoAEliminar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="eliminar-comunicado-titulo"
+            className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl flex flex-col gap-4"
+          >
+            <h2 id="eliminar-comunicado-titulo" className="text-lg font-bold text-gray-900">
+              ¿Eliminar este comunicado?
+            </h2>
+            <p className="text-sm text-gray-600">
+              Se borrará <span className="font-semibold text-gray-900">«{comunicadoAEliminar.titulo}»</span> del historial.
+              Los vendedores dejarán de verlo si estaba activo. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setComunicadoAEliminar(null)}
+                disabled={eliminando}
+                className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarEliminar}
+                disabled={eliminando}
+                className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+              >
+                {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
               </button>
             </div>
           </div>

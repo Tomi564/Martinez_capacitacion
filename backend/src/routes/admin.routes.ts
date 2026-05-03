@@ -9,26 +9,7 @@ import { adminController } from '../controllers/admin.controller';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 import { supabase } from '../config/database';
 import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
-
-const pushDisponible =
-  !!process.env.VAPID_PUBLIC_KEY && !!process.env.VAPID_PRIVATE_KEY;
-
-let webpushLib: typeof import('web-push') | null = null;
-if (pushDisponible) {
-  try {
-    webpushLib = require('web-push');
-  } catch {
-    webpushLib = null;
-  }
-}
-
-if (pushDisponible && webpushLib) {
-  webpushLib.setVapidDetails(
-    'mailto:admin@martinez.com',
-    process.env.VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
-  );
-}
+import { enviarPushComunicado } from '../services/comunicados-scheduler.service';
 
 const router = Router();
 
@@ -490,7 +471,7 @@ router.get('/comunicados', async (_req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('comunicados')
-      .select('id, titulo, contenido, activo, created_at')
+      .select('id, titulo, contenido, activo, created_at, programado_para')
       .order('created_at', { ascending: false });
     if (error) throw new Error('Error al obtener comunicados');
     return res.status(200).json({ comunicados: data || [] });
@@ -499,19 +480,60 @@ router.get('/comunicados', async (_req, res, next) => {
   }
 });
 
-// POST /api/admin/comunicados
+// POST /api/admin/comunicados — inmediato o programado (programado_para ISO futuro)
 router.post('/comunicados', async (req, res, next) => {
   try {
-    const { titulo, contenido } = req.body;
+    const { titulo, contenido, programado_para: programadoRaw } = req.body;
     if (!titulo?.trim() || !contenido?.trim()) {
       return res.status(400).json({ error: 'Título y contenido son requeridos' });
     }
-    // Desactivar todos los anteriores antes de crear uno nuevo activo
+
+    let programadoPara: string | null = null;
+    if (programadoRaw) {
+      const d = new Date(programadoRaw);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: 'Fecha de programación inválida' });
+      }
+      programadoPara = d.toISOString();
+    }
+
+    const ahora = Date.now();
+    const esFuturo = programadoPara && new Date(programadoPara).getTime() > ahora;
+
+    if (esFuturo) {
+      const { data, error } = await supabase
+        .from('comunicados')
+        .insert({
+          titulo: titulo.trim(),
+          contenido: contenido.trim(),
+          activo: false,
+          programado_para: programadoPara,
+        })
+        .select()
+        .single();
+      if (error) throw new Error('Error al crear comunicado programado');
+
+      await registrarAuditoria(req, {
+        accion: 'programar_comunicado',
+        entidad: 'comunicado',
+        entidadId: data?.id || null,
+        datosAnteriores: null,
+        datosNuevos: data || null,
+      });
+
+      return res.status(201).json({ comunicado: data });
+    }
+
     await supabase.from('comunicados').update({ activo: false }).eq('activo', true);
 
     const { data, error } = await supabase
       .from('comunicados')
-      .insert({ titulo: titulo.trim(), contenido: contenido.trim(), activo: true })
+      .insert({
+        titulo: titulo.trim(),
+        contenido: contenido.trim(),
+        activo: true,
+        programado_para: null,
+      })
       .select()
       .single();
     if (error) throw new Error('Error al crear comunicado');
@@ -524,42 +546,7 @@ router.post('/comunicados', async (req, res, next) => {
       datosNuevos: data || null,
     });
 
-    // Envío push automático (best effort, no rompe flujo principal)
-    if (pushDisponible && webpushLib) {
-      try {
-        const preview = contenido.trim().slice(0, 100);
-        const cuerpo = contenido.trim().length > 100 ? `${preview}...` : preview;
-
-        const { data: suscripciones } = await supabase
-          .from('push_subscriptions')
-          .select('endpoint, p256dh, auth');
-
-        if (suscripciones?.length) {
-          const payload = JSON.stringify({
-            titulo: titulo.trim(),
-            cuerpo,
-          });
-
-          await Promise.allSettled(
-            suscripciones.map(async (s) => {
-              try {
-                await webpushLib.sendNotification(
-                  { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                  payload
-                );
-              } catch {
-                await supabase
-                  .from('push_subscriptions')
-                  .delete()
-                  .eq('endpoint', s.endpoint);
-              }
-            })
-          );
-        }
-      } catch {
-        // Silencioso: no debe romper la creación del comunicado
-      }
-    }
+    await enviarPushComunicado(titulo.trim(), contenido.trim());
 
     return res.status(201).json({ comunicado: data });
   } catch (error) {
@@ -573,7 +560,7 @@ router.delete('/comunicados/:id', async (req, res, next) => {
     const { id } = req.params;
     const { data: anterior } = await supabase
       .from('comunicados')
-      .select('id, titulo, contenido, activo, created_at')
+      .select('id, titulo, contenido, activo, created_at, programado_para')
       .eq('id', id)
       .maybeSingle();
 
@@ -594,16 +581,74 @@ router.delete('/comunicados/:id', async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/comunicados/:id
+// PATCH /api/admin/comunicados/:id — activo, texto, fecha programada
 router.patch('/comunicados/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { activo } = req.body;
-    if (typeof activo !== 'boolean') {
-      return res.status(400).json({ error: 'activo debe ser boolean' });
+    const { activo, titulo, contenido, programado_para: programadoRaw } = req.body;
+
+    const { data: anterior } = await supabase
+      .from('comunicados')
+      .select('id, titulo, contenido, activo, created_at, programado_para')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Comunicado no encontrado' });
     }
-    await supabase.from('comunicados').update({ activo }).eq('id', id);
-    return res.status(200).json({ mensaje: 'Comunicado actualizado' });
+
+    const updates: Record<string, unknown> = {};
+
+    if (typeof titulo === 'string' && titulo.trim()) updates.titulo = titulo.trim();
+    if (typeof contenido === 'string' && contenido.trim()) updates.contenido = contenido.trim();
+
+    if ('programado_para' in req.body) {
+      if (programadoRaw === null || programadoRaw === '') {
+        updates.programado_para = null;
+      } else {
+        const d = new Date(programadoRaw);
+        if (Number.isNaN(d.getTime())) {
+          return res.status(400).json({ error: 'programado_para inválido' });
+        }
+        updates.programado_para = d.toISOString();
+      }
+    }
+
+    if (typeof activo === 'boolean') {
+      if (activo === true) {
+        await supabase.from('comunicados').update({ activo: false }).eq('activo', true);
+        updates.activo = true;
+        updates.programado_para = null;
+      } else {
+        updates.activo = false;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No hay cambios válidos' });
+    }
+
+    const { error: upErr } = await supabase.from('comunicados').update(updates).eq('id', id);
+    if (upErr) throw new Error('Error al actualizar comunicado');
+
+    const { data: nuevo } = await supabase
+      .from('comunicados')
+      .select('id, titulo, contenido, activo, created_at, programado_para')
+      .eq('id', id)
+      .maybeSingle();
+
+    await registrarAuditoria(req, {
+      accion: 'editar_comunicado',
+      entidad: 'comunicado',
+      entidadId: id,
+      datosAnteriores: anterior,
+      datosNuevos: nuevo,
+    });
+
+    if (updates.activo === true) {
+      await enviarPushComunicado(nuevo?.titulo ?? '', nuevo?.contenido ?? '');
+    }
+
+    return res.status(200).json({ comunicado: nuevo, mensaje: 'Comunicado actualizado' });
   } catch (error) {
     next(error);
   }

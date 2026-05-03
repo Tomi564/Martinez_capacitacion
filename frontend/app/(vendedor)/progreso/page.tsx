@@ -85,21 +85,24 @@ export default function ProgresoPage() {
         </p>
       </div>
 
-      {/* Tarjeta principal de progreso */}
-      <div className="bg-[#C8102E] text-white rounded-2xl p-5">
+      {/* Tarjeta principal de progreso — alto contraste en textos */}
+      <div className="bg-[#C8102E] text-white rounded-2xl p-5 shadow-md border border-black/10">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm text-gray-400">Completado</p>
-            <p className="text-4xl font-bold mt-0.5">{porcentaje}%</p>
+            <p className="text-sm font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] [text-shadow:0_1px_2px_rgba(0,0,0,0.2)]">
+              Completado
+            </p>
+            <p className="text-4xl font-black mt-0.5 text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.25)]">
+              {porcentaje}%
+            </p>
           </div>
 
-          {/* Círculo de progreso visual */}
           <div className="relative w-16 h-16">
-            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64" aria-hidden>
               <circle
                 cx="32" cy="32" r="28"
                 fill="none"
-                stroke="#374151"
+                stroke="rgba(0,0,0,0.22)"
                 strokeWidth="6"
               />
               <circle
@@ -113,16 +116,15 @@ export default function ProgresoPage() {
                 className="transition-all duration-700"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]">
               {stats.aprobados}/{stats.total}
             </span>
           </div>
         </div>
 
-        {/* Barra de progreso */}
-        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+        <div className="w-full h-2.5 bg-black/25 rounded-full overflow-hidden ring-1 ring-white/20">
           <div
-            className="h-full bg-white rounded-full transition-all duration-700"
+            className="h-full bg-white rounded-full transition-all duration-700 shadow-sm"
             style={{ width: `${porcentaje}%` }}
           />
         </div>
@@ -130,23 +132,27 @@ export default function ProgresoPage() {
 
       {/* Stats en grid */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
-          <p className="text-2xl font-bold text-green-600">{stats.aprobados}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Módulos aprobados</p>
+        <div className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 border border-gray-200/90">
+          <span className="absolute left-0 top-0 bottom-0 w-1 bg-green-600" aria-hidden />
+          <p className="text-2xl font-bold text-green-600 pl-2">{stats.aprobados}</p>
+          <p className="text-xs font-medium text-gray-600 mt-0.5 pl-2">Módulos aprobados</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 border border-gray-200/90">
+          <span className="absolute left-0 top-0 bottom-0 w-1 bg-gray-800" aria-hidden />
+          <p className="text-2xl font-bold text-gray-900 pl-2">
             {stats.promedioNotas > 0 ? `${stats.promedioNotas.toFixed(1)}%` : '—'}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5">Promedio de notas</p>
+          <p className="text-xs font-medium text-gray-600 mt-0.5 pl-2">Promedio de notas</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
-          <p className="text-2xl font-bold text-gray-900">{stats.totalIntentos}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Total de intentos</p>
+        <div className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 border border-gray-200/90">
+          <span className="absolute left-0 top-0 bottom-0 w-1 bg-slate-500" aria-hidden />
+          <p className="text-2xl font-bold text-gray-900 pl-2">{stats.totalIntentos}</p>
+          <p className="text-xs font-medium text-gray-600 mt-0.5 pl-2">Total de intentos</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
-          <p className="text-2xl font-bold text-amber-500">{stats.enCurso}</p>
-          <p className="text-xs text-gray-500 mt-0.5">En curso</p>
+        <div className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 border border-gray-200/90">
+          <span className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500" aria-hidden />
+          <p className="text-2xl font-bold text-amber-600 pl-2">{stats.enCurso}</p>
+          <p className="text-xs font-medium text-gray-600 mt-0.5 pl-2">En curso</p>
         </div>
       </div>
 

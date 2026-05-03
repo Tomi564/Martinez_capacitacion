@@ -180,6 +180,14 @@ export default function NuevaVisita() {
       setError('Si el vehículo no está vinculado, completá marca y modelo.');
       return false;
     }
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      setError('Completá nombre y apellido del titular del vehículo.');
+      return false;
+    }
+    if (!form.telefono.trim()) {
+      setError('Ingresá un teléfono de contacto del cliente.');
+      return false;
+    }
     return true;
   };
 
@@ -212,6 +220,17 @@ export default function NuevaVisita() {
     try {
       let vehiculoId = vehiculoSeleccionado?.id;
 
+      if (vehiculoSeleccionado?.id && !vehiculoSeleccionado.clientes) {
+        await apiClient.patch(`/mecanico/vehiculos/${vehiculoSeleccionado.id}`, {
+          cliente: {
+            nombre: form.nombre.trim(),
+            apellido: form.apellido.trim(),
+            telefono: form.telefono.trim() || null,
+            email: form.email.trim() || null,
+          },
+        });
+      }
+
       if (!vehiculoId) {
         const vRes = await apiClient.post<{ vehiculo: { id: string } }>('/mecanico/vehiculos', {
           patente: form.patente.trim().toUpperCase(),
@@ -219,14 +238,12 @@ export default function NuevaVisita() {
           modelo: form.modelo.trim(),
           anio: form.anio ? Number(form.anio) : null,
           medida_rueda: form.medida_rueda.trim() || null,
-          cliente: form.nombre.trim() || form.apellido.trim()
-            ? {
-                nombre: form.nombre.trim(),
-                apellido: form.apellido.trim(),
-                telefono: form.telefono.trim() || null,
-                email: form.email.trim() || null,
-              }
-            : undefined,
+          cliente: {
+            nombre: form.nombre.trim(),
+            apellido: form.apellido.trim(),
+            telefono: form.telefono.trim() || null,
+            email: form.email.trim() || null,
+          },
         });
         vehiculoId = vRes.vehiculo.id;
       }
@@ -255,7 +272,7 @@ export default function NuevaVisita() {
   const progreso = useMemo(() => (step / 3) * 100, [step]);
 
   return (
-    <div className="px-4 py-5 pb-28 max-w-lg mx-auto flex flex-col gap-4 overflow-x-hidden">
+    <div className="px-4 py-5 pb-40 max-w-lg mx-auto flex flex-col gap-4 overflow-x-hidden">
       <header className="bg-white border border-gray-200 rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nueva visita</p>
@@ -360,14 +377,14 @@ export default function NuevaVisita() {
             </Row>
           </Section>
 
-          <Section title="Cliente vinculado (opcional)">
-            <Row label="Nombre">
+          <Section title="Titular del vehículo">
+            <Row label="Nombre *">
               <Input placeholder="Juan" value={form.nombre} onChange={(e) => setField('nombre')(e.target.value)} />
             </Row>
-            <Row label="Apellido">
+            <Row label="Apellido *">
               <Input placeholder="García" value={form.apellido} onChange={(e) => setField('apellido')(e.target.value)} />
             </Row>
-            <Row label="Teléfono">
+            <Row label="Teléfono *">
               <Input placeholder="3874000000" type="tel" value={form.telefono} onChange={(e) => setField('telefono')(e.target.value)} />
             </Row>
             <Row label="Email">
@@ -422,7 +439,7 @@ export default function NuevaVisita() {
                 onChange={(e) => setField('observaciones')(e.target.value)}
                 placeholder="Ej: ruido en freno delantero, se detecta desgaste irregular..."
                 rows={4}
-                className="w-full text-sm text-gray-900 placeholder-gray-400 border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
+                className="w-full text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 bg-white shadow-sm rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E] resize-none"
               />
             </div>
             <div className="px-4 py-3 border-t border-gray-100">
@@ -442,7 +459,7 @@ export default function NuevaVisita() {
                 onChange={(e) => setField('recomendacion')(e.target.value)}
                 placeholder="Ej: conviene alineación y revisar pastillas en 15 días..."
                 rows={4}
-                className="w-full text-sm text-gray-900 placeholder-gray-400 border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
+                className="w-full text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 bg-white shadow-sm rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E] resize-none"
               />
             </div>
           </Section>
@@ -479,7 +496,7 @@ export default function NuevaVisita() {
         </div>
       )}
 
-      <footer className="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-200 px-4 py-3">
+      <footer className="fixed left-0 right-0 bottom-16 z-30 bg-white border-t border-gray-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           {step > 1 && (
             <button
@@ -678,7 +695,7 @@ function Input({ placeholder, type = 'text', value, onChange }: {
       placeholder={placeholder}
       value={value}
       onChange={onChange}
-      className="flex-1 min-w-0 h-10 text-base text-gray-900 placeholder-gray-300 focus:outline-none bg-transparent"
+      className="flex-1 min-w-0 h-10 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]"
     />
   );
 }

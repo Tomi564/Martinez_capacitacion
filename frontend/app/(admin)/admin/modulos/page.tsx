@@ -174,16 +174,18 @@ export default function AdminModulosPage() {
               </div>
             </div>
 
-            {/* Acciones */}
-            <div className="flex flex-col lg:flex-row items-end lg:items-center gap-1.5 flex-shrink-0">
-              <Link href={`/admin/modulos/${modulo.id}`}>
-                <button className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors">
-                  Editar
-                </button>
+            {/* Acciones — mismo ancho para las tres */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-1.5 flex-shrink-0 w-[7.85rem]">
+              <Link
+                href={`/admin/modulos/${modulo.id}`}
+                className="w-full text-center text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+              >
+                Editar
               </Link>
               <button
+                type="button"
                 onClick={() => handleToggleActivo(modulo)}
-                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                className={`w-full text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors text-center ${
                   modulo.activo
                     ? 'border-amber-200 text-amber-600 hover:bg-amber-50'
                     : 'border-green-200 text-green-600 hover:bg-green-50'
@@ -192,6 +194,7 @@ export default function AdminModulosPage() {
                 {modulo.activo ? 'Desactivar' : 'Activar'}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (confirm(`¿Eliminar el módulo "${modulo.titulo}"? Esta acción no se puede deshacer.`)) {
                     apiClient.delete(`/admin/modulos/${modulo.id}`)
@@ -199,7 +202,7 @@ export default function AdminModulosPage() {
                       .catch((err) => console.error(err));
                   }
                 }}
-                className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors"
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors text-center"
               >
                 Eliminar
               </button>

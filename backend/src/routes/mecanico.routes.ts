@@ -119,6 +119,67 @@ router.post('/vehiculos', requireRole('mecanico', 'admin'), async (req: AuthRequ
   } catch (e) { next(e); }
 });
 
+// PATCH /api/mecanico/vehiculos/:id — vincular o actualizar titular
+router.patch('/vehiculos/:vehiculoId', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const vehiculoId = req.params.vehiculoId as string;
+    const { cliente } = req.body as {
+      cliente?: { nombre?: string; apellido?: string; telefono?: string | null; email?: string | null };
+    };
+    if (!cliente?.nombre?.trim() || !cliente?.apellido?.trim()) {
+      throw new AppError('Nombre y apellido del cliente son requeridos', 400);
+    }
+
+    const { data: vehiculo, error: vErr } = await supabase
+      .from('vehiculos')
+      .select('id, cliente_id')
+      .eq('id', vehiculoId)
+      .single();
+    if (vErr || !vehiculo) throw new AppError('Vehículo no encontrado', 404);
+
+    let clienteId = vehiculo.cliente_id as string | null;
+
+    if (clienteId) {
+      const { error: cErr } = await supabase
+        .from('clientes')
+        .update({
+          nombre: cliente.nombre.trim(),
+          apellido: cliente.apellido.trim(),
+          telefono: cliente.telefono?.trim() || null,
+          email: cliente.email?.trim() || null,
+        })
+        .eq('id', clienteId);
+      if (cErr) throw new AppError('Error al actualizar cliente', 500);
+    } else {
+      const { data: nuevoCliente, error: insErr } = await supabase
+        .from('clientes')
+        .insert({
+          nombre: cliente.nombre.trim(),
+          apellido: cliente.apellido.trim(),
+          telefono: cliente.telefono?.trim() || null,
+          email: cliente.email?.trim() || null,
+        })
+        .select('id')
+        .single();
+      if (insErr) throw new AppError('Error al crear cliente', 500);
+      clienteId = nuevoCliente.id;
+      const { error: linkErr } = await supabase
+        .from('vehiculos')
+        .update({ cliente_id: clienteId })
+        .eq('id', vehiculoId);
+      if (linkErr) throw new AppError('Error al vincular cliente al vehículo', 500);
+    }
+
+    const { data: out, error: outErr } = await supabase
+      .from('vehiculos')
+      .select('*, clientes(id, nombre, apellido, telefono, email)')
+      .eq('id', vehiculoId)
+      .single();
+    if (outErr) throw new AppError('Error al leer vehículo', 500);
+    return res.json({ vehiculo: out });
+  } catch (e) { next(e); }
+});
+
 // ─── Visitas ─────────────────────────────────────────────────────────────────
 
 // GET /api/mecanico/visitas — visitas de hoy del mecánico

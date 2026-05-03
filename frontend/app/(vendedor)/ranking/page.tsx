@@ -80,9 +80,9 @@ export default function RankingPage() {
             {miPosicion < 3 ? MEDALLAS[miPosicion] : `#${miPosicion + 1}`}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-400">Tu posición esta semana</p>
+            <p className="text-xs text-red-50/95">Tu posición esta semana</p>
             <p className="font-bold truncate">{miEntry.nombre}</p>
-            <div className="flex gap-3 mt-1 text-xs text-gray-300">
+            <div className="flex gap-3 mt-1 text-xs text-red-50/95">
               <span>🛒 {miEntry.cantidadVentas} {miEntry.cantidadVentas === 1 ? 'venta' : 'ventas'}</span>
             </div>
           </div>
@@ -126,7 +126,7 @@ export default function RankingPage() {
                   />
                 </div>
 
-                <p className={`text-xs mt-1 ${esMio ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className={`text-xs mt-1 ${esMio ? 'text-red-50/95' : 'text-gray-500'}`}>
                   {entry.cantidadVentas === 0
                     ? 'Sin ventas aún'
                     : `${entry.cantidadVentas} ${entry.cantidadVentas === 1 ? 'venta' : 'ventas'}`
@@ -137,7 +137,7 @@ export default function RankingPage() {
               {/* Número de ventas */}
               <div className={`text-right shrink-0 ${esMio ? 'text-white' : 'text-gray-900'}`}>
                 <p className="text-2xl font-black">{entry.cantidadVentas}</p>
-                <p className={`text-xs ${esMio ? 'text-gray-400' : 'text-gray-400'}`}>ventas</p>
+                <p className={`text-xs ${esMio ? 'text-red-50/95' : 'text-gray-400'}`}>ventas</p>
               </div>
             </div>
           );

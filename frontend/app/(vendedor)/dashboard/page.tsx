@@ -196,22 +196,22 @@ export default function DashboardPage() {
       <div className="bg-[#C8102E] text-white rounded-2xl p-5 flex flex-col gap-4">
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-gray-400">Capacitación</p>
+            <p className="text-sm text-red-50/95">Capacitación</p>
             <p className="text-sm font-bold">
               {resumen?.aprobados} / {resumen?.total} módulos
             </p>
           </div>
           <Progress value={porcentaje} className="h-2 bg-red-900/30" indicatorClassName="bg-white" />
-          <p className="text-xs text-gray-400 mt-1.5">{porcentaje}% completado</p>
+          <p className="text-xs text-red-50/95 mt-1.5">{porcentaje}% completado</p>
         </div>
 
         {objetivo && progresoObjetivo && (objetivo.meta_ventas > 0 || objetivo.meta_conversion > 0) && (
           <div className="border-t border-gray-700 pt-4 flex flex-col gap-3">
-            <p className="text-sm text-gray-400">Objetivo del mes</p>
+            <p className="text-sm text-red-50/95">Objetivo del mes</p>
             {objetivo.meta_ventas > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-300">Ventas cerradas</span>
+                  <span className="text-xs text-red-50/95">Ventas cerradas</span>
                   <span className="text-xs font-bold text-white">
                     {progresoObjetivo.ventas} / {objetivo.meta_ventas}
                   </span>
@@ -229,7 +229,7 @@ export default function DashboardPage() {
             {objetivo.meta_conversion > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-300">Tasa de conversión</span>
+                  <span className="text-xs text-red-50/95">Tasa de conversión</span>
                   <span className="text-xs font-bold text-white">
                     {progresoObjetivo.tasaConversion}% / {objetivo.meta_conversion}%
                   </span>

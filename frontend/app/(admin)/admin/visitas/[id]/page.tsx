@@ -103,24 +103,24 @@ export default function AdminVisitaDetallePage() {
           rows={3}
           value={form.observaciones}
           onChange={(e) => setForm(f => ({ ...f, observaciones: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl p-3 text-sm"
+          className="w-full border border-gray-300 bg-white shadow-sm rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select value={form.estado_neumaticos} onChange={(e) => setForm(f => ({ ...f, estado_neumaticos: e.target.value }))} className="h-10 px-3 border border-gray-200 rounded-xl text-sm bg-white">
+          <select value={form.estado_neumaticos} onChange={(e) => setForm(f => ({ ...f, estado_neumaticos: e.target.value }))} className="h-10 px-3 border border-gray-300 rounded-xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]">
             <option value="">Estado neumáticos</option>
             <option value="buen_estado">Buen estado</option>
             <option value="desgaste_medio">Desgaste medio</option>
             <option value="reemplazo_urgente">Reemplazo urgente</option>
           </select>
-          <select value={form.estado_frenos} onChange={(e) => setForm(f => ({ ...f, estado_frenos: e.target.value }))} className="h-10 px-3 border border-gray-200 rounded-xl text-sm bg-white">
+          <select value={form.estado_frenos} onChange={(e) => setForm(f => ({ ...f, estado_frenos: e.target.value }))} className="h-10 px-3 border border-gray-300 rounded-xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]">
             <option value="">Estado frenos</option>
             <option value="buen_estado">Buen estado</option>
             <option value="desgaste_medio">Desgaste medio</option>
             <option value="reemplazo_urgente">Reemplazo urgente</option>
           </select>
-          <input type="number" placeholder="Presión PSI" value={form.presion_psi} onChange={(e) => setForm(f => ({ ...f, presion_psi: e.target.value }))} className="h-10 px-3 border border-gray-200 rounded-xl text-sm" />
-          <select value={form.estado_visita} onChange={(e) => setForm(f => ({ ...f, estado_visita: e.target.value as 'abierta' | 'cerrada' }))} className="h-10 px-3 border border-gray-200 rounded-xl text-sm bg-white">
+          <input type="number" placeholder="Presión PSI" value={form.presion_psi} onChange={(e) => setForm(f => ({ ...f, presion_psi: e.target.value }))} className="h-10 px-3 border border-gray-300 rounded-xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]" />
+          <select value={form.estado_visita} onChange={(e) => setForm(f => ({ ...f, estado_visita: e.target.value as 'abierta' | 'cerrada' }))} className="h-10 px-3 border border-gray-300 rounded-xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]">
             <option value="abierta">Abierta</option>
             <option value="cerrada">Cerrada</option>
           </select>
@@ -131,7 +131,7 @@ export default function AdminVisitaDetallePage() {
           rows={3}
           value={form.recomendacion}
           onChange={(e) => setForm(f => ({ ...f, recomendacion: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl p-3 text-sm"
+          className="w-full border border-gray-300 bg-white shadow-sm rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]"
         />
 
         <button onClick={guardar} disabled={isSaving} className="h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50">

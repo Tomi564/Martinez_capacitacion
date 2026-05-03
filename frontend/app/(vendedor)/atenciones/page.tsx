@@ -100,7 +100,7 @@ export default function AtencionesPage() {
         <div className="flex flex-col gap-3">
           {/* Tasa de conversión destacada */}
           <div className="bg-[#C8102E] text-white rounded-2xl p-5">
-            <p className="text-sm text-gray-400 mb-1">Tasa de conversión</p>
+            <p className="text-sm text-red-50/95 mb-1">Tasa de conversión</p>
             <p className="text-4xl font-black">{data.stats.tasaConversion}%</p>
             <div className="w-full h-2 bg-gray-700 rounded-full mt-3 overflow-hidden">
               <div
@@ -108,7 +108,7 @@ export default function AtencionesPage() {
                 style={{ width: `${data.stats.tasaConversion}%` }}
               />
             </div>
-            <div className="flex gap-4 mt-3 text-xs text-gray-400">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-red-50/95">
               <span>✅ {data.stats.ventas} ventas</span>
               <span>❌ {data.stats.noVentas} sin venta</span>
               <span>⏳ {data.stats.pendientes} pendientes</span>

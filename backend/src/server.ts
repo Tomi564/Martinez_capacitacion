@@ -42,6 +42,7 @@ import {
   enviarCierreSemanalRanking,
   enviarReinicioLunesRanking,
 } from './services/ranking-notificaciones.service';
+import { processScheduledComunicados } from './services/comunicados-scheduler.service';
 const app = express();
 
 // ─────────────────────────────────────────────────────
@@ -173,7 +174,12 @@ app.listen(PORT, () => {
     enviarReinicioLunesRanking().catch(console.error);
   }, { timezone: 'America/Argentina/Salta' });
 
-  console.log('   ⏰ Cron jobs activos: módulos, objetivos, ranking');
+  // Cada minuto — publicar comunicados programados
+  cron.schedule('* * * * *', () => {
+    processScheduledComunicados().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  console.log('   ⏰ Cron jobs activos: módulos, objetivos, ranking, comunicados programados');
 });
 
 export default app;
