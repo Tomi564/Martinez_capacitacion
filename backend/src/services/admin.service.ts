@@ -135,6 +135,52 @@ export class AdminService {
       p_datos_nuevos: (params.datosNuevos ?? null) as any,
     });
   }
+
+  /**
+   * Lista eventos de auditoría operacional (panel admin).
+   */
+  async listAuditoriaOperacional(params: {
+    desde?: string;
+    hasta?: string;
+    rol?: string;
+    accion?: string;
+    limit: number;
+    offset: number;
+  }) {
+    const { desde, hasta, rol, accion, limit, offset } = params;
+
+    let query = supabase
+      .from('auditoria_operacional')
+      .select(
+        `
+        id, usuario_id, rol, accion, entidad, entidad_id, datos_anteriores, datos_nuevos, created_at,
+        users!auditoria_operacional_usuario_id_fkey(nombre, apellido, email)
+      `,
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (rol) query = query.eq('rol', rol);
+    if (accion) query = query.eq('accion', accion);
+    if (desde) {
+      query = query.gte('created_at', new Date(`${desde}T00:00:00.000Z`).toISOString());
+    }
+    if (hasta) {
+      query = query.lte('created_at', new Date(`${hasta}T23:59:59.999Z`).toISOString());
+    }
+
+    const { data, error, count } = await query;
+    if (error) throw new AppError('Error al obtener auditoría operacional', 500);
+
+    return {
+      eventos: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    };
+  }
+
   /**
    * Dashboard con métricas globales del sistema.
    */

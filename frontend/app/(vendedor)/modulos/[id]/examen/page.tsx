@@ -15,6 +15,16 @@ import { CelebracionAprobado } from '@/components/ui/CelebracionAprobado';
 import { BadgeCheck, GraduationCap, Lightbulb, LockOpen, Timer } from 'lucide-react';
 import { useExamen } from '@/hooks/useExamen';
 
+/** Separa el enunciado en bloques legibles (párrafos o incisos a) b) c)). */
+function fragmentosEnunciado(raw: string): string[] {
+  const t = raw.trim();
+  if (!t) return [];
+  const porParrafos = t.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  if (porParrafos.length > 1) return porParrafos;
+  const porInciso = t.split(/(?=[a-z]\)\s)/i).map((s) => s.trim()).filter(Boolean);
+  return porInciso.length > 0 ? porInciso : [t];
+}
+
 export default function ExamenPage() {
   const params = useParams();
   const router = useRouter();
@@ -23,7 +33,6 @@ export default function ExamenPage() {
     estado,
     preguntas,
     preguntaActual,
-    setPreguntaActual,
     respuestas,
     resultado,
     error,
@@ -36,10 +45,12 @@ export default function ExamenPage() {
     pregunta,
     seleccionarOpcion,
     siguientePregunta,
-    anteriorPregunta,
     submitExamen,
     reintentar,
   } = useExamen(moduloId);
+
+  const tieneRespuestaActual =
+    typeof respuestaActual === 'string' && respuestaActual.trim().length > 0;
 
   // Formatear timer MM:SS
   const formatTiempo = (seg: number) => {
@@ -304,8 +315,8 @@ export default function ExamenPage() {
     <div className="flex flex-col min-h-screen max-w-lg mx-auto">
 
       {/* Header del examen */}
-      <div className="px-4 py-3 bg-white border-b border-gray-100 sticky top-[52px] z-10">
-        <div className="flex items-center justify-between mb-2">
+      <div className="px-4 py-4 bg-white border-b border-gray-100 sticky top-[52px] z-10">
+        <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-gray-900">
             Pregunta {preguntaActual + 1} de {preguntas.length}
           </span>
@@ -318,7 +329,7 @@ export default function ExamenPage() {
         </div>
 
         {/* Barra de progreso del examen */}
-        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-gray-900 rounded-full transition-all duration-300"
             style={{
@@ -327,13 +338,14 @@ export default function ExamenPage() {
           />
         </div>
 
-        {/* Indicadores de preguntas respondidas */}
-        <div className="flex gap-1 mt-2">
+        {/* Indicadores (solo lectura: no se puede saltar ni volver atrás) */}
+        <div className="flex gap-1.5 mt-3" role="list" aria-label="Progreso del examen">
           {preguntas.map((p, i) => (
-            <button
+            <div
               key={p.id}
-              onClick={() => setPreguntaActual(i)}
-              className={`flex-1 h-1.5 rounded-full transition-colors ${
+              role="listitem"
+              title={respuestas[p.id] ? 'Respondida' : i === preguntaActual ? 'Actual' : 'Pendiente'}
+              className={`flex-1 h-2 rounded-full transition-colors ${
                 respuestas[p.id]
                   ? 'bg-green-500'
                   : i === preguntaActual
@@ -346,14 +358,20 @@ export default function ExamenPage() {
       </div>
 
       {/* Pregunta */}
-      <div className="flex-1 px-4 py-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 leading-snug">
-          {pregunta?.enunciado}
-        </h2>
+      <div className="flex-1 px-4 py-8">
+        <div className="flex flex-col gap-5 mb-8">
+          {pregunta?.enunciado
+            ? fragmentosEnunciado(pregunta.enunciado).map((bloque, idx) => (
+                <p key={idx} className="text-lg font-bold text-gray-900 leading-relaxed">
+                  {bloque}
+                </p>
+              ))
+            : null}
+        </div>
 
         {/* Opciones / Desarrollo */}
         {pregunta?.tipo === 'desarrollo' ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3 mt-2">
             <label className="text-sm font-semibold text-gray-700">
               Tu respuesta (desarrollo)
             </label>
@@ -362,30 +380,31 @@ export default function ExamenPage() {
               onChange={(e) => seleccionarOpcion(e.target.value)}
               placeholder="Escribí tu respuesta con tus palabras..."
               rows={8}
-              className="w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
+              className="w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none min-h-[11rem]"
             />
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {pregunta?.opciones.map((opcion) => {
               const seleccionada = respuestaActual === opcion.id;
               return (
                 <button
                   key={opcion.id}
+                  type="button"
                   onClick={() => seleccionarOpcion(opcion.id)}
                   className={`
                     w-full text-left px-4 py-4 rounded-2xl border-2 transition-all
-                    active:scale-95
+                    active:scale-[0.99]
                     ${seleccionada
                       ? 'border-gray-900 bg-[#C8102E] text-white'
                       : 'border-gray-200 bg-white text-gray-900 hover:border-gray-400'
                     }
                   `}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <span className={`
                       w-7 h-7 rounded-full border-2 flex items-center justify-center
-                      text-xs font-bold flex-shrink-0
+                      text-xs font-bold flex-shrink-0 mt-0.5
                       ${seleccionada
                         ? 'border-white text-white'
                         : 'border-gray-300 text-gray-500'
@@ -393,7 +412,7 @@ export default function ExamenPage() {
                     `}>
                       {opcion.id.toUpperCase()}
                     </span>
-                    <span className="text-sm leading-snug">{opcion.texto}</span>
+                    <span className="text-sm leading-relaxed pt-0.5">{opcion.texto}</span>
                   </div>
                 </button>
               );
@@ -403,22 +422,27 @@ export default function ExamenPage() {
       </div>
 
       {/* Navegación y envío */}
-      <div className="px-4 py-4 bg-white border-t border-gray-100 pb-24">
-        <div className="flex gap-3 mb-3">
-          <button
-            onClick={anteriorPregunta}
-            disabled={preguntaActual === 0}
-            className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl disabled:opacity-30 active:scale-95 transition-transform"
-          >
-            ← Anterior
-          </button>
-          <button
-            onClick={siguientePregunta}
-            disabled={preguntaActual === preguntas.length - 1}
-            className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl disabled:opacity-30 active:scale-95 transition-transform"
-          >
-            Siguiente →
-          </button>
+      <div className="px-4 py-5 bg-white border-t border-gray-100 pb-24">
+        <div className="mb-4">
+          {preguntaActual < preguntas.length - 1 ? (
+            <button
+              type="button"
+              onClick={siguientePregunta}
+              disabled={!tieneRespuestaActual}
+              className="w-full py-3.5 rounded-2xl font-semibold text-base bg-gray-900 text-white active:scale-[0.99] transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Siguiente →
+            </button>
+          ) : (
+            <p className="text-center text-sm text-gray-500 leading-relaxed px-1">
+              Última pregunta. Cuando todas estén respondidas, enviá el examen abajo.
+            </p>
+          )}
+          {preguntaActual < preguntas.length - 1 && !tieneRespuestaActual && (
+            <p className="text-xs text-center text-amber-700 mt-2 font-medium">
+              Respondé esta pregunta para continuar.
+            </p>
+          )}
         </div>
 
         {/* Contador de respondidas */}

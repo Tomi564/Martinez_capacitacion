@@ -9,7 +9,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 export class ExamenesController {
   /**
    * GET /api/examenes/:moduloId/preguntas
-   * Retorna preguntas aleatorias para el examen — sin respuestas correctas
+   * Retorna todas las preguntas activas en orden de creación (como en el editor), sin respuestas correctas.
    */
   async getPreguntas(req: AuthRequest, res: Response, next: NextFunction) {
     try {

@@ -47,10 +47,6 @@ export function useExamen(moduloId: string) {
     if (preguntaActual < preguntas.length - 1) setPreguntaActual((p) => p + 1);
   };
 
-  const anteriorPregunta = () => {
-    if (preguntaActual > 0) setPreguntaActual((p) => p - 1);
-  };
-
   const submitExamen = useCallback(async () => {
     setEstado('enviando');
     try {
@@ -97,7 +93,6 @@ export function useExamen(moduloId: string) {
     estado,
     preguntas,
     preguntaActual,
-    setPreguntaActual,
     respuestas,
     resultado,
     error,
@@ -110,7 +105,6 @@ export function useExamen(moduloId: string) {
     pregunta,
     seleccionarOpcion,
     siguientePregunta,
-    anteriorPregunta,
     submitExamen,
     reintentar,
   };

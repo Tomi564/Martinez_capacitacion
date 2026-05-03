@@ -44,47 +44,9 @@ router.use(requireRole('admin'));
 // Dashboard
 // ─────────────────────────────────────────────────────
 
-// GET /api/admin/auditoria
-router.get('/auditoria', async (req, res, next) => {
-  try {
-    const desde = (req.query.desde as string) || '';
-    const hasta = (req.query.hasta as string) || '';
-    const rol = (req.query.rol as string) || '';
-    const accion = (req.query.accion as string) || '';
-    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
-    const offset = Math.max(0, Number(req.query.offset) || 0);
-
-    let query = supabase
-      .from('auditoria_operacional')
-      .select(`
-        id, usuario_id, rol, accion, entidad, entidad_id, datos_anteriores, datos_nuevos, created_at,
-        users!auditoria_operacional_usuario_id_fkey(nombre, apellido, email)
-      `, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (rol) query = query.eq('rol', rol);
-    if (accion) query = query.eq('accion', accion);
-    if (desde) {
-      query = query.gte('created_at', new Date(`${desde}T00:00:00.000Z`).toISOString());
-    }
-    if (hasta) {
-      query = query.lte('created_at', new Date(`${hasta}T23:59:59.999Z`).toISOString());
-    }
-
-    const { data, error, count } = await query;
-    if (error) throw new Error('Error al obtener auditoría operacional');
-
-    return res.status(200).json({
-      eventos: data || [],
-      total: count || 0,
-      limit,
-      offset,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// GET /api/admin/auditoria (y variante con barra final por compatibilidad con proxies)
+router.get('/auditoria', adminController.getAuditoria.bind(adminController));
+router.get('/auditoria/', adminController.getAuditoria.bind(adminController));
 
 // GET /api/admin/dashboard
 router.get(

@@ -98,23 +98,32 @@ export default function VisitaDetallePage() {
     setIsSaving(true);
     setMsg(null);
     try {
+      const presionRaw = presionPsi.replace(',', '.').trim();
+      const presionNum = presionRaw ? Number(presionRaw) : null;
+      const presionPsiBody = presionNum != null && Number.isFinite(presionNum) ? presionNum : null;
+
       const rows = Object.values(respuestas).filter((r) => r.estado).map((r) => ({
         item_id: r.item_id, estado: r.estado!, nota: r.nota || undefined,
       }));
-      if (rows.length) {
-        await apiClient.post(`/mecanico/visitas/${id}/checklist`, { respuestas: rows });
-      }
+
       await apiClient.patch(`/mecanico/visitas/${id}`, {
         observaciones: observaciones.trim() || null,
         estado_neumaticos: estadoNeumaticos || null,
         estado_frenos: estadoFrenos || null,
-        presion_psi: presionPsi ? Number(presionPsi) : null,
+        presion_psi: presionPsiBody,
         recomendacion: recomendacion.trim() || null,
       });
+      if (rows.length) {
+        await apiClient.post(`/mecanico/visitas/${id}/checklist`, { respuestas: rows });
+      }
       setMsg({ tipo: 'ok', texto: 'Guardado correctamente' });
     } catch (error) {
       console.error('[VisitaDetallePage] Error guardando checklist/diagnóstico', error);
-      setMsg({ tipo: 'error', texto: 'Error al guardar' });
+      const detalle = error instanceof Error ? error.message : '';
+      setMsg({
+        tipo: 'error',
+        texto: detalle ? `Error al guardar: ${detalle}` : 'Error al guardar',
+      });
     } finally {
       setIsSaving(false);
     }

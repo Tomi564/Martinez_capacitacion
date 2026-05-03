@@ -46,8 +46,8 @@ export class ExamenesService {
     return `${userId}:${moduloId}`;
   }
   /**
-   * Obtiene preguntas aleatorias para un examen.
-   * NUNCA incluye la respuesta_correcta en la respuesta.
+   * Obtiene todas las preguntas activas del módulo en orden fijo (created_at ASC,
+   * igual que el listado del editor admin). NUNCA incluye respuesta_correcta.
    */
   async getPreguntasExamen(moduloId: string, userId: string) {
     // Verificar que el módulo esté disponible para este usuario
@@ -84,13 +84,15 @@ export class ExamenesService {
       .from('preguntas')
       .select('id, enunciado, opciones, tipo, puntaje')
       .eq('modulo_id', moduloId)
-      .eq('activo', true);
+      .eq('activo', true)
+      .order('created_at', { ascending: true });
     if (primerIntento.error) {
       const fallback = await supabase
         .from('preguntas')
         .select('id, enunciado, opciones')
         .eq('modulo_id', moduloId)
-        .eq('activo', true);
+        .eq('activo', true)
+        .order('created_at', { ascending: true });
       preguntas = fallback.data as any[] | null;
       error = fallback.error;
     } else {
@@ -104,11 +106,7 @@ export class ExamenesService {
       );
     }
 
-    // Mezclar preguntas aleatoriamente (Fisher-Yates shuffle)
-    const shuffled = [...preguntas].sort(() => Math.random() - 0.5);
-
-    // Máximo 10 preguntas por examen
-    const preguntasExamen = shuffled.slice(0, 10);
+    const preguntasExamen = preguntas;
     examenesServidos.set(
       this.getExamenKey(userId, moduloId),
       preguntasExamen.map((p: any) => p.id)
@@ -140,8 +138,8 @@ export class ExamenesService {
    *  2. Obtener respuestas correctas de la DB
    *  3. Calcular nota
    *  4. Guardar intento
-   *  5. Actualizar progreso
-   *  6. Si aprobó, desbloquear el siguiente módulo
+   *  5. Actualizar progreso (si ya estaba aprobado y desaprueba un reintento, sigue aprobado)
+   *  6. Si aprobó este intento, desbloquear el siguiente módulo
    */
   async submitExamen(
     userId: string,
@@ -153,7 +151,7 @@ export class ExamenesService {
     const [{ data: progreso }, { data: moduloData }] = await Promise.all([
       supabase
         .from('progreso')
-        .select('estado, mejor_nota, intentos')
+        .select('estado, mejor_nota, intentos, completado_at')
         .eq('user_id', userId)
         .eq('modulo_id', moduloId)
         .single(),
@@ -318,18 +316,29 @@ export class ExamenesService {
 
     // 6. Actualizar progreso
     const nuevaMejorNota = Math.max(nota, progreso.mejor_nota || 0);
+    const intentosAntes = progreso.intentos || 0;
+    const nuevosIntentos = intentosAntes + 1;
+    const yaEstabaAprobado = progreso.estado === 'aprobado';
 
-    await supabase
-      .from('progreso')
-      .update({
-        estado: aprobado ? 'aprobado' : 'en_curso',
-        intentos: (progreso.intentos || 0) + 1,
-        mejor_nota: nuevaMejorNota,
-        ultimo_intento: new Date().toISOString(),
-        completado_at: aprobado ? new Date().toISOString() : null,
-      })
-      .eq('user_id', userId)
-      .eq('modulo_id', moduloId);
+    const progresoPatch: Record<string, unknown> = {
+      intentos: nuevosIntentos,
+      mejor_nota: nuevaMejorNota,
+      ultimo_intento: new Date().toISOString(),
+    };
+
+    if (aprobado) {
+      progresoPatch.estado = 'aprobado';
+      progresoPatch.completado_at = new Date().toISOString();
+    } else if (yaEstabaAprobado) {
+      // Reintento solo para mejorar nota: no se pierde la aprobación ni se afectan módulos siguientes
+      progresoPatch.estado = 'aprobado';
+      // completado_at se mantiene (no se envía)
+    } else {
+      progresoPatch.estado = 'en_curso';
+      progresoPatch.completado_at = null;
+    }
+
+    await supabase.from('progreso').update(progresoPatch).eq('user_id', userId).eq('modulo_id', moduloId);
 
     // 7. Si aprobó, desbloquear el siguiente módulo
     let siguienteModuloDesbloqueado = false;
@@ -346,9 +355,8 @@ export class ExamenesService {
       }
     }
 
-    // 8. Si no aprobó y alcanzó el límite de intentos, notificar al admin
-    const nuevosIntentos = (progreso.intentos || 0) + 1;
-    if (!aprobado && nuevosIntentos >= MAX_INTENTOS) {
+    // 8. Si no aprobó (nunca había aprobado) y alcanzó el límite de intentos, notificar al admin
+    if (!aprobado && nuevosIntentos >= MAX_INTENTOS && !yaEstabaAprobado) {
       await this.notificarAdminLimiteIntentos(userId, moduloId);
     }
     examenesServidos.delete(examKey);

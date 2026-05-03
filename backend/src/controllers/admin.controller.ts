@@ -34,6 +34,32 @@ export class AdminController {
   }
 
   /**
+   * GET /api/admin/auditoria
+   * Historial de acciones en el panel (filtros opcionales por query).
+   */
+  async getAuditoria(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const desde = (req.query.desde as string) || '';
+      const hasta = (req.query.hasta as string) || '';
+      const rol = (req.query.rol as string) || '';
+      const accion = (req.query.accion as string) || '';
+      const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+      const offset = Math.max(0, Number(req.query.offset) || 0);
+      const result = await adminService.listAuditoriaOperacional({
+        desde,
+        hasta,
+        rol,
+        accion,
+        limit,
+        offset,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/admin/vendedores
    * Lista todos los vendedores con su progreso
    */

@@ -271,7 +271,13 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
         observaciones: observaciones || null,
         estado_neumaticos: estado_neumaticos || null,
         estado_frenos: estado_frenos || null,
-        presion_psi: presion_psi != null ? Number(presion_psi) : null,
+        presion_psi:
+          presion_psi != null && presion_psi !== ''
+            ? (() => {
+                const n = Number(String(presion_psi).replace(',', '.'));
+                return Number.isFinite(n) ? n : null;
+              })()
+            : null,
         recomendacion: recomendacion || null,
         estado_visita: 'abierta',
         km: km || null,
@@ -284,8 +290,8 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
   } catch (e) { next(e); }
 });
 
-// GET /api/mecanico/visitas/:id — detalle de visita con checklist
-router.get('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+// GET /api/mecanico/visitas/:id — detalle de visita con checklist (vendedor: solo lectura en el front)
+router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { data: visita, error } = await supabase
       .from('visitas_taller')
@@ -326,11 +332,21 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
     if (observaciones !== undefined) updates.observaciones = observaciones;
     if (estado_neumaticos !== undefined) updates.estado_neumaticos = estado_neumaticos || null;
     if (estado_frenos !== undefined) updates.estado_frenos = estado_frenos || null;
-    if (presion_psi !== undefined) updates.presion_psi = presion_psi != null ? Number(presion_psi) : null;
+    if (presion_psi !== undefined) {
+      if (presion_psi == null || presion_psi === '') {
+        updates.presion_psi = null;
+      } else {
+        const n = Number(String(presion_psi).replace(',', '.'));
+        updates.presion_psi = Number.isFinite(n) ? n : null;
+      }
+    }
     if (recomendacion !== undefined) updates.recomendacion = recomendacion || null;
     if (estado_visita !== undefined) updates.estado_visita = estado_visita;
     const { error } = await supabase.from('visitas_taller').update(updates).eq('id', req.params.id);
-    if (error) throw new AppError('Error al actualizar visita', 500);
+    if (error) {
+      console.error('[mecanico] PATCH visitas_taller', req.params.id, error);
+      throw new AppError('Error al actualizar visita', 500);
+    }
     return res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -342,12 +358,31 @@ router.post('/visitas/:id/checklist', requireRole('mecanico', 'admin'), async (r
     if (!respuestas?.length) throw new AppError('Respuestas requeridas', 400);
 
     const visitaId = req.params.id;
-    const rows = respuestas.map(r => ({ visita_id: visitaId, item_id: r.item_id, estado: r.estado, nota: r.nota || null }));
+    const estadosPermitidos = new Set(['ok', 'revisar', 'urgente']);
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const r of respuestas) {
+      if (!r.item_id || !uuidRe.test(String(r.item_id))) {
+        throw new AppError('Ítem de checklist inválido', 400);
+      }
+      if (!r.estado || !estadosPermitidos.has(String(r.estado))) {
+        throw new AppError('Estado de checklist inválido', 400);
+      }
+    }
+
+    const rows = respuestas.map((r) => ({
+      visita_id: visitaId,
+      item_id: r.item_id,
+      estado: r.estado,
+      nota: r.nota != null && String(r.nota).trim() !== '' ? String(r.nota).trim() : null,
+    }));
 
     const { error } = await supabase
       .from('checklist_respuestas')
       .upsert(rows, { onConflict: 'visita_id,item_id' });
-    if (error) throw new AppError('Error al guardar checklist', 500);
+    if (error) {
+      console.error('[mecanico] checklist_respuestas upsert', visitaId, error);
+      throw new AppError('Error al guardar checklist', 500);
+    }
     return res.json({ ok: true });
   } catch (e) { next(e); }
 });

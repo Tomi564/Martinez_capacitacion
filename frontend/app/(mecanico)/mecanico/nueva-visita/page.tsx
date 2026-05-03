@@ -65,7 +65,7 @@ export default function NuevaVisita() {
   const [form, setForm] = useState<WizardForm>(FORM_INICIAL);
   const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState<Vehiculo | null>(null);
   const { sugerencias, setSugerencias, isBuscandoSugerencias } = usePatenteSugerencias(form.patente);
-  const { isSupported: speechDisponible, isListening, startDictation } = useSpeechInput();
+  const { isSupported: speechDisponible, isListening, startDictation, stopDictation } = useSpeechInput();
   const [isBuscandoExacto, setIsBuscandoExacto] = useState(false);
   const [dictadoTarget, setDictadoTarget] = useState<DictadoTarget | null>(null);
   const [isGuardando, setIsGuardando] = useState(false);
@@ -161,14 +161,20 @@ export default function NuevaVisita() {
   };
 
   const iniciarDictado = (target: DictadoTarget) => {
+    if (isListening && dictadoTarget === target) {
+      stopDictation();
+      return;
+    }
     setDictadoTarget(target);
     startDictation((texto) => {
-      if (target === 'observaciones') {
-        setField('observaciones')(form.observaciones ? `${form.observaciones} ${texto}` : texto);
-      } else {
-        setField('recomendacion')(form.recomendacion ? `${form.recomendacion} ${texto}` : texto);
-      }
-      setDictadoTarget(null);
+      setForm((prev) => {
+        if (target === 'observaciones') {
+          const next = prev.observaciones ? `${prev.observaciones} ${texto}`.trim() : texto;
+          return { ...prev, observaciones: next };
+        }
+        const next = prev.recomendacion ? `${prev.recomendacion} ${texto}`.trim() : texto;
+        return { ...prev, recomendacion: next };
+      });
     });
   };
 
@@ -439,7 +445,7 @@ export default function NuevaVisita() {
                     onClick={() => iniciarDictado('observaciones')}
                     className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700"
                   >
-                    {dictadoTarget === 'observaciones' ? 'Dictando...' : 'Micrófono'}
+                    {dictadoTarget === 'observaciones' && isListening ? 'Tocá para detener' : 'Micrófono'}
                   </button>
                 )}
               </div>
@@ -459,7 +465,7 @@ export default function NuevaVisita() {
                     onClick={() => iniciarDictado('recomendacion')}
                     className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700"
                   >
-                    {dictadoTarget === 'recomendacion' ? 'Dictando...' : 'Micrófono'}
+                    {dictadoTarget === 'recomendacion' && isListening ? 'Tocá para detener' : 'Micrófono'}
                   </button>
                 )}
               </div>
