@@ -18,6 +18,103 @@ interface ActorAuditoria {
   rol?: string;
 }
 
+/** Fila devuelta por RPC `admin_dashboard_resumen`. */
+interface AdminDashboardVendedorRow {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  modulos_aprobados?: number | null;
+  total_modulos?: number | null;
+  promedio_notas?: number | null;
+  ultima_actividad?: string | null;
+}
+
+export interface DashboardVendedorResumen {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  modulosAprobados: number;
+  totalModulos: number;
+  promedioNotas: number;
+  ultimaActividad: string | null;
+}
+
+/** Fila RPC `admin_reportes_progreso`. */
+interface AdminReporteProgresoRow {
+  nombre?: string | null;
+  apellido?: string | null;
+  email: string;
+  modulos_aprobados?: number | null;
+  total_modulos?: number | null;
+  porcentaje?: number | null;
+  promedio_notas?: number | null;
+  total_intentos?: number | null;
+  fecha_ultima_actividad?: string | null;
+}
+
+/** Fila RPC `admin_reportes_calificaciones`. */
+interface AdminReporteCalificacionesRow {
+  nombre?: string | null;
+  apellido?: string | null;
+  email: string;
+  promedio?: number | null;
+  promedio_vendedor?: number | null;
+  promedio_empresa?: number | null;
+  total_calificaciones?: number | null;
+  estrellas5?: number | null;
+  estrellas4?: number | null;
+  estrellas3?: number | null;
+  estrellas2?: number | null;
+  estrellas1?: number | null;
+  vendedor5?: number | null;
+  vendedor4?: number | null;
+  vendedor3?: number | null;
+  vendedor2?: number | null;
+  vendedor1?: number | null;
+  empresa5?: number | null;
+  empresa4?: number | null;
+  empresa3?: number | null;
+  empresa2?: number | null;
+  empresa1?: number | null;
+}
+
+export interface ReporteProgresoItem {
+  vendedor: string;
+  email: string;
+  modulosAprobados: number;
+  totalModulos: number;
+  porcentaje: number;
+  promedioNotas: number;
+  totalIntentos: number;
+  fechaUltimaActividad: string | null;
+}
+
+export interface ReporteCalificacionesItem {
+  vendedor: string;
+  email: string;
+  promedio: number;
+  promedioVendedor: number;
+  promedioEmpresa: number;
+  totalCalificaciones: number;
+  estrellas5: number;
+  estrellas4: number;
+  estrellas3: number;
+  estrellas2: number;
+  estrellas1: number;
+  vendedor5: number;
+  vendedor4: number;
+  vendedor3: number;
+  vendedor2: number;
+  vendedor1: number;
+  empresa5: number;
+  empresa4: number;
+  empresa3: number;
+  empresa2: number;
+  empresa1: number;
+}
+
 export class AdminService {
   private async registrarAuditoria(params: {
     actor?: ActorAuditoria;
@@ -45,7 +142,7 @@ export class AdminService {
     const { data, error } = await supabase.rpc('admin_dashboard_resumen');
     if (error) throw new AppError('Error al obtener dashboard', 500);
 
-    const vendedores = (data || []).map((row: any) => ({
+    const vendedores: DashboardVendedorResumen[] = (data || []).map((row: AdminDashboardVendedorRow) => ({
       id: row.id,
       nombre: row.nombre,
       apellido: row.apellido,
@@ -348,7 +445,10 @@ export class AdminService {
   /**
    * Reportes completos de progreso y calificaciones.
    */
-  async getReportes() {
+  async getReportes(): Promise<{
+    progreso: ReporteProgresoItem[];
+    calificaciones: ReporteCalificacionesItem[];
+  }> {
     const [{ data: progresoRows, error: progresoError }, { data: calificacionesRows, error: calificacionesError }] =
       await Promise.all([
         supabase.rpc('admin_reportes_progreso'),
@@ -358,7 +458,7 @@ export class AdminService {
     if (progresoError) throw new AppError('Error al obtener reporte de progreso', 500);
     if (calificacionesError) throw new AppError('Error al obtener reporte de calificaciones', 500);
 
-    const reporteProgreso = (progresoRows || []).map((row: any) => ({
+    const reporteProgreso: ReporteProgresoItem[] = (progresoRows || []).map((row: AdminReporteProgresoRow) => ({
       vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
       email: row.email,
       modulosAprobados: Number(row.modulos_aprobados || 0),
@@ -369,7 +469,8 @@ export class AdminService {
       fechaUltimaActividad: row.fecha_ultima_actividad || null,
     }));
 
-    const reporteCalificaciones = (calificacionesRows || []).map((row: any) => ({
+    const reporteCalificaciones: ReporteCalificacionesItem[] = (calificacionesRows || []).map(
+      (row: AdminReporteCalificacionesRow) => ({
       vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
       email: row.email,
       promedio: Math.round(Number(row.promedio || 0) * 10) / 10,
@@ -391,7 +492,8 @@ export class AdminService {
       empresa3: Number(row.empresa3 || 0),
       empresa2: Number(row.empresa2 || 0),
       empresa1: Number(row.empresa1 || 0),
-    }));
+    })
+    );
 
     return {
       progreso: reporteProgreso,

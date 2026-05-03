@@ -57,21 +57,36 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Permite requests sin origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
-      const allowed = process.env.FRONTEND_URL || '';
-      // Acepta el dominio exacto o cualquier preview de Vercel del mismo proyecto
-      if (
-        origin === allowed ||
-        origin === 'http://localhost:3000' ||
-        /^https:\/\/martinez-capac[^.]*\.vercel\.app$/.test(origin)
-      ) {
+
+      const stripSlash = (o: string) => o.replace(/\/$/, '');
+      const originNorm = stripSlash(origin);
+
+      const fromEnv = (process.env.FRONTEND_URL || '')
+        .split(',')
+        .map((s) => stripSlash(s.trim()))
+        .filter(Boolean);
+      const extra = (process.env.FRONTEND_URLS || '')
+        .split(',')
+        .map((s) => stripSlash(s.trim()))
+        .filter(Boolean);
+      const allowList = [...fromEnv, ...extra];
+
+      const isLocal =
+        originNorm === 'http://localhost:3000' || originNorm === 'http://127.0.0.1:3000';
+      const isVercel = /^https:\/\/[a-z0-9.-]+\.vercel\.app$/i.test(originNorm);
+
+      if (allowList.includes(originNorm) || isLocal || isVercel) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS: origen no permitido: ${origin}`));
+
+      console.warn(
+        `[CORS] Origen no permitido: ${originNorm} (FRONTEND_URL=${process.env.FRONTEND_URL || '(vacío)'})`,
+      );
+      return callback(null, false);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
