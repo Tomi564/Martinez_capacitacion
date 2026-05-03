@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { normalizePatenteAr } from '../utils/patente';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { Resend } from 'resend';
 
@@ -54,15 +55,21 @@ router.post('/clientes', requireRole('admin', 'vendedor', 'mecanico'), async (re
 // GET /api/mecanico/vehiculos/sugerencias?q=ABC
 router.get('/vehiculos/sugerencias', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const q = String(req.query.q || '').trim();
-    if (q.length < 3) {
-      return res.json({ vehiculos: [] });
-    }
+    const rawTrim = String(req.query.q || '').trim();
+    if (rawTrim.length < 3 || !/[a-zA-Z0-9]/.test(rawTrim)) return res.json({ vehiculos: [] });
+
+    const qTexto = rawTrim.toUpperCase();
+    const qPatente = normalizePatenteAr(rawTrim);
+
+    const orFilter =
+      qPatente.length > 0
+        ? `patente.ilike.%${qPatente}%,marca.ilike.%${qTexto}%,modelo.ilike.%${qTexto}%`
+        : `marca.ilike.%${qTexto}%,modelo.ilike.%${qTexto}%`;
 
     const { data, error } = await supabase
       .from('vehiculos')
       .select(`id, patente, marca, modelo, anio, medida_rueda, clientes(id, nombre, apellido, telefono, email)`)
-      .or(`patente.ilike.%${q}%,marca.ilike.%${q}%,modelo.ilike.%${q}%`)
+      .or(orFilter)
       .order('created_at', { ascending: false })
       .limit(8);
 
@@ -74,11 +81,19 @@ router.get('/vehiculos/sugerencias', requireRole('mecanico', 'admin'), async (re
 // GET /api/mecanico/vehiculos/buscar/:patente
 router.get('/vehiculos/buscar/:patente', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const patente = (req.params.patente as string).toUpperCase();
+    const param = req.params.patente;
+    let rawPat = typeof param === 'string' ? param : Array.isArray(param) ? param[0] || '' : '';
+    try {
+      rawPat = decodeURIComponent(rawPat.replace(/\+/g, '%20'));
+    } catch {
+      /* parámetro inválido, normalize devolverá '' */
+    }
+    const patenteParam = normalizePatenteAr(rawPat);
+    if (!patenteParam) throw new AppError('Patente vacía', 400);
     const { data, error } = await supabase
       .from('vehiculos')
       .select(`*, clientes(id, nombre, apellido, dni, telefono, email)`)
-      .eq('patente', patente)
+      .eq('patente', patenteParam)
       .maybeSingle();
     if (error) throw new AppError('Error al buscar', 500);
     return res.json({ vehiculo: data });
@@ -88,7 +103,8 @@ router.get('/vehiculos/buscar/:patente', requireRole('mecanico', 'admin'), async
 // POST /api/mecanico/vehiculos — crear vehículo (y cliente si viene)
 router.post('/vehiculos', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { patente, marca, modelo, anio, medida_rueda, cliente_id, cliente } = req.body;
+    const { patente: patenteRaw, marca, modelo, anio, medida_rueda, cliente_id, cliente } = req.body;
+    const patente = normalizePatenteAr(String(patenteRaw || ''));
     if (!patente || !marca || !modelo) throw new AppError('Patente, marca y modelo requeridos', 400);
 
     let clienteId = cliente_id;
@@ -111,7 +127,7 @@ router.post('/vehiculos', requireRole('mecanico', 'admin'), async (req: AuthRequ
 
     const { data, error } = await supabase
       .from('vehiculos')
-      .insert({ patente: patente.toUpperCase(), marca, modelo, anio: anio || null, medida_rueda: medida_rueda || null, cliente_id: clienteId || null })
+      .insert({ patente, marca, modelo, anio: anio || null, medida_rueda: medida_rueda || null, cliente_id: clienteId || null })
       .select(`*, clientes(id, nombre, apellido, telefono, email)`)
       .single();
     if (error) throw new AppError('Error al crear vehículo', 500);

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { formatPatenteArDisplay, normalizePatenteAr } from '@/lib/patente';
 import { usePatenteSugerencias } from '@/hooks/usePatenteSugerencias';
 import { useSpeechInput } from '@/hooks/useSpeechInput';
 
@@ -77,9 +78,10 @@ export default function NuevaVisita() {
 
   const aplicarVehiculo = (v: Vehiculo) => {
     setVehiculoSeleccionado(v);
+    const patenteCanon = normalizePatenteAr(v.patente || '');
     setForm((prev) => ({
       ...prev,
-      patente: v.patente || '',
+      patente: patenteCanon ? formatPatenteArDisplay(patenteCanon) : '',
       marca: v.marca || '',
       modelo: v.modelo || '',
       anio: v.anio ? String(v.anio) : '',
@@ -93,8 +95,9 @@ export default function NuevaVisita() {
 
   const limpiarVehiculoSeleccionadoSiCorresponde = (nextPatente?: string) => {
     if (!vehiculoSeleccionado) return;
-    const patenteComparar = (nextPatente ?? form.patente).trim().toUpperCase();
-    if (patenteComparar !== vehiculoSeleccionado.patente.trim().toUpperCase()) {
+    const siguiente = normalizePatenteAr(nextPatente ?? form.patente);
+    const actual = normalizePatenteAr(vehiculoSeleccionado.patente || '');
+    if (siguiente !== actual) {
       setVehiculoSeleccionado(null);
     }
   };
@@ -134,12 +137,14 @@ export default function NuevaVisita() {
   }, [form, step, vehiculoSeleccionado]);
 
   const buscarPorPatenteExacta = async () => {
-    const patente = form.patente.trim().toUpperCase();
-    if (!patente) return;
+    const patenteCanon = normalizePatenteAr(form.patente);
+    if (!patenteCanon) return;
     setError('');
     setIsBuscandoExacto(true);
     try {
-      const res = await apiClient.get<{ vehiculo: Vehiculo | null }>(`/mecanico/vehiculos/buscar/${patente}`);
+      const res = await apiClient.get<{ vehiculo: Vehiculo | null }>(
+        `/mecanico/vehiculos/buscar/${encodeURIComponent(patenteCanon)}`,
+      );
       if (!res.vehiculo) {
         setVehiculoSeleccionado(null);
         setError('No encontramos esa patente. Podés completar los datos y crearla como vehículo nuevo.');
@@ -172,7 +177,7 @@ export default function NuevaVisita() {
   }, [isListening]);
 
   const validarPaso1 = () => {
-    if (!form.patente.trim()) {
+    if (!normalizePatenteAr(form.patente)) {
       setError('Ingresá la patente para continuar.');
       return false;
     }
@@ -233,7 +238,7 @@ export default function NuevaVisita() {
 
       if (!vehiculoId) {
         const vRes = await apiClient.post<{ vehiculo: { id: string } }>('/mecanico/vehiculos', {
-          patente: form.patente.trim().toUpperCase(),
+          patente: normalizePatenteAr(form.patente),
           marca: form.marca.trim(),
           modelo: form.modelo.trim(),
           anio: form.anio ? Number(form.anio) : null,
@@ -300,9 +305,13 @@ export default function NuevaVisita() {
                       limpiarVehiculoSeleccionadoSiCorresponde(nextPatente);
                       setError('');
                     }}
+                    onBlur={() => {
+                      const canon = normalizePatenteAr(form.patente);
+                      if (canon) setField('patente')(formatPatenteArDisplay(canon));
+                    }}
                     onKeyDown={(e) => e.key === 'Enter' && buscarPorPatenteExacta()}
-                    placeholder="Ej: ABC123"
-                    maxLength={8}
+                    placeholder="Ej: AC 797 HP"
+                    maxLength={12}
                     className="flex-1 min-w-0 h-14 px-4 bg-white border-2 border-gray-200 rounded-2xl text-2xl font-black tracking-wider text-gray-900 placeholder-gray-300 focus:outline-none focus:border-[#C8102E] uppercase"
                   />
                   <button
