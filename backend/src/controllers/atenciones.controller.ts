@@ -43,8 +43,13 @@ export class AtencionesController {
   async actualizar(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const atencionId = req.params.id;
+      const rawId = req.params.id;
+      const atencionId = typeof rawId === 'string' ? rawId : rawId?.[0];
       const { canal, resultado, producto, monto, observaciones } = req.body;
+
+      if (!atencionId) {
+        return res.status(400).json({ error: 'ID de atención inválido' });
+      }
 
       if (!canal || !resultado) {
         return res.status(400).json({

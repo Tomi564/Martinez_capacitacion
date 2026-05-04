@@ -396,7 +396,9 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
 // DELETE /api/mecanico/visitas/:id — eliminar visita del mecánico
 router.delete('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const visitaId = req.params.id;
+    const rawId = req.params.id;
+    const visitaId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    if (!visitaId) throw new AppError('ID de visita inválido', 400);
     const mecanicoId = req.user!.id;
 
     const { data: visita, error: readErr } = await supabase
