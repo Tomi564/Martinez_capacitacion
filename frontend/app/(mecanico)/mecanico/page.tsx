@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Car, ChevronDown, PlusCircle, Wrench } from 'lucide-react';
+import { Car, ChevronDown, PlusCircle, Trash2, Wrench } from 'lucide-react';
 
 interface Visita {
   id: string;
@@ -69,6 +69,8 @@ export default function MecanicoHome() {
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistorial, setIsLoadingHistorial] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [visitaAEliminar, setVisitaAEliminar] = useState<Visita | null>(null);
   const [errorHoy, setErrorHoy] = useState<string | null>(null);
   const [errorHistorial, setErrorHistorial] = useState<string | null>(null);
 
@@ -78,7 +80,7 @@ export default function MecanicoHome() {
       const res = await apiClient.get<{ visitas: Visita[] }>('/mecanico/visitas');
       setVisitas(res.visitas);
     } catch {
-      setErrorHoy('No se pudieron cargar las visitas de hoy.');
+      setErrorHoy('No se pudieron cargar las visitas activas.');
       setVisitas([]);
     }
     finally { setIsLoading(false); }
@@ -109,6 +111,22 @@ export default function MecanicoHome() {
     }
   }, [historialAbierto]);
 
+  const eliminarVisita = async (v: Visita) => {
+    setDeletingId(v.id);
+    try {
+      await apiClient.delete(`/mecanico/visitas/${v.id}`);
+      await fetchVisitas();
+      if (historialAbierto) {
+        await fetchHistorial(0, false);
+      }
+    } catch {
+      setErrorHoy('No se pudo eliminar la revisión.');
+    } finally {
+      setDeletingId(null);
+      setVisitaAEliminar(null);
+    }
+  };
+
   const activas = visitas.filter(v => v.estado !== 'entregado');
   const entregadas = visitas.filter(v => v.estado === 'entregado');
 
@@ -124,10 +142,10 @@ export default function MecanicoHome() {
         Nueva visita
       </button>
 
-      {/* Visitas de hoy */}
+      {/* Visitas activas */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-gray-900 text-base">Hoy — {activas.length} {activas.length === 1 ? 'visita' : 'visitas'}</h2>
+          <h2 className="font-bold text-gray-900 text-base">Activas — {activas.length} {activas.length === 1 ? 'visita' : 'visitas'}</h2>
           <Button onClick={fetchVisitas} variant="ghost" className="h-8 px-2 text-xs">Actualizar</Button>
         </div>
 
@@ -148,7 +166,7 @@ export default function MecanicoHome() {
           <Card className="rounded-xl text-center">
             <CardContent className="p-8">
             <Wrench className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">Sin visitas hoy</p>
+            <p className="text-gray-500 text-sm">Sin visitas activas</p>
             <p className="text-gray-400 text-xs mt-1">Tocá "Nueva visita" para empezar</p>
             </CardContent>
           </Card>
@@ -158,23 +176,39 @@ export default function MecanicoHome() {
               const cfg = ESTADO_CONFIG[v.estado] || ESTADO_CONFIG.en_espera;
               const cliente = v.vehiculos?.clientes;
               return (
-                <button
+                <div
                   key={v.id}
-                  onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
-                  className="w-full bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-4 active:scale-[0.99] transition-transform text-left"
+                  className="w-full bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-4"
                 >
-                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                  <button
+                    onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
+                    className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 active:scale-[0.99] transition-transform"
+                  >
                     <Car className="w-5 h-5 text-gray-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
+                  </button>
+                  <button
+                    onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
+                    className="flex-1 min-w-0 text-left active:scale-[0.99] transition-transform"
+                  >
                     <p className="font-bold text-gray-900 text-base">{v.vehiculos?.patente}</p>
                     <p className="text-sm text-gray-500 truncate">{v.vehiculos?.marca} {v.vehiculos?.modelo}</p>
                     {cliente && <p className="text-xs text-gray-400">{cliente.nombre} {cliente.apellido}</p>}
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${cfg.bg} ${cfg.color}`}>
+                      {cfg.label}
+                    </span>
+                    <button
+                      onClick={() => setVisitaAEliminar(v)}
+                      disabled={deletingId === v.id}
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                      aria-label="Eliminar revisión"
+                      title="Eliminar revisión"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <span className={`text-xs font-bold px-3 py-1.5 rounded-full shrink-0 ${cfg.bg} ${cfg.color}`}>
-                    {cfg.label}
-                  </span>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -268,6 +302,33 @@ export default function MecanicoHome() {
           </div>
         )}
       </div>
+
+      {visitaAEliminar && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-5">
+            <h3 className="text-base font-bold text-gray-900">Eliminar revisión</h3>
+            <p className="text-sm text-gray-600 mt-2">
+              ¿Seguro querés eliminar la revisión {visitaAEliminar.vehiculos?.patente || ''}? Esta acción no se puede deshacer.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setVisitaAEliminar(null)}
+                disabled={deletingId === visitaAEliminar.id}
+                className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => eliminarVisita(visitaAEliminar)}
+                disabled={deletingId === visitaAEliminar.id}
+                className="h-10 px-4 rounded-xl bg-[#C8102E] text-sm font-bold text-white disabled:opacity-50"
+              >
+                {deletingId === visitaAEliminar.id ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

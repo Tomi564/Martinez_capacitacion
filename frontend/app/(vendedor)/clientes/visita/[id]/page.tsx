@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
+import { ArrowLeft } from 'lucide-react';
 
 interface ChecklistItem { id: string; descripcion: string; orden: number; }
 interface Respuesta { item_id: string; estado: string; nota: string | null; }
@@ -24,6 +25,7 @@ const ESTADO_CFG: Record<string, { label: string; color: string; bg: string }> =
 
 export default function VisitaVendedorDetalle() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [visita, setVisita] = useState<Visita | null>(null);
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({});
@@ -72,6 +74,13 @@ export default function VisitaVendedorDetalle() {
 
   return (
     <div className="px-4 py-5 pb-24 flex flex-col gap-5 max-w-lg mx-auto">
+      <button
+        onClick={() => router.back()}
+        className="self-start inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Volver
+      </button>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
         <div className="flex items-start justify-between gap-3">

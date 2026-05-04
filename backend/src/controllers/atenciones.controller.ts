@@ -37,6 +37,36 @@ export class AtencionesController {
   }
 
   /**
+   * PATCH /api/atenciones/:id
+   * Edita una atención existente del vendedor
+   */
+  async actualizar(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id;
+      const atencionId = req.params.id;
+      const { canal, resultado, producto, monto, observaciones } = req.body;
+
+      if (!canal || !resultado) {
+        return res.status(400).json({
+          error: 'Canal y resultado son requeridos',
+        });
+      }
+
+      const result = await atencionesService.actualizar(userId, atencionId, {
+        canal,
+        resultado,
+        producto,
+        monto: monto ? Number(monto) : undefined,
+        observaciones,
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/atenciones/mias
    * Historial y estadísticas del vendedor
    */

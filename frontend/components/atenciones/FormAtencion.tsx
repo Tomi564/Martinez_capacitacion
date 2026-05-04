@@ -38,6 +38,8 @@ interface FormAtencionProps {
   onCerrar: () => void;
   onGuardar: () => void;
   onLimpiarSugerencias: () => void;
+  title?: string;
+  submitLabel?: string;
 }
 
 export function FormAtencion({
@@ -54,12 +56,14 @@ export function FormAtencion({
   onCerrar,
   onGuardar,
   onLimpiarSugerencias,
+  title = 'Registrar atención',
+  submitLabel = 'Guardar',
 }: FormAtencionProps) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md p-5 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Registrar atención</h2>
+          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <button onClick={onCerrar} className="p-2 hover:bg-gray-100 rounded-lg">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -219,7 +223,7 @@ export function FormAtencion({
                 Guardando...
               </>
             ) : (
-              'Guardar'
+              submitLabel
             )}
           </button>
         </div>

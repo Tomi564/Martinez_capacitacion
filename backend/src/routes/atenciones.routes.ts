@@ -16,6 +16,12 @@ router.post(
   atencionesController.crear.bind(atencionesController)
 );
 
+// PATCH /api/atenciones/:id
+router.patch(
+  '/:id',
+  atencionesController.actualizar.bind(atencionesController)
+);
+
 // GET /api/atenciones/mias
 router.get(
   '/mias',

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { formatPatenteArDisplay, normalizePatenteAr } from '@/lib/patente';
 import { usePatenteSugerencias } from '@/hooks/usePatenteSugerencias';
-import { useSpeechInput } from '@/hooks/useSpeechInput';
 
 interface Vehiculo {
   id: string;
@@ -17,9 +16,8 @@ interface Vehiculo {
   clientes: { id: string; nombre: string; apellido: string; telefono: string | null; email: string | null } | null;
 }
 
-type EstadoDiagnostico = 'buen_estado' | 'desgaste_medio' | 'reemplazo_urgente';
-type WizardStep = 1 | 2 | 3;
-type DictadoTarget = 'observaciones' | 'recomendacion';
+type WizardStep = 1 | 2;
+type EstadoChecklist = 'ok' | 'revisar' | 'urgente';
 
 interface WizardForm {
   patente: string;
@@ -32,11 +30,18 @@ interface WizardForm {
   telefono: string;
   email: string;
   motivo: string;
-  observaciones: string;
-  estado_neumaticos: '' | EstadoDiagnostico;
-  estado_frenos: '' | EstadoDiagnostico;
-  presion_psi: string;
-  recomendacion: string;
+}
+
+interface ChecklistItem {
+  id: string;
+  descripcion: string;
+  orden: number;
+}
+
+interface RespuestaChecklist {
+  item_id: string;
+  estado: EstadoChecklist | null;
+  nota: string | null;
 }
 
 const DRAFT_KEY = 'mecanico_nueva_visita_wizard_draft_v1';
@@ -52,11 +57,6 @@ const FORM_INICIAL: WizardForm = {
   telefono: '',
   email: '',
   motivo: '',
-  observaciones: '',
-  estado_neumaticos: '',
-  estado_frenos: '',
-  presion_psi: '',
-  recomendacion: '',
 };
 
 export default function NuevaVisita() {
@@ -65,9 +65,10 @@ export default function NuevaVisita() {
   const [form, setForm] = useState<WizardForm>(FORM_INICIAL);
   const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState<Vehiculo | null>(null);
   const { sugerencias, setSugerencias, isBuscandoSugerencias } = usePatenteSugerencias(form.patente);
-  const { isSupported: speechDisponible, isListening, startDictation, stopDictation } = useSpeechInput();
   const [isBuscandoExacto, setIsBuscandoExacto] = useState(false);
-  const [dictadoTarget, setDictadoTarget] = useState<DictadoTarget | null>(null);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [respuestas, setRespuestas] = useState<Record<string, RespuestaChecklist>>({});
+  const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
   const [isGuardando, setIsGuardando] = useState(false);
   const [error, setError] = useState('');
 
@@ -110,10 +111,12 @@ export default function NuevaVisita() {
       const draft = JSON.parse(raw) as {
         form?: WizardForm;
         step?: WizardStep;
+        respuestas?: Record<string, RespuestaChecklist>;
         vehiculoSeleccionado?: Vehiculo | null;
       };
       if (draft.form) setForm((prev) => ({ ...prev, ...draft.form }));
-      if (draft.step && [1, 2, 3].includes(draft.step)) setStep(draft.step);
+      if (draft.step && [1, 2].includes(draft.step)) setStep(draft.step);
+      if (draft.respuestas) setRespuestas(draft.respuestas);
       if (draft.vehiculoSeleccionado?.id) setVehiculoSeleccionado(draft.vehiculoSeleccionado);
     } catch (draftError) {
       console.error('[NuevaVisitaWizard] Error leyendo borrador local', draftError);
@@ -128,13 +131,30 @@ export default function NuevaVisita() {
         JSON.stringify({
           form,
           step,
+          respuestas,
           vehiculoSeleccionado,
         })
       );
     } catch (draftError) {
       console.error('[NuevaVisitaWizard] Error guardando borrador local', draftError);
     }
-  }, [form, step, vehiculoSeleccionado]);
+  }, [form, step, respuestas, vehiculoSeleccionado]);
+
+  useEffect(() => {
+    const fetchChecklistItems = async () => {
+      setIsLoadingChecklist(true);
+      try {
+        const res = await apiClient.get<{ items: ChecklistItem[] }>('/mecanico/checklist-items');
+        setChecklistItems(res.items || []);
+      } catch (checklistError) {
+        console.error('[NuevaVisitaWizard] Error cargando checklist', checklistError);
+        setChecklistItems([]);
+      } finally {
+        setIsLoadingChecklist(false);
+      }
+    };
+    fetchChecklistItems();
+  }, []);
 
   const buscarPorPatenteExacta = async () => {
     const patenteCanon = normalizePatenteAr(form.patente);
@@ -159,28 +179,6 @@ export default function NuevaVisita() {
       setIsBuscandoExacto(false);
     }
   };
-
-  const iniciarDictado = (target: DictadoTarget) => {
-    if (isListening && dictadoTarget === target) {
-      stopDictation();
-      return;
-    }
-    setDictadoTarget(target);
-    startDictation((texto) => {
-      setForm((prev) => {
-        if (target === 'observaciones') {
-          const next = prev.observaciones ? `${prev.observaciones} ${texto}`.trim() : texto;
-          return { ...prev, observaciones: next };
-        }
-        const next = prev.recomendacion ? `${prev.recomendacion} ${texto}`.trim() : texto;
-        return { ...prev, recomendacion: next };
-      });
-    });
-  };
-
-  useEffect(() => {
-    if (!isListening) setDictadoTarget(null);
-  }, [isListening]);
 
   const validarPaso1 = () => {
     if (!normalizePatenteAr(form.patente)) {
@@ -207,10 +205,6 @@ export default function NuevaVisita() {
     if (step === 1) {
       if (!validarPaso1()) return;
       setStep(2);
-      return;
-    }
-    if (step === 2) {
-      setStep(3);
     }
   };
 
@@ -218,6 +212,20 @@ export default function NuevaVisita() {
     setError('');
     if (step === 1) return;
     setStep((prev) => (prev - 1) as WizardStep);
+  };
+
+  const setEstadoChecklist = (itemId: string, estado: EstadoChecklist) => {
+    setRespuestas((prev) => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], item_id: itemId, estado, nota: prev[itemId]?.nota || null },
+    }));
+  };
+
+  const setNotaChecklist = (itemId: string, nota: string) => {
+    setRespuestas((prev) => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], item_id: itemId, estado: prev[itemId]?.estado || null, nota: nota || null },
+    }));
   };
 
   const confirmarYGuardar = async () => {
@@ -229,6 +237,14 @@ export default function NuevaVisita() {
     setError('');
     setIsGuardando(true);
     try {
+      const ok = typeof window === 'undefined'
+        ? true
+        : window.confirm('¿Guardar visita con el checklist cargado?');
+      if (!ok) {
+        setIsGuardando(false);
+        return;
+      }
+
       let vehiculoId = vehiculoSeleccionado?.id;
 
       if (vehiculoSeleccionado?.id && !vehiculoSeleccionado.clientes) {
@@ -262,12 +278,17 @@ export default function NuevaVisita() {
       const visRes = await apiClient.post<{ visita: { id: string } }>('/mecanico/visitas', {
         vehiculo_id: vehiculoId,
         motivo: form.motivo.trim() || null,
-        observaciones: form.observaciones.trim() || null,
-        estado_neumaticos: form.estado_neumaticos || null,
-        estado_frenos: form.estado_frenos || null,
-        presion_psi: form.presion_psi ? Number(form.presion_psi) : null,
-        recomendacion: form.recomendacion.trim() || null,
+        observaciones: null,
+        presion_psi: null,
+        recomendacion: null,
       });
+
+      const rows = Object.values(respuestas)
+        .filter((r) => r.estado)
+        .map((r) => ({ item_id: r.item_id, estado: r.estado as EstadoChecklist, nota: r.nota || undefined }));
+      if (rows.length > 0) {
+        await apiClient.post(`/mecanico/visitas/${visRes.visita.id}/checklist`, { respuestas: rows });
+      }
 
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(DRAFT_KEY);
@@ -280,14 +301,14 @@ export default function NuevaVisita() {
     }
   };
 
-  const progreso = useMemo(() => (step / 3) * 100, [step]);
+  const progreso = useMemo(() => (step / 2) * 100, [step]);
 
   return (
     <div className="px-4 py-5 pb-40 max-w-lg mx-auto flex flex-col gap-4 overflow-x-hidden">
       <header className="bg-white border border-gray-200 rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nueva visita</p>
-          <p className="text-sm font-semibold text-gray-800">Paso {step} de 3</p>
+          <p className="text-sm font-semibold text-gray-800">Paso {step} de 2</p>
         </div>
         <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
           <div className="h-full bg-[#C8102E] rounded-full transition-all duration-300" style={{ width: `${progreso}%` }} />
@@ -421,93 +442,54 @@ export default function NuevaVisita() {
 
       {step === 2 && (
         <div className="flex flex-col gap-4">
-          <Section title="Diagnóstico (opcional)">
+          <Section title="Checklist operativo">
             <div className="px-4 py-3">
-              <DiagnosticoSection
-                estadoNeumaticos={form.estado_neumaticos || null}
-                setEstadoNeumaticos={(v) => setForm((f) => ({ ...f, estado_neumaticos: v || '' }))}
-                estadoFrenos={form.estado_frenos || null}
-                setEstadoFrenos={(v) => setForm((f) => ({ ...f, estado_frenos: v || '' }))}
-                presionPsi={form.presion_psi}
-                setPresionPsi={(v) => setForm((f) => ({ ...f, presion_psi: v }))}
-                recomendacion={form.recomendacion}
-                setRecomendacion={(v) => setForm((f) => ({ ...f, recomendacion: v }))}
-              />
+              {isLoadingChecklist ? (
+                <p className="text-sm text-gray-500">Cargando checklist...</p>
+              ) : checklistItems.length === 0 ? (
+                <p className="text-sm text-gray-500">No hay ítems de checklist activos.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {checklistItems.map((item) => {
+                    const r = respuestas[item.id];
+                    return (
+                      <div key={item.id} className="border border-gray-200 rounded-xl p-3">
+                        <p className="font-semibold text-gray-900 mb-2">{item.descripcion}</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <EstadoBtn
+                            activo={r?.estado === 'ok'}
+                            onClick={() => setEstadoChecklist(item.id, 'ok')}
+                            color="green"
+                            label="✓ OK"
+                          />
+                          <EstadoBtn
+                            activo={r?.estado === 'revisar'}
+                            onClick={() => setEstadoChecklist(item.id, 'revisar')}
+                            color="amber"
+                            label="⚠ Revisar"
+                          />
+                          <EstadoBtn
+                            activo={r?.estado === 'urgente'}
+                            onClick={() => setEstadoChecklist(item.id, 'urgente')}
+                            color="red"
+                            label="🔴 Urgente"
+                          />
+                        </div>
+                        {(r?.estado === 'revisar' || r?.estado === 'urgente') && (
+                          <input
+                            value={r?.nota || ''}
+                            onChange={(e) => setNotaChecklist(item.id, e.target.value)}
+                            placeholder="Observación (opcional)"
+                            className="mt-2 w-full h-9 px-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C8102E] placeholder-gray-400"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </Section>
-
-          <Section title="Observaciones">
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm text-gray-500">Observaciones del mecánico</label>
-                {speechDisponible && (
-                  <button
-                    onClick={() => iniciarDictado('observaciones')}
-                    className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700"
-                  >
-                    {dictadoTarget === 'observaciones' && isListening ? 'Tocá para detener' : 'Micrófono'}
-                  </button>
-                )}
-              </div>
-              <textarea
-                value={form.observaciones}
-                onChange={(e) => setField('observaciones')(e.target.value)}
-                placeholder="Ej: ruido en freno delantero, se detecta desgaste irregular..."
-                rows={4}
-                className="w-full text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 bg-white shadow-sm rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E] resize-none"
-              />
-            </div>
-            <div className="px-4 py-3 border-t border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm text-gray-500">Recomendación para el cliente</label>
-                {speechDisponible && (
-                  <button
-                    onClick={() => iniciarDictado('recomendacion')}
-                    className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700"
-                  >
-                    {dictadoTarget === 'recomendacion' && isListening ? 'Tocá para detener' : 'Micrófono'}
-                  </button>
-                )}
-              </div>
-              <textarea
-                value={form.recomendacion}
-                onChange={(e) => setField('recomendacion')(e.target.value)}
-                placeholder="Ej: conviene alineación y revisar pastillas en 15 días..."
-                rows={4}
-                className="w-full text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 bg-white shadow-sm rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E] resize-none"
-              />
-            </div>
-          </Section>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="flex flex-col gap-4">
-          <ResumenSection
-            title="Identificación"
-            onEdit={() => setStep(1)}
-            lines={[
-              ['Patente', form.patente || 'Sin completar'],
-              ['Vehículo', `${form.marca || '-'} ${form.modelo || '-'}`],
-              ['Año', form.anio || 'Sin dato'],
-              ['Medida rueda', form.medida_rueda || 'Sin dato'],
-              ['Cliente', `${form.nombre || ''} ${form.apellido || ''}`.trim() || 'Sin cliente'],
-              ['Contacto', form.telefono || form.email || 'Sin contacto'],
-              ['Motivo', form.motivo || 'Sin motivo'],
-            ]}
-          />
-
-          <ResumenSection
-            title="Diagnóstico"
-            onEdit={() => setStep(2)}
-            lines={[
-              ['Estado neumáticos', labelEstado(form.estado_neumaticos)],
-              ['Estado frenos', labelEstado(form.estado_frenos)],
-              ['Presión PSI', form.presion_psi || 'Sin dato'],
-              ['Observaciones', form.observaciones || 'Sin observaciones'],
-              ['Recomendación', form.recomendacion || 'Sin recomendación'],
-            ]}
-          />
         </div>
       )}
 
@@ -522,35 +504,28 @@ export default function NuevaVisita() {
             </button>
           )}
 
-          {step < 3 && (
+          {step < 2 && (
             <button
               onClick={irSiguiente}
               className="flex-1 h-12 rounded-xl bg-[#C8102E] text-white font-bold text-base active:scale-95 transition-transform"
             >
-              {step === 2 ? 'Saltar / Siguiente' : 'Siguiente'}
+              Siguiente
             </button>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <button
               onClick={confirmarYGuardar}
               disabled={isGuardando}
               className="flex-1 h-12 rounded-xl bg-[#C8102E] text-white font-bold text-base active:scale-95 transition-transform disabled:opacity-50"
             >
-              {isGuardando ? 'Guardando...' : 'Confirmar y guardar'}
+              {isGuardando ? 'Guardando...' : 'Guardar visita'}
             </button>
           )}
         </div>
       </footer>
     </div>
   );
-}
-
-function labelEstado(value: '' | EstadoDiagnostico) {
-  if (!value) return 'Sin evaluar';
-  if (value === 'buen_estado') return 'Buen estado';
-  if (value === 'desgaste_medio') return 'Desgaste medio';
-  return 'Reemplazo urgente';
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -564,139 +539,31 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function ResumenSection({
-  title,
-  onEdit,
-  lines,
-}: {
-  title: string;
-  onEdit: () => void;
-  lines: Array<[string, string]>;
-}) {
-  return (
-    <Section title={title}>
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-900">Resumen</p>
-        <button onClick={onEdit} className="text-xs font-semibold text-[#C8102E]">
-          Editar
-        </button>
-      </div>
-      <div className="px-4 py-3 flex flex-col gap-2">
-        {lines.map(([label, value]) => (
-          <div key={label} className="flex items-start justify-between gap-3">
-            <p className="text-xs text-gray-500 shrink-0">{label}</p>
-            <p className="text-sm text-right text-gray-800">{value}</p>
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-function DiagnosticoSection({
-  estadoNeumaticos,
-  setEstadoNeumaticos,
-  estadoFrenos,
-  setEstadoFrenos,
-  presionPsi,
-  setPresionPsi,
-  recomendacion,
-  setRecomendacion,
-}: {
-  estadoNeumaticos: EstadoDiagnostico | null;
-  setEstadoNeumaticos: (v: EstadoDiagnostico | null) => void;
-  estadoFrenos: EstadoDiagnostico | null;
-  setEstadoFrenos: (v: EstadoDiagnostico | null) => void;
-  presionPsi: string;
-  setPresionPsi: (v: string) => void;
-  recomendacion: string;
-  setRecomendacion: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Diagnóstico (opcional)</p>
-
-      <SelectorDiagnostico
-        titulo="Estado de neumáticos"
-        value={estadoNeumaticos}
-        onChange={setEstadoNeumaticos}
-      />
-      <SelectorDiagnostico
-        titulo="Estado de frenos"
-        value={estadoFrenos}
-        onChange={setEstadoFrenos}
-      />
-
-      <div>
-        <label className="text-sm text-gray-500">Presión (PSI)</label>
-        <input
-          type="number"
-          value={presionPsi}
-          onChange={(e) => setPresionPsi(e.target.value)}
-          placeholder="Ej: 32"
-          className="mt-1 w-full h-10 px-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm text-gray-500">Recomendación</label>
-        </div>
-        <textarea
-          value={recomendacion}
-          onChange={(e) => setRecomendacion(e.target.value)}
-          placeholder="Ej: conviene alineación y control de pastillas en 15 días..."
-          rows={3}
-          className="w-full text-sm text-gray-900 placeholder-gray-400 border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
-        />
-      </div>
-    </div>
-  );
-}
-
-function SelectorDiagnostico({
-  titulo,
-  value,
-  onChange,
-}: {
-  titulo: string;
-  value: EstadoDiagnostico | null;
-  onChange: (v: EstadoDiagnostico | null) => void;
-}) {
-  const opciones: { id: EstadoDiagnostico; label: string }[] = [
-    { id: 'buen_estado', label: 'Buen estado' },
-    { id: 'desgaste_medio', label: 'Desgaste medio' },
-    { id: 'reemplazo_urgente', label: 'Reemplazo urgente' },
-  ];
-
-  return (
-    <div>
-      <p className="text-sm text-gray-500 mb-1.5">{titulo}</p>
-      <div className="grid grid-cols-1 gap-2">
-        {opciones.map((op) => (
-          <button
-            key={op.id}
-            onClick={() => onChange(value === op.id ? null : op.id)}
-            className={`w-full text-left px-3 py-3 rounded-xl border text-sm font-medium ${
-              value === op.id
-                ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
-                : 'border-gray-200 bg-white text-gray-700'
-            }`}
-          >
-            {op.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center px-4 py-3 gap-3">
       <span className="text-sm text-gray-500 w-32 shrink-0">{label}</span>
       {children}
     </div>
+  );
+}
+
+function EstadoBtn({ activo, onClick, color, label }: {
+  activo: boolean;
+  onClick: () => void;
+  color: 'green' | 'amber' | 'red';
+  label: string;
+}) {
+  const base = 'py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all border-2';
+  const styles = {
+    green: activo ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-green-200 text-green-700',
+    amber: activo ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-amber-200 text-amber-700',
+    red: activo ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white border-red-200 text-red-700',
+  };
+  return (
+    <button onClick={onClick} className={`${base} ${styles[color]}`}>
+      {label}
+    </button>
   );
 }
 

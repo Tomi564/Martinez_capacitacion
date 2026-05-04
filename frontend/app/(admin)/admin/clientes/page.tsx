@@ -59,7 +59,9 @@ export default function ClientesAdminPage() {
     cargarClientes();
   }, []);
 
-  const filtradosVehiculos = vehiculos.filter(v => {
+  const vehiculosConVisitas = vehiculos.filter(v => (v.visitas_taller?.length || 0) > 0);
+
+  const filtradosVehiculos = vehiculosConVisitas.filter(v => {
     const q = busqueda.toLowerCase();
     const c = v.clientes;
     return v.patente.toLowerCase().includes(q) || v.marca.toLowerCase().includes(q) ||
@@ -76,15 +78,17 @@ export default function ClientesAdminPage() {
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-5 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Clientes</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Base unificada del taller y del QR de vendedores</p>
+        <h1 className="text-xl font-bold text-gray-900">Clientes y visitas</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Historial por vehículo, checklist y base del taller y del QR
+        </p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{vehiculos.length}</p>
-          <p className="text-xs text-gray-500 mt-0.5">vehículos taller</p>
+          <p className="text-2xl font-bold text-gray-900">{vehiculosConVisitas.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">vehículos con visitas</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center">
           <p className="text-2xl font-bold text-gray-900">{participantes.length}</p>
@@ -118,7 +122,7 @@ export default function ClientesAdminPage() {
       {tab === 'taller' && (
         <PageState
           state={filtradosVehiculos.length === 0 ? 'empty' : 'content'}
-          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Aún no hay vehículos registrados.'}
+          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Aún no hay visitas registradas.'}
         >
           <div className="flex flex-col gap-3">
             {filtradosVehiculos.map(v => {

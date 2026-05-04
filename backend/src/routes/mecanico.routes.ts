@@ -11,6 +11,33 @@ router.use(authMiddleware);
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+const registrarAuditoria = async (
+  req: AuthRequest,
+  payload: {
+    accion: string;
+    entidad: string;
+    entidadId?: string | null;
+    datosAnteriores?: unknown;
+    datosNuevos?: unknown;
+  }
+) => {
+  const user = req.user as { id?: string; rol?: string } | undefined;
+  if (!user?.id) return;
+  try {
+    await supabase.rpc('registrar_auditoria_operacional', {
+      p_usuario_id: user.id,
+      p_rol: user.rol || 'mecanico',
+      p_accion: payload.accion,
+      p_entidad: payload.entidad,
+      p_entidad_id: payload.entidadId || null,
+      p_datos_anteriores: (payload.datosAnteriores ?? null) as any,
+      p_datos_nuevos: (payload.datosNuevos ?? null) as any,
+    });
+  } catch (e) {
+    console.error('[mecanico] auditoria_operacional error', e);
+  }
+};
+
 // ─── Clientes ───────────────────────────────────────────────────────────────
 
 // GET /api/mecanico/clientes — lista para admin/vendedor
@@ -18,6 +45,7 @@ router.get('/clientes', requireRole('admin', 'vendedor'), async (req, res: Respo
   try {
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const includeEmpty = String(req.query.include_empty || '').toLowerCase() === 'true';
     const { data, error, count } = await supabase
       .from('vehiculos')
       .select(
@@ -27,9 +55,12 @@ router.get('/clientes', requireRole('admin', 'vendedor'), async (req, res: Respo
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw new AppError('Error al obtener vehículos', 500);
+    const vehiculos = includeEmpty
+      ? (data || [])
+      : (data || []).filter((v: any) => Array.isArray(v.visitas_taller) && v.visitas_taller.length > 0);
     return res.json({
-      vehiculos: data || [],
-      total: count || 0,
+      vehiculos,
+      total: includeEmpty ? (count || 0) : vehiculos.length,
       limit,
       offset,
     });
@@ -198,12 +229,23 @@ router.patch('/vehiculos/:vehiculoId', requireRole('mecanico', 'admin'), async (
 
 // ─── Visitas ─────────────────────────────────────────────────────────────────
 
-// GET /api/mecanico/visitas — visitas de hoy del mecánico
+// GET /api/mecanico/checklist-items — ítems activos del checklist
+router.get('/checklist-items', requireRole('mecanico', 'admin', 'vendedor'), async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { data, error } = await supabase
+      .from('checklist_items')
+      .select('id, descripcion, orden')
+      .eq('activo', true)
+      .order('orden');
+    if (error) throw new AppError('Error al obtener checklist', 500);
+    return res.json({ items: data || [] });
+  } catch (e) { next(e); }
+});
+
+// GET /api/mecanico/visitas — visitas activas del mecánico (sin entregadas)
 router.get('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const mecanicoId = req.user!.id;
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
@@ -211,7 +253,7 @@ router.get('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest
       .from('visitas_taller')
       .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' })
       .eq('mecanico_id', mecanicoId)
-      .gte('created_at', hoy.toISOString())
+      .neq('estado', 'entregado')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw new AppError('Error al obtener visitas', 500);
@@ -351,6 +393,44 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
   } catch (e) { next(e); }
 });
 
+// DELETE /api/mecanico/visitas/:id — eliminar visita del mecánico
+router.delete('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const visitaId = req.params.id;
+    const mecanicoId = req.user!.id;
+
+    const { data: visita, error: readErr } = await supabase
+      .from('visitas_taller')
+      .select('id, estado, mecanico_id')
+      .eq('id', visitaId)
+      .maybeSingle();
+    if (readErr) throw new AppError('Error al buscar visita', 500);
+    if (!visita) throw new AppError('Visita no encontrada', 404);
+    if (String(visita.mecanico_id) !== String(mecanicoId)) throw new AppError('No autorizado', 403);
+    if (visita.estado === 'entregado') {
+      throw new AppError('No se puede eliminar una visita entregada', 400);
+    }
+
+    const datosAnteriores = { ...visita };
+
+    const { error: delErr } = await supabase
+      .from('visitas_taller')
+      .delete()
+      .eq('id', visitaId);
+    if (delErr) throw new AppError('Error al eliminar visita', 500);
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_visita',
+      entidad: 'visitas_taller',
+      entidadId: visitaId,
+      datosAnteriores,
+      datosNuevos: null,
+    });
+
+    return res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // POST /api/mecanico/visitas/:id/checklist — guardar respuestas
 router.post('/visitas/:id/checklist', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -380,8 +460,32 @@ router.post('/visitas/:id/checklist', requireRole('mecanico', 'admin'), async (r
       .from('checklist_respuestas')
       .upsert(rows, { onConflict: 'visita_id,item_id' });
     if (error) {
-      console.error('[mecanico] checklist_respuestas upsert', visitaId, error);
-      throw new AppError('Error al guardar checklist', 500);
+      const err = error as { code?: string; message?: string };
+      const missingUpdatedAt =
+        err.code === '42703' && typeof err.message === 'string' && err.message.includes('updated_at');
+
+      if (!missingUpdatedAt) {
+        console.error('[mecanico] checklist_respuestas upsert', visitaId, error);
+        throw new AppError('Error al guardar checklist', 500);
+      }
+
+      // Compatibilidad para entornos con schema viejo: evita UPDATE (trigger con updated_at roto)
+      const itemIds = Array.from(new Set(rows.map((r) => r.item_id)));
+      const { error: delErr } = await supabase
+        .from('checklist_respuestas')
+        .delete()
+        .eq('visita_id', visitaId)
+        .in('item_id', itemIds);
+      if (delErr) {
+        console.error('[mecanico] checklist_respuestas delete fallback', visitaId, delErr);
+        throw new AppError('Error al guardar checklist', 500);
+      }
+
+      const { error: insertErr } = await supabase.from('checklist_respuestas').insert(rows);
+      if (insertErr) {
+        console.error('[mecanico] checklist_respuestas insert fallback', visitaId, insertErr);
+        throw new AppError('Error al guardar checklist', 500);
+      }
     }
     return res.json({ ok: true });
   } catch (e) { next(e); }

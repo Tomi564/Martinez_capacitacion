@@ -8,6 +8,8 @@ export interface FabMenuItem {
   label: string;
   icon: ReactNode;
   exactMatch?: boolean;
+  /** Si hay varios prefijos, el ítem aparece activo si la ruta coincide con alguno */
+  activePathPrefixes?: string[];
 }
 
 interface FabMenuSheetProps {
@@ -25,8 +27,12 @@ export function FabMenuSheet({
   columns = 2,
   onClose,
 }: FabMenuSheetProps) {
-  const isActive = (item: FabMenuItem) =>
-    item.exactMatch ? pathname === item.href : pathname.startsWith(item.href);
+  const isActive = (item: FabMenuItem) => {
+    if (item.exactMatch) return pathname === item.href;
+    const prefixes = item.activePathPrefixes;
+    if (prefixes?.length) return prefixes.some((p) => pathname.startsWith(p));
+    return pathname.startsWith(item.href);
+  };
 
   return (
     <>

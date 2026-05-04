@@ -11,6 +11,30 @@ import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 
 export class ModulosService {
+  private async ensureProgresoRows(userId: string, modulos: Array<{ id: string; orden: number }>) {
+    const { data: progresos, error: progresoError } = await supabase
+      .from('progreso')
+      .select('modulo_id')
+      .eq('user_id', userId);
+
+    if (progresoError) throw new AppError('Error al obtener el progreso', 500);
+
+    const existentes = new Set((progresos || []).map((p) => p.modulo_id));
+    const faltantes = modulos.filter((m) => !existentes.has(m.id));
+    if (faltantes.length === 0) return;
+
+    const registros = faltantes.map((m) => ({
+      user_id: userId,
+      modulo_id: m.id,
+      estado: m.orden === 1 ? 'disponible' : 'bloqueado',
+      intentos: 0,
+      mejor_nota: 0,
+    }));
+
+    const { error: insertError } = await supabase.from('progreso').insert(registros);
+    if (insertError) throw new AppError('Error al inicializar progreso faltante', 500);
+  }
+
   /**
    * Obtiene todos los módulos activos con el estado de progreso
    * del vendedor autenticado.
@@ -32,6 +56,13 @@ export class ModulosService {
 
     if (!modulos?.length) return { modulos: [] };
 
+    // Autorrepara vendedores históricos que no tengan filas en progreso
+    // o que tengan filas faltantes por módulos nuevos.
+    await this.ensureProgresoRows(
+      userId,
+      modulos.map((m) => ({ id: m.id, orden: m.orden }))
+    );
+
     // 2. Obtener el progreso del vendedor para todos los módulos
     const { data: progresos, error: progresoError } = await supabase
       .from('progreso')
@@ -42,10 +73,46 @@ export class ModulosService {
       throw new AppError('Error al obtener el progreso', 500);
     }
 
-    // 3. Crear un mapa de progreso por modulo_id para lookup O(1)
-    const progresoMap = new Map(
-      (progresos || []).map((p) => [p.modulo_id, p])
-    );
+    // 3. Crear mapa de progreso por modulo_id para lookup O(1)
+    const progresoMap = new Map((progresos || []).map((p) => [p.modulo_id, p]));
+
+    // 3.b Reparar inconsistencias históricas:
+    // si existe intento aprobado pero el progreso no está en "aprobado".
+    const moduloIds = modulos.map((m) => m.id);
+    const { data: intentosAprobados, error: intentosErr } = await supabase
+      .from('intentos_examen')
+      .select('modulo_id, nota')
+      .eq('user_id', userId)
+      .eq('aprobado', true)
+      .in('modulo_id', moduloIds);
+    if (intentosErr) throw new AppError('Error al verificar intentos aprobados', 500);
+
+    const mejorNotaAprobada = new Map<string, number>();
+    for (const intento of intentosAprobados || []) {
+      const actual = mejorNotaAprobada.get(intento.modulo_id) || 0;
+      const nota = Number(intento.nota || 0);
+      if (nota > actual) mejorNotaAprobada.set(intento.modulo_id, nota);
+    }
+
+    for (const [moduloId, notaAprobada] of mejorNotaAprobada.entries()) {
+      const progreso = progresoMap.get(moduloId);
+      if (!progreso) continue;
+      if (progreso.estado === 'aprobado') continue;
+
+      const patch = {
+        estado: 'aprobado',
+        completado_at: progreso.completado_at || new Date().toISOString(),
+        mejor_nota: Math.max(Number(progreso.mejor_nota || 0), notaAprobada),
+      };
+      const { error: syncErr } = await supabase
+        .from('progreso')
+        .update(patch)
+        .eq('user_id', userId)
+        .eq('modulo_id', moduloId);
+      if (syncErr) throw new AppError('Error al sincronizar progreso aprobado', 500);
+
+      progresoMap.set(moduloId, { ...progreso, ...patch });
+    }
 
     // 4. Combinar módulos con su progreso
     const modulosConProgreso = modulos.map((modulo) => {
@@ -87,13 +154,35 @@ export class ModulosService {
       .eq('modulo_id', moduloId)
       .single();
 
+    let progresoFinal = progreso;
+    if (progreso && progreso.estado !== 'aprobado') {
+      const { data: intentoAprobado } = await supabase
+        .from('intentos_examen')
+        .select('nota')
+        .eq('user_id', userId)
+        .eq('modulo_id', moduloId)
+        .eq('aprobado', true)
+        .order('nota', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (intentoAprobado) {
+        const patch = {
+          estado: 'aprobado',
+          completado_at: progreso.completado_at || new Date().toISOString(),
+          mejor_nota: Math.max(Number(progreso.mejor_nota || 0), Number(intentoAprobado.nota || 0)),
+        };
+        await supabase.from('progreso').update(patch).eq('user_id', userId).eq('modulo_id', moduloId);
+        progresoFinal = { ...progreso, ...patch };
+      }
+    }
+
     return {
       modulo: {
         ...modulo,
-        estado: progreso?.estado || 'bloqueado',
-        mejor_nota: progreso?.mejor_nota || null,
-        intentos: progreso?.intentos || 0,
-        completado_at: progreso?.completado_at || null,
+        estado: progresoFinal?.estado || 'bloqueado',
+        mejor_nota: progresoFinal?.mejor_nota || null,
+        intentos: progresoFinal?.intentos || 0,
+        completado_at: progresoFinal?.completado_at || null,
       },
     };
   }

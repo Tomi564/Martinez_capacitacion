@@ -85,14 +85,14 @@ export default function ProgresoPage() {
         </p>
       </div>
 
-      {/* Tarjeta principal de progreso — alto contraste en textos */}
-      <div className="bg-[#C8102E] text-white rounded-2xl p-5 shadow-md border border-black/10">
+      {/* Tarjeta principal de progreso — estilo consistente con ventas */}
+      <div className="bg-[#C8102E] text-white rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] [text-shadow:0_1px_2px_rgba(0,0,0,0.2)]">
+            <p className="text-sm text-red-50/95 mb-1">
               Completado
             </p>
-            <p className="text-4xl font-black mt-0.5 text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.25)]">
+            <p className="text-4xl font-black">
               {porcentaje}%
             </p>
           </div>
@@ -102,7 +102,7 @@ export default function ProgresoPage() {
               <circle
                 cx="32" cy="32" r="28"
                 fill="none"
-                stroke="rgba(0,0,0,0.22)"
+                stroke="rgba(0,0,0,0.28)"
                 strokeWidth="6"
               />
               <circle
@@ -116,15 +116,15 @@ export default function ProgresoPage() {
                 className="transition-all duration-700"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]">
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white">
               {stats.aprobados}/{stats.total}
             </span>
           </div>
         </div>
 
-        <div className="w-full h-2.5 bg-black/25 rounded-full overflow-hidden ring-1 ring-white/20">
+        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-white rounded-full transition-all duration-700 shadow-sm"
+            className="h-full bg-white rounded-full transition-all duration-700"
             style={{ width: `${porcentaje}%` }}
           />
         </div>

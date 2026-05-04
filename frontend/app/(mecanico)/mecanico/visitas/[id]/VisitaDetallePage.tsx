@@ -11,10 +11,7 @@ interface Visita {
   estado_visita?: 'abierta' | 'cerrada' | null;
   motivo: string | null;
   observaciones: string | null;
-  estado_neumaticos?: 'buen_estado' | 'desgaste_medio' | 'reemplazo_urgente' | null;
-  estado_frenos?: 'buen_estado' | 'desgaste_medio' | 'reemplazo_urgente' | null;
   presion_psi?: number | null;
-  recomendacion?: string | null;
   updated_by_admin_at?: string | null;
   diagnostico_enviado: boolean;
   vehiculos: {
@@ -48,10 +45,7 @@ export default function VisitaDetallePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [isEntregando, setIsEntregando] = useState(false);
-  const [estadoNeumaticos, setEstadoNeumaticos] = useState<Visita['estado_neumaticos']>(null);
-  const [estadoFrenos, setEstadoFrenos] = useState<Visita['estado_frenos']>(null);
   const [presionPsi, setPresionPsi] = useState('');
-  const [recomendacion, setRecomendacion] = useState('');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -63,10 +57,7 @@ export default function VisitaDetallePage() {
       setVisita(res.visita);
       setItems(res.items);
       setObservaciones(res.visita.observaciones || '');
-      setEstadoNeumaticos(res.visita.estado_neumaticos || null);
-      setEstadoFrenos(res.visita.estado_frenos || null);
       setPresionPsi(res.visita.presion_psi != null ? String(res.visita.presion_psi) : '');
-      setRecomendacion(res.visita.recomendacion || '');
       const map: Record<string, Respuesta> = {};
       res.respuestas.forEach((r) => { map[r.item_id] = r; });
       setRespuestas(map);
@@ -108,10 +99,7 @@ export default function VisitaDetallePage() {
 
       await apiClient.patch(`/mecanico/visitas/${id}`, {
         observaciones: observaciones.trim() || null,
-        estado_neumaticos: estadoNeumaticos || null,
-        estado_frenos: estadoFrenos || null,
         presion_psi: presionPsiBody,
-        recomendacion: recomendacion.trim() || null,
       });
       if (rows.length) {
         await apiClient.post(`/mecanico/visitas/${id}/checklist`, { respuestas: rows });
@@ -244,18 +232,16 @@ export default function VisitaDetallePage() {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Diagnóstico</p>
-        <Selector titulo="Estado de neumáticos" value={estadoNeumaticos} onChange={setEstadoNeumaticos} disabled={entregado} />
-        <Selector titulo="Estado de frenos" value={estadoFrenos} onChange={setEstadoFrenos} disabled={entregado} />
-        <div>
-          <label className="text-sm text-gray-500">Presión (PSI)</label>
-          <input type="number" disabled={entregado} value={presionPsi} onChange={(e) => setPresionPsi(e.target.value)} className="mt-1 w-full h-10 px-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
-        </div>
-        <div>
-          <label className="text-sm text-gray-500">Recomendación</label>
-          <textarea rows={3} disabled={entregado} value={recomendacion} onChange={(e) => setRecomendacion(e.target.value)} className="mt-1 w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none" />
-        </div>
+      <div className="bg-white rounded-2xl border border-gray-200 p-4">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Presión de neumáticos</p>
+        <label className="text-sm text-gray-500">Presión (PSI)</label>
+        <input
+          type="number"
+          disabled={entregado}
+          value={presionPsi}
+          onChange={(e) => setPresionPsi(e.target.value)}
+          className="mt-1 w-full h-10 px-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+        />
       </div>
 
       {msg && (
@@ -322,45 +308,5 @@ function EstadoBtn({ activo, onClick, color, label, disabled }: {
     <button onClick={onClick} disabled={disabled} className={`${base} ${styles[color]}`}>
       {label}
     </button>
-  );
-}
-
-function Selector({
-  titulo,
-  value,
-  onChange,
-  disabled,
-}: {
-  titulo: string;
-  value: 'buen_estado' | 'desgaste_medio' | 'reemplazo_urgente' | null | undefined;
-  onChange: (v: 'buen_estado' | 'desgaste_medio' | 'reemplazo_urgente' | null) => void;
-  disabled: boolean;
-}) {
-  const opciones: Array<{ id: 'buen_estado' | 'desgaste_medio' | 'reemplazo_urgente'; label: string }> = [
-    { id: 'buen_estado', label: 'Buen estado' },
-    { id: 'desgaste_medio', label: 'Desgaste medio' },
-    { id: 'reemplazo_urgente', label: 'Reemplazo urgente' },
-  ];
-
-  return (
-    <div>
-      <p className="text-sm text-gray-500 mb-1.5">{titulo}</p>
-      <div className="grid grid-cols-1 gap-2">
-        {opciones.map((op) => (
-          <button
-            key={op.id}
-            disabled={disabled}
-            onClick={() => onChange(value === op.id ? null : op.id)}
-            className={`w-full text-left px-3 py-3 rounded-xl border text-sm font-medium ${
-              value === op.id
-                ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
-                : 'border-gray-200 bg-white text-gray-700'
-            } disabled:opacity-50`}
-          >
-            {op.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

@@ -95,6 +95,40 @@ export class AtencionesService {
   }
 
   /**
+   * Actualiza una atención existente del vendedor.
+   */
+  async actualizar(
+    userId: string,
+    atencionId: string,
+    data: {
+      canal: string;
+      resultado: string;
+      producto?: string;
+      monto?: number;
+      observaciones?: string;
+    }
+  ) {
+    const { data: updated, error } = await supabase
+      .from('atenciones')
+      .update({
+        canal: data.canal,
+        resultado: data.resultado,
+        producto: data.producto || null,
+        monto: data.monto || null,
+        observaciones: data.observaciones || null,
+      })
+      .eq('id', atencionId)
+      .eq('user_id', userId)
+      .select('id')
+      .maybeSingle();
+
+    if (error) throw new AppError('Error al actualizar la atención', 500);
+    if (!updated) throw new AppError('Atención no encontrada', 404);
+
+    return { mensaje: 'Atención actualizada correctamente' };
+  }
+
+  /**
    * Historial y estadísticas del vendedor.
    */
   async getMisAtenciones(userId: string) {

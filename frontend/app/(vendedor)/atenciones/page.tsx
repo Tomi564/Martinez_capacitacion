@@ -10,8 +10,10 @@
 
 'use client';
 
+import { useState } from 'react';
 import { FormAtencion } from '@/components/atenciones/FormAtencion';
-import { useAtenciones } from '@/hooks/useAtenciones';
+import { Atencion, useAtenciones } from '@/hooks/useAtenciones';
+import { apiClient } from '@/lib/api';
 
 const CANALES = [
   { id: 'whatsapp',     label: 'WhatsApp',      icono: '💬' },
@@ -45,17 +47,72 @@ export default function AtencionesPage() {
     buscandoProducto,
     form,
     setForm,
+    fetchAtenciones,
     buscarProductos,
     seleccionarProducto,
     handleGuardar,
     cerrarForm,
   } = useAtenciones();
+  const [editandoAtencion, setEditandoAtencion] = useState<Atencion | null>(null);
+  const [mostrarConfirmacionEdicion, setMostrarConfirmacionEdicion] = useState(false);
+  const [isGuardandoEdicion, setIsGuardandoEdicion] = useState(false);
 
   const formatCanal = (canal: string) =>
     CANALES.find(c => c.id === canal) || { label: canal, icono: '📞' };
 
   const formatResultado = (resultado: string) =>
     RESULTADOS.find(r => r.id === resultado) || { label: resultado, icono: '○', color: 'bg-gray-50 border-gray-200 text-gray-700' };
+
+  const abrirEdicion = (atencion: Atencion) => {
+    setEditandoAtencion(atencion);
+    setForm({
+      canal: atencion.canal || '',
+      resultado: atencion.resultado || '',
+      producto: atencion.producto || '',
+      monto: atencion.monto != null ? String(atencion.monto) : '',
+      observaciones: atencion.observaciones || '',
+    });
+    setMostrarDetalles(!!atencion.observaciones);
+    setSugerencias([]);
+    setAtencionDetalle(null);
+    setShowForm(true);
+  };
+
+  const cerrarFormConContexto = () => {
+    setEditandoAtencion(null);
+    setMostrarConfirmacionEdicion(false);
+    cerrarForm();
+  };
+
+  const handleGuardarConContexto = async () => {
+    if (!editandoAtencion) {
+      await handleGuardar();
+      return;
+    }
+    setMostrarConfirmacionEdicion(true);
+  };
+
+  const confirmarEdicion = async () => {
+    if (!editandoAtencion) return;
+    setIsGuardandoEdicion(true);
+    try {
+      await apiClient.patch(`/atenciones/${editandoAtencion.id}`, {
+        canal: form.canal,
+        resultado: form.resultado,
+        producto: form.producto || null,
+        monto: form.monto ? Number(form.monto) : null,
+        observaciones: form.observaciones || null,
+      });
+      setMostrarConfirmacionEdicion(false);
+      setEditandoAtencion(null);
+      cerrarForm();
+      fetchAtenciones();
+    } catch (e) {
+      console.error('[AtencionesPage] Error editando atención', e);
+    } finally {
+      setIsGuardandoEdicion(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -275,6 +332,12 @@ export default function AtencionesPage() {
               >
                 Cerrar
               </button>
+              <button
+                onClick={() => abrirEdicion(atencionDetalle)}
+                className="w-full py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm"
+              >
+                Editar atención
+              </button>
             </div>
           </div>
         );
@@ -286,17 +349,46 @@ export default function AtencionesPage() {
           form={form}
           setForm={setForm}
           error={error}
-          isGuardando={isGuardando}
+          isGuardando={isGuardando || isGuardandoEdicion}
           mostrarDetalles={mostrarDetalles}
           setMostrarDetalles={setMostrarDetalles}
           sugerencias={sugerencias}
           buscandoProducto={buscandoProducto}
           onBuscarProductos={buscarProductos}
           onSeleccionarProducto={seleccionarProducto}
-          onCerrar={cerrarForm}
-          onGuardar={handleGuardar}
+          onCerrar={cerrarFormConContexto}
+          onGuardar={handleGuardarConContexto}
           onLimpiarSugerencias={() => setSugerencias([])}
+          title={editandoAtencion ? 'Editar atención' : 'Registrar atención'}
+          submitLabel={editandoAtencion ? 'Guardar cambios' : 'Guardar'}
         />
+      )}
+
+      {mostrarConfirmacionEdicion && editandoAtencion && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-gray-900">Confirmar edición</h3>
+            <p className="text-sm text-gray-600">
+              ¿Seguro querés guardar los cambios de esta atención?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setMostrarConfirmacionEdicion(false)}
+                disabled={isGuardandoEdicion}
+                className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEdicion}
+                disabled={isGuardandoEdicion}
+                className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50"
+              >
+                {isGuardandoEdicion ? 'Guardando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

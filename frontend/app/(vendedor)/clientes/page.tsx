@@ -58,7 +58,9 @@ export default function ClientesVendedorPage() {
     cargarClientes();
   }, []);
 
-  const filtradosVehiculos = vehiculos.filter(v => {
+  const vehiculosConVisitas = vehiculos.filter(v => (v.visitas_taller?.length || 0) > 0);
+
+  const filtradosVehiculos = vehiculosConVisitas.filter(v => {
     const q = busqueda.toLowerCase();
     const c = v.clientes;
     return v.patente.toLowerCase().includes(q) || v.marca.toLowerCase().includes(q) ||
@@ -98,7 +100,7 @@ export default function ClientesVendedorPage() {
       {tab === 'taller' && (
         <PageState
           state={filtradosVehiculos.length === 0 ? 'empty' : 'content'}
-          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Sin vehículos registrados.'}
+          emptyMessage={busqueda ? 'Sin resultados para esa búsqueda.' : 'Sin visitas registradas.'}
         >
           <div className="flex flex-col gap-3">
             {filtradosVehiculos.map(v => {

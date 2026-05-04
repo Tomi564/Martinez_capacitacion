@@ -1,3 +1,9 @@
+/**
+ * Genera íconos PWA por defecto (MN sobre fondo oscuro).
+ * Si tenés el logo final, reemplazá manualmente:
+ *   frontend/public/icons/icon-192.png  (192×192)
+ *   frontend/public/icons/icon-512.png  (512×512, puede ser maskable)
+ */
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');

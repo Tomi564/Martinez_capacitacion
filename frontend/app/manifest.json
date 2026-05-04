@@ -1,7 +1,7 @@
 {
-  "name": "Martínez Neumáticos — Capacitación",
-  "short_name": "MN Capacitación",
-  "description": "Sistema de capacitación para vendedores de Martínez Neumáticos",
+  "name": "Martinez Neumaticos",
+  "short_name": "Martinez Neumaticos",
+  "description": "Sistema de capacitación para vendedores de Martinez Neumaticos",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",

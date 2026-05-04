@@ -32,21 +32,31 @@ export class ProgresoService {
    * Calcula el nivel actual del vendedor.
    */
   async getNivel(userId: string): Promise<InfoNivel> {
-    // Obtener progreso aprobado
+    // Obtener progreso (incluye estados históricos que pudieron quedar inconsistentes)
     const { data: progresos } = await supabase
       .from('progreso')
       .select(`
         estado,
         mejor_nota,
+        completado_at,
+        modulo_id,
         modulos (orden)
       `)
-      .eq('user_id', userId)
-      .eq('estado', 'aprobado');
+      .eq('user_id', userId);
 
-    const aprobados = (progresos || []).map((p: any) => ({
+    const { data: intentosAprobados } = await supabase
+      .from('intentos_examen')
+      .select('modulo_id')
+      .eq('user_id', userId)
+      .eq('aprobado', true);
+    const modulosConIntentoAprobado = new Set((intentosAprobados || []).map((i: any) => i.modulo_id));
+
+    const aprobados = (progresos || [])
+      .filter((p: any) => p.estado === 'aprobado' || !!p.completado_at || modulosConIntentoAprobado.has(p.modulo_id))
+      .map((p: any) => ({
       orden: p.modulos?.orden || 0,
       nota: p.mejor_nota || 0,
-    }));
+      }));
 
     const totalAprobados = aprobados.length;
 

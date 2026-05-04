@@ -232,11 +232,11 @@ export default function VendedoresPage() {
                 </span>
               </div>
 
-              {/* Acciones */}
-              <div className="flex flex-col lg:flex-row items-end lg:items-center gap-1.5 flex-shrink-0">
+              {/* Acciones — mismo ancho/alineación que en módulos */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-1.5 flex-shrink-0 w-[7.85rem]">
               <button
                 onClick={() => handleToggleActivo(vendedor)}
-                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                className={`w-full text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors text-center ${
                   vendedor.activo
                     ? 'border-amber-200 text-amber-600 hover:bg-amber-50'
                     : 'border-green-200 text-green-600 hover:bg-green-50'
@@ -252,7 +252,7 @@ export default function VendedoresPage() {
                       .catch((err) => console.error(err));
                   }
                 }}
-                className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors"
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors text-center"
               >
                 Eliminar
               </button>

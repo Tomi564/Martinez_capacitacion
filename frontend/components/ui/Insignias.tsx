@@ -34,7 +34,10 @@ interface InsigniasProps {
 }
 
 export function Insignias({ modulos }: InsigniasProps) {
-  const aprobados = modulos.filter(m => m.estado === 'aprobado').length;
+  const isDesbloqueada = (modulo: ModuloConProgreso) =>
+    modulo.estado === 'aprobado' || !!modulo.completado_at;
+
+  const aprobados = modulos.filter(isDesbloqueada).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -59,7 +62,7 @@ export function Insignias({ modulos }: InsigniasProps) {
               border: 'border-gray-200',
             };
 
-            const desbloqueada = modulo.estado === 'aprobado';
+            const desbloqueada = isDesbloqueada(modulo);
 
             return (
               <div

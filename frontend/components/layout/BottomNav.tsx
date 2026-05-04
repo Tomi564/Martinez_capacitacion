@@ -11,6 +11,17 @@ export interface BottomNavItem {
   icon: ReactNode;
   exactMatch?: boolean;
   badgeCount?: number;
+  activePathPrefixes?: string[];
+}
+
+function pathnameMatchesNav(
+  pathname: string,
+  item: { href: string; exactMatch?: boolean; activePathPrefixes?: string[] },
+) {
+  if (item.exactMatch) return pathname === item.href;
+  const prefixes = item.activePathPrefixes;
+  if (prefixes?.length) return prefixes.some((p) => pathname.startsWith(p));
+  return pathname.startsWith(item.href);
 }
 
 interface BottomNavProps {
@@ -29,8 +40,8 @@ export function BottomNav({
   const [sheetOpen, setSheetOpen] = useState(false);
   const hasFab = fabItems.length > 0;
 
-  const isActive = (item: { href: string; exactMatch?: boolean }) =>
-    item.exactMatch ? pathname === item.href : pathname.startsWith(item.href);
+  const isActive = (item: BottomNavItem | FabMenuItem) =>
+    pathnameMatchesNav(pathname, item);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20">

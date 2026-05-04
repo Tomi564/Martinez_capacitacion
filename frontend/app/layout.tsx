@@ -24,15 +24,15 @@ const exo = Exo({
 // ─────────────────────────────────────────────────────
 export const metadata: Metadata = {
   title: {
-    default: 'Martínez Neumáticos — Capacitación',
-    template: '%s | Martínez Capacitación',
+    default: 'Martinez Neumaticos',
+    template: '%s | Martinez Neumaticos',
   },
-  description: 'Sistema de capacitación para vendedores de Martínez Neumáticos',
+  description: 'Sistema de capacitación para vendedores de Martinez Neumaticos',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'MN Capacitación',
+    title: 'Martinez Neumaticos',
   },
   formatDetection: {
     telephone: false,
