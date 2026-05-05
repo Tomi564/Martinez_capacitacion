@@ -39,7 +39,7 @@ const ACCIONES = [
   'editar_modulo',
 ];
 
-const ROLES = ['', 'admin', 'vendedor', 'mecanico'];
+const ROLES = ['', 'admin', 'vendedor', 'mecanico', 'gomero'];
 
 const ORDEN_CAMPOS = [
   'titulo',

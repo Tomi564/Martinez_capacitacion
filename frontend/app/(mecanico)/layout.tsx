@@ -41,6 +41,7 @@ export default function MecanicoLayout({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace('/login'); return; }
+    if (user?.rol === 'gomero') { router.replace('/gomero'); return; }
     if (user?.rol !== 'mecanico') { router.replace('/login'); return; }
   }, []);
 

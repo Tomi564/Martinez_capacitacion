@@ -7,11 +7,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Car, ChevronDown, PlusCircle, Trash2, Wrench } from 'lucide-react';
+import { Car, ChevronDown, Package, PlusCircle, Trash2, Wrench } from 'lucide-react';
 
 interface Visita {
   id: string;
   estado: string;
+  orden_estado?: string | null;
   motivo: string | null;
   created_at: string;
   vehiculos: { patente: string; marca: string; modelo: string; clientes: { nombre: string; apellido: string } | null } | null;
@@ -128,7 +129,59 @@ export default function MecanicoHome() {
   };
 
   const activas = visitas.filter(v => v.estado !== 'entregado');
+  const ordenesDelGomero = activas.filter(v => v.orden_estado === 'pendiente_mecanico');
+  const otrasActivas = activas.filter(v => v.orden_estado !== 'pendiente_mecanico');
   const entregadas = visitas.filter(v => v.estado === 'entregado');
+
+  function TarjetaVisita({ v, destacada }: { v: Visita; destacada?: boolean }) {
+    const cfg = ESTADO_CONFIG[v.estado] || ESTADO_CONFIG.en_espera;
+    const cliente = v.vehiculos?.clientes;
+    return (
+      <div
+        className={`w-full rounded-xl p-4 flex items-center gap-4 ${
+          destacada
+            ? 'bg-white border-2 border-[#C8102E]/35 shadow-[0_2px_12px_rgba(200,16,46,0.08)]'
+            : 'bg-white border border-gray-200'
+        }`}
+      >
+        <button
+          onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
+          className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 active:scale-[0.99] transition-transform"
+        >
+          <Car className="w-5 h-5 text-gray-500" />
+        </button>
+        <button
+          onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
+          className="flex-1 min-w-0 text-left active:scale-[0.99] transition-transform"
+        >
+          <p className="font-bold text-gray-900 text-base">{v.vehiculos?.patente}</p>
+          <p className="text-sm text-gray-500 truncate">{v.vehiculos?.marca} {v.vehiculos?.modelo}</p>
+          {cliente && <p className="text-xs text-gray-400">{cliente.nombre} {cliente.apellido}</p>}
+        </button>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          {destacada && (
+            <span className="text-[10px] font-black uppercase tracking-wide text-[#C8102E] bg-[#C8102E]/10 px-2 py-0.5 rounded-full">
+              Gomero
+            </span>
+          )}
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${cfg.bg} ${cfg.color}`}>
+              {cfg.label}
+            </span>
+            <button
+              onClick={() => setVisitaAEliminar(v)}
+              disabled={deletingId === v.id}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40"
+              aria-label="Eliminar revisión"
+              title="Eliminar revisión"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-5 flex flex-col gap-5 max-w-lg mx-auto pb-24">
@@ -171,46 +224,48 @@ export default function MecanicoHome() {
             </CardContent>
           </Card>
         ) : (
-          <div className="flex flex-col gap-3">
-            {activas.map(v => {
-              const cfg = ESTADO_CONFIG[v.estado] || ESTADO_CONFIG.en_espera;
-              const cliente = v.vehiculos?.clientes;
-              return (
-                <div
-                  key={v.id}
-                  className="w-full bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-4"
-                >
-                  <button
-                    onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
-                    className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 active:scale-[0.99] transition-transform"
-                  >
-                    <Car className="w-5 h-5 text-gray-500" />
-                  </button>
-                  <button
-                    onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
-                    className="flex-1 min-w-0 text-left active:scale-[0.99] transition-transform"
-                  >
-                    <p className="font-bold text-gray-900 text-base">{v.vehiculos?.patente}</p>
-                    <p className="text-sm text-gray-500 truncate">{v.vehiculos?.marca} {v.vehiculos?.modelo}</p>
-                    {cliente && <p className="text-xs text-gray-400">{cliente.nombre} {cliente.apellido}</p>}
-                  </button>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${cfg.bg} ${cfg.color}`}>
-                      {cfg.label}
-                    </span>
-                    <button
-                      onClick={() => setVisitaAEliminar(v)}
-                      disabled={deletingId === v.id}
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40"
-                      aria-label="Eliminar revisión"
-                      title="Eliminar revisión"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+          <div className="flex flex-col gap-5">
+            {ordenesDelGomero.length > 0 && (
+              <section
+                className="rounded-2xl border-2 border-dashed border-[#C8102E]/45 bg-gradient-to-b from-red-50/90 to-white p-4 shadow-sm"
+                aria-label="Órdenes del gomero pendientes de mecánico"
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#C8102E] text-white flex items-center justify-center shrink-0">
+                    <Package className="w-5 h-5" />
                   </div>
+                  <div>
+                    <p className="text-sm font-black text-[#C8102E] uppercase tracking-wide">Órdenes del gomero</p>
+                    <p className="text-xs text-gray-600 mt-1 leading-snug">
+                      Pendientes de que las tomes — deslizá la lista general solo después de revisar estas.
+                    </p>
+                  </div>
+                  <span className="ml-auto text-xs font-black tabular-nums bg-[#C8102E] text-white px-2 py-1 rounded-full shrink-0">
+                    {ordenesDelGomero.length}
+                  </span>
                 </div>
-              );
-            })}
+                <div className="flex flex-col gap-3">
+                  {ordenesDelGomero.map((v) => (
+                    <TarjetaVisita key={v.id} v={v} destacada />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {(otrasActivas.length > 0 || ordenesDelGomero.length === 0) && (
+              <div className="flex flex-col gap-3">
+                {ordenesDelGomero.length > 0 && (
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-0.5">
+                    Otras visitas activas ({otrasActivas.length})
+                  </p>
+                )}
+                {otrasActivas.length === 0 && ordenesDelGomero.length > 0 ? (
+                  <p className="text-sm text-gray-400 px-1">No hay otras visitas en curso.</p>
+                ) : (
+                  otrasActivas.map((v) => <TarjetaVisita key={v.id} v={v} />)
+                )}
+              </div>
+            )}
           </div>
         )}
 

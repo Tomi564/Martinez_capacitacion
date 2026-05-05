@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
+import { FileText } from 'lucide-react';
 
 interface ChecklistItem { id: string; descripcion: string; orden: number; }
 interface Respuesta { item_id: string; estado: string; nota: string | null; }
@@ -72,6 +74,14 @@ export default function VisitaAdminDetalle() {
 
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-5 max-w-2xl mx-auto pb-10">
+
+      <Link
+        href={`/admin/clientes/informe/${id}`}
+        className="inline-flex items-center gap-2 self-start rounded-xl border border-[#C8102E]/30 bg-[#C8102E]/5 px-4 py-3 text-sm font-bold text-[#C8102E] active:scale-[0.99] transition-transform"
+      >
+        <FileText className="w-4 h-4" />
+        Ver informe completo (gomero + mecánico)
+      </Link>
 
       {/* Cabecera */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5">

@@ -6,9 +6,11 @@
  *  - Módulo en_curso sin rendir examen hace 5+ días
  *  - Objetivo mensual por debajo del 40% al día 15
  *  - Cierre de ranking semanal (viernes)
+ *  - Órdenes taller pendiente_mecanico sin tomar (+2 h) → push a admins
  */
 
 import { supabase } from '../config/database';
+import { sendPushToUserIds } from './push-send.service';
 
 /** Envía push a un usuario específico */
 async function pushUsuario(userId: string, titulo: string, cuerpo: string) {
@@ -63,6 +65,20 @@ async function pushTodosVendedores(titulo: string, cuerpo: string) {
   await Promise.allSettled(
     vendedores.map((v) => pushUsuario(v.id, titulo, cuerpo))
   );
+}
+
+/** Push a todos los administradores activos */
+async function pushTodosAdmins(titulo: string, cuerpo: string) {
+  const { data: admins } = await supabase
+    .from('users')
+    .select('id')
+    .eq('rol', 'admin')
+    .eq('activo', true);
+
+  if (!admins?.length) return;
+
+  const ids = admins.map((a) => a.id).filter(Boolean);
+  await sendPushToUserIds(ids, titulo, cuerpo);
 }
 
 /**
@@ -167,4 +183,56 @@ export async function recordatorioCierreRanking() {
     'Mañana sábado se cierra la tabla semanal. ¡Registrá tus ventas de hoy!'
   );
   console.log('[cron] Recordatorio ranking enviado');
+}
+
+const MS_2H = 2 * 60 * 60 * 1000;
+/** Texto exacto pedido para la notificación push a admins */
+const ALERTA_SIN_MECANICO_CUERPO =
+  '⚠️ Hay una orden sin atender hace más de 2 horas';
+
+/**
+ * Órdenes en pendiente_mecanico sin tomar (mecanico_tomo_at nulo)
+ * con más de 2 h desde enviado_al_mecanico_at → una push a admins (una vez por orden).
+ */
+export async function alertarOrdenesSinMecanico2h() {
+  console.log('[cron] Órdenes taller: alerta +2h sin tomar...');
+
+  const limite = new Date(Date.now() - MS_2H).toISOString();
+
+  const { data: filas, error } = await supabase
+    .from('visitas_taller')
+    .select('id')
+    .eq('orden_estado', 'pendiente_mecanico')
+    .is('mecanico_tomo_at', null)
+    .not('enviado_al_mecanico_at', 'is', null)
+    .lt('enviado_al_mecanico_at', limite)
+    .is('alerta_sin_mecanico_2h_enviada_at', null)
+    .limit(100);
+
+  if (error) {
+    console.error('[cron] alertarOrdenesSinMecanico2h query', error);
+    return;
+  }
+
+  if (!filas?.length) {
+    console.log('[cron] Sin órdenes para alertar (+2h)');
+    return;
+  }
+
+  const titulo = 'Orden de trabajo';
+  await pushTodosAdmins(titulo, ALERTA_SIN_MECANICO_CUERPO);
+
+  const ahora = new Date().toISOString();
+  const ids = filas.map((f) => f.id);
+  const { error: upErr } = await supabase
+    .from('visitas_taller')
+    .update({ alerta_sin_mecanico_2h_enviada_at: ahora })
+    .in('id', ids);
+
+  if (upErr) {
+    console.error('[cron] alertarOrdenesSinMecanico2h update flags', upErr);
+    return;
+  }
+
+  console.log(`[cron] Alerta +2h enviada a admins (${filas.length} orden/es)`);
 }

@@ -10,7 +10,7 @@
 // USUARIOS
 // ─────────────────────────────────────────────────────
 
-export type Rol = 'vendedor' | 'admin' | 'mecanico';
+export type Rol = 'vendedor' | 'admin' | 'mecanico' | 'gomero';
 
 export interface User {
   id: string;
@@ -170,6 +170,76 @@ export interface ResumenCalificaciones {
 
 export interface ApiError {
   error: string;
+}
+
+// ─────────────────────────────────────────────────────
+// PREGUNTAS DIARIAS (post-capacitación)
+// ─────────────────────────────────────────────────────
+
+export type CategoriaPreguntaDiaria = 'ventas' | 'producto';
+
+export interface PreguntaDiariaEstadoItemBase {
+  id: string;
+  categoria: CategoriaPreguntaDiaria;
+  enunciado: string;
+  opciones: OpcionPregunta[];
+}
+
+export interface PreguntaDiariaEstadoItemPendiente extends PreguntaDiariaEstadoItemBase {
+  estado: 'pendiente';
+}
+
+export interface PreguntaDiariaEstadoItemRespondida extends PreguntaDiariaEstadoItemBase {
+  estado: 'respondida';
+  feedback: {
+    correcto: boolean;
+    opcionElegida: string;
+    respuestaCorrecta: string;
+    explicacion: string | null;
+  };
+}
+
+export type PreguntaDiariaEstadoItem =
+  | PreguntaDiariaEstadoItemPendiente
+  | PreguntaDiariaEstadoItemRespondida;
+
+export type PreguntasDiariasEstadoRespuesta =
+  | { eligible: false }
+  | {
+      eligible: true;
+      fecha: string;
+      completado: true;
+      mensaje: string;
+    }
+  | {
+      eligible: true;
+      fecha: string;
+      completado: false;
+      items: PreguntaDiariaEstadoItem[];
+    };
+
+export interface PreguntaDiariaAdmin {
+  id: string;
+  enunciado: string;
+  categoria: CategoriaPreguntaDiaria;
+  opciones: OpcionPregunta[];
+  respuesta_correcta: string;
+  explicacion: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RespuestaDiariaAdminRow {
+  id: string;
+  fecha: string;
+  opcion_elegida: string;
+  es_correcta: boolean;
+  created_at: string;
+  user_id: string;
+  pregunta_diaria_id: string;
+  users: { nombre: string; apellido: string; email: string | null } | null;
+  preguntas_diarias: { enunciado: string; categoria: string } | null;
 }
 
 // Wrapper genérico para respuestas paginadas (futuro)

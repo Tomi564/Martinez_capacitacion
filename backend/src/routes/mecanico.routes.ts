@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { normalizePatenteAr } from '../utils/patente';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { Resend } from 'resend';
+import { sendPushToUserIds } from '../services/push-send.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -84,7 +85,7 @@ router.post('/clientes', requireRole('admin', 'vendedor', 'mecanico'), async (re
 // ─── Vehículos ──────────────────────────────────────────────────────────────
 
 // GET /api/mecanico/vehiculos/sugerencias?q=ABC
-router.get('/vehiculos/sugerencias', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/vehiculos/sugerencias', requireRole('mecanico', 'admin', 'gomero'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const rawTrim = String(req.query.q || '').trim();
     if (rawTrim.length < 3 || !/[a-zA-Z0-9]/.test(rawTrim)) return res.json({ vehiculos: [] });
@@ -254,6 +255,7 @@ router.get('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest
       .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' })
       .eq('mecanico_id', mecanicoId)
       .neq('estado', 'entregado')
+      .or('orden_estado.is.null,orden_estado.eq.pendiente_mecanico')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw new AppError('Error al obtener visitas', 500);
@@ -308,6 +310,7 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
       .from('visitas_taller')
       .insert({
         vehiculo_id,
+        gomero_id: null,
         mecanico_id: req.user!.id,
         motivo: motivo || null,
         observaciones: observaciones || null,
@@ -323,7 +326,8 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
         recomendacion: recomendacion || null,
         estado_visita: 'abierta',
         km: km || null,
-        estado: 'en_revision'
+        estado: 'en_revision',
+        orden_estado: 'pendiente_mecanico',
       })
       .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido, email))`)
       .single();
@@ -368,7 +372,30 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
       presion_psi,
       recomendacion,
       estado_visita,
+      orden_estado,
+      tren_delantero,
+      tren_alineado,
+      tren_balanceo,
+      amortiguadores_revisados,
+      auxilio_revisado,
+      presupuesto,
+      fotos_neumatico_urls,
     } = req.body;
+
+    const { data: prev, error: prevErr } = await supabase
+      .from('visitas_taller')
+      .select(
+        'id, orden_estado, mecanico_tomo_at, mecanico_id, vehiculos(patente)'
+      )
+      .eq('id', req.params.id)
+      .single();
+    if (prevErr || !prev) throw new AppError('Visita no encontrada', 404);
+
+    const uid = req.user!.id;
+    if (req.user!.rol === 'mecanico' && String(prev.mecanico_id) !== String(uid)) {
+      throw new AppError('No autorizado', 403);
+    }
+
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (estado) updates.estado = estado;
     if (observaciones !== undefined) updates.observaciones = observaciones;
@@ -384,11 +411,53 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
     }
     if (recomendacion !== undefined) updates.recomendacion = recomendacion || null;
     if (estado_visita !== undefined) updates.estado_visita = estado_visita;
+
+    if (tren_delantero !== undefined) {
+      updates.tren_delantero = tren_delantero === null || tren_delantero === '' ? null : String(tren_delantero);
+    }
+    if (tren_alineado !== undefined) updates.tren_alineado = tren_alineado;
+    if (tren_balanceo !== undefined) updates.tren_balanceo = tren_balanceo;
+    if (amortiguadores_revisados !== undefined) updates.amortiguadores_revisados = amortiguadores_revisados;
+    if (auxilio_revisado !== undefined) updates.auxilio_revisado = auxilio_revisado;
+    if (presupuesto !== undefined) updates.presupuesto = presupuesto || null;
+    if (fotos_neumatico_urls !== undefined) {
+      updates.fotos_neumatico_urls = Array.isArray(fotos_neumatico_urls) ? fotos_neumatico_urls : null;
+    }
+
+    if (orden_estado !== undefined) {
+      const allowed = new Set(['pendiente_gomero', 'pendiente_mecanico', 'finalizado', 'incompleto']);
+      if (!allowed.has(String(orden_estado))) throw new AppError('orden_estado inválido', 400);
+      updates.orden_estado = orden_estado;
+    }
+
+    if (
+      req.user!.rol === 'mecanico' &&
+      prev.mecanico_tomo_at == null &&
+      prev.orden_estado === 'pendiente_mecanico'
+    ) {
+      updates.mecanico_tomo_at = new Date().toISOString();
+    }
+
     const { error } = await supabase.from('visitas_taller').update(updates).eq('id', req.params.id);
     if (error) {
       console.error('[mecanico] PATCH visitas_taller', req.params.id, error);
       throw new AppError('Error al actualizar visita', 500);
     }
+
+    const nuevoOrdenEstado = updates.orden_estado as string | undefined;
+    if (nuevoOrdenEstado === 'finalizado' && prev.orden_estado !== 'finalizado') {
+      const { data: recipients } = await supabase
+        .from('users')
+        .select('id')
+        .in('rol', ['vendedor', 'admin'])
+        .eq('activo', true);
+      const ids = (recipients || []).map((r) => r.id).filter(Boolean);
+      const patente = (prev.vehiculos as { patente?: string } | null)?.patente || 'orden';
+      if (ids.length) {
+        await sendPushToUserIds(ids, 'Orden de trabajo finalizada', `${patente} — informe listo`);
+      }
+    }
+
     return res.json({ ok: true });
   } catch (e) { next(e); }
 });

@@ -10,6 +10,7 @@ import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 import { supabase } from '../config/database';
 import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
 import { enviarPushComunicado } from '../services/comunicados-scheduler.service';
+import { preguntasDiariasService } from '../services/preguntas-diarias.service';
 
 const router = Router();
 
@@ -684,6 +685,24 @@ router.get('/visitas', async (req, res, next) => {
   }
 });
 
+/** Contador SLA: pendiente_mecanico, sin tomar, enviada hace más de 2 h. */
+router.get('/taller/ordenes-mecanico-retrasadas-count', async (req, res, next) => {
+  try {
+    const limite = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('visitas_taller')
+      .select('id', { count: 'exact', head: true })
+      .eq('orden_estado', 'pendiente_mecanico')
+      .is('mecanico_tomo_at', null)
+      .not('enviado_al_mecanico_at', 'is', null)
+      .lt('enviado_al_mecanico_at', limite);
+    if (error) throw error;
+    return res.status(200).json({ count: count ?? 0 });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/admin/visitas/:id
 router.get('/visitas/:id', async (req, res, next) => {
   try {
@@ -976,6 +995,62 @@ router.get('/estadisticas', async (_req, res, next) => {
       conversionPorVendedor,
       montoPorMes: montoPorMes || [],
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// Preguntas diarias (post-capacitación)
+// ─────────────────────────────────────────────────────
+
+router.get('/preguntas-diarias/respuestas', async (req, res, next) => {
+  try {
+    const result = await preguntasDiariasService.listRespuestasAdmin({
+      vendedor_id: (req.query.vendedor_id as string) || undefined,
+      fecha: (req.query.fecha as string) || undefined,
+      fecha_desde: (req.query.fecha_desde as string) || undefined,
+      fecha_hasta: (req.query.fecha_hasta as string) || undefined,
+      limit: Number(req.query.limit),
+      offset: Number(req.query.offset),
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/preguntas-diarias/:id', async (req, res, next) => {
+  try {
+    const result = await preguntasDiariasService.getPreguntaAdmin(req.params.id);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/preguntas-diarias', async (_req, res, next) => {
+  try {
+    const result = await preguntasDiariasService.listPreguntasAdmin();
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/preguntas-diarias', async (req, res, next) => {
+  try {
+    const result = await preguntasDiariasService.createPreguntaAdmin(req.body);
+    return res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/preguntas-diarias/:id', async (req, res, next) => {
+  try {
+    const result = await preguntasDiariasService.updatePreguntaAdmin(req.params.id, req.body);
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }

@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 
 interface ChecklistItem { id: string; descripcion: string; orden: number; }
 interface Respuesta { item_id: string; estado: string; nota: string | null; }
@@ -81,6 +82,14 @@ export default function VisitaVendedorDetalle() {
         <ArrowLeft className="w-4 h-4" />
         Volver
       </button>
+
+      <Link
+        href={`/clientes/informe/${id}`}
+        className="inline-flex items-center gap-2 self-start rounded-xl border border-[#C8102E]/30 bg-[#C8102E]/5 px-4 py-3 text-sm font-bold text-[#C8102E] active:scale-[0.99] transition-transform"
+      >
+        <FileText className="w-4 h-4" />
+        Ver informe completo
+      </Link>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
         <div className="flex items-start justify-between gap-3">

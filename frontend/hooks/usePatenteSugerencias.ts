@@ -27,8 +27,12 @@ export function usePatenteSugerencias(query: string, debounceMs = 300) {
     const timeoutId = setTimeout(async () => {
       setIsBuscandoSugerencias(true);
       try {
+        const base =
+          typeof window !== 'undefined' && window.location.pathname.startsWith('/gomero')
+            ? '/gomero'
+            : '/mecanico';
         const res = await apiClient.get<{ vehiculos: VehiculoSugerido[] }>(
-          `/mecanico/vehiculos/sugerencias?q=${encodeURIComponent(q)}`
+          `${base}/vehiculos/sugerencias?q=${encodeURIComponent(q)}`
         );
         setSugerencias(res.vehiculos || []);
       } catch (error) {

@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bell, Megaphone } from 'lucide-react';
 import { ModuloIcon, QrIcon } from '@/components/ui/icons';
+import { PreguntasDiariasDashboard } from '@/components/vendedor/PreguntasDiariasDashboard';
 
 interface Comunicado {
   id: string;
@@ -260,6 +261,15 @@ export default function DashboardPage() {
           </p>
           </CardContent>
         </Card>
+      )}
+
+      {resumen && resumen.total > 0 && resumen.aprobados === resumen.total && (
+        <div className="flex flex-col gap-3 pt-2 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Refuerzo diario
+          </p>
+          <PreguntasDiariasDashboard />
+        </div>
       )}
 
       {/* Calificaciones QR */}

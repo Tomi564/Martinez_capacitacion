@@ -22,7 +22,13 @@ export default function LoginPage() {
 
   const getRedirect = () => {
     const { user: u, isAdmin: ia } = useAuth.getState();
-    return ia() ? '/admin' : u?.rol === 'mecanico' ? '/mecanico' : '/dashboard';
+    return ia()
+      ? '/admin'
+      : u?.rol === 'mecanico'
+        ? '/mecanico'
+        : u?.rol === 'gomero'
+          ? '/gomero'
+          : '/dashboard';
   };
 
   useEffect(() => {

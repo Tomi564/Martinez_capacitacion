@@ -129,6 +129,13 @@ export class ModulosService {
     return { modulos: modulosConProgreso };
   }
 
+  /** Todos los módulos activos están aprobados (y hay al menos uno). */
+  async capacitacionCompleta(userId: string): Promise<boolean> {
+    const { modulos } = await this.getModulosConProgreso(userId);
+    if (!modulos.length) return false;
+    return modulos.every((m) => m.estado === 'aprobado');
+  }
+
   /**
    * Obtiene el detalle de un módulo específico con el progreso
    * del vendedor autenticado.

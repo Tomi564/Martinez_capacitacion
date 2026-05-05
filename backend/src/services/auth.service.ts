@@ -17,7 +17,7 @@ import { AppError } from '../middleware/errorHandler';
 interface JWTPayload {
   id: string;
   email: string;
-  rol: 'vendedor' | 'admin' | 'mecanico';
+  rol: 'vendedor' | 'admin' | 'mecanico' | 'gomero';
   nombre: string;
   apellido: string;
 }
@@ -27,7 +27,7 @@ interface LoginResult {
   user: {
     id: string;
     email: string;
-    rol: 'vendedor' | 'admin' | 'mecanico';
+    rol: 'vendedor' | 'admin' | 'mecanico' | 'gomero';
     nombre: string;
     apellido: string;
     avatar_url: string | null;

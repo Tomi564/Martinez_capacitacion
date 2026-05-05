@@ -79,7 +79,7 @@ export class AdminController {
    */
   async crearVendedor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { nombre, apellido, email, password } = req.body;
+      const { nombre, apellido, email, password, rol } = req.body;
 
       if (!nombre || !apellido || !email || !password) {
         return res.status(400).json({
@@ -92,6 +92,7 @@ export class AdminController {
         apellido,
         email,
         password,
+        rol,
       });
 
       return res.status(201).json(result);

@@ -55,6 +55,7 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [ordenesMecanicoRetrasadas, setOrdenesMecanicoRetrasadas] = useState<number>(0);
 
   const alertaCritica = (() => {
     if (!data?.vendedores?.length) return null;
@@ -90,12 +91,14 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const [dashRes, rankRes] = await Promise.all([
+        const [dashRes, rankRes, retrasadasRes] = await Promise.all([
           apiClient.get<DashboardAdminData>('/admin/dashboard'),
           apiClient.get<{ stats: RankingEntry[] }>('/ranking/historico'),
+          apiClient.get<{ count: number }>('/admin/taller/ordenes-mecanico-retrasadas-count').catch(() => ({ count: 0 })),
         ]);
         setData(dashRes);
         setRanking(rankRes.stats.slice(0, 5));
+        setOrdenesMecanicoRetrasadas(typeof retrasadasRes.count === 'number' ? retrasadasRes.count : 0);
       } catch (err) {
         setError('Error al cargar el dashboard');
         console.error(err);
@@ -160,6 +163,38 @@ export default function AdminDashboardPage() {
           <p className="text-sm text-gray-500 mt-1">Promedio general del equipo</p>
         </CardContent>
       </Card>
+
+      {/* Taller: órdenes del gomero sin tomar (+2 h) */}
+      <Link href="/admin/clientes" className="block active:scale-[0.99] transition-transform">
+        <Card
+          className={`rounded-xl border-2 ${
+            ordenesMecanicoRetrasadas > 0
+              ? 'border-red-300 bg-red-50'
+              : 'border-gray-100 bg-gray-50/80'
+          }`}
+        >
+          <CardContent className="flex items-center justify-between gap-4 py-4">
+            <div className="min-w-0">
+              <p className={`text-sm font-bold ${ordenesMecanicoRetrasadas > 0 ? 'text-red-900' : 'text-gray-700'}`}>
+                Órdenes taller sin mecánico (+2 h)
+              </p>
+              <p className={`text-xs mt-1 leading-snug ${ordenesMecanicoRetrasadas > 0 ? 'text-red-800/90' : 'text-gray-500'}`}>
+                {ordenesMecanicoRetrasadas > 0
+                  ? 'Pendiente mecánico, enviadas hace más de dos horas sin “tomar”. Ir a clientes / visitas.'
+                  : 'Ninguna orden supera el umbral en este momento.'}
+              </p>
+            </div>
+            <span
+              className={`text-3xl font-black tabular-nums shrink-0 min-w-[2.5rem] text-center ${
+                ordenesMecanicoRetrasadas > 0 ? 'text-red-700' : 'text-gray-400'
+              }`}
+              aria-live="polite"
+            >
+              {ordenesMecanicoRetrasadas}
+            </span>
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* First fold: alerta crítica */}
       {alertaCritica ? (

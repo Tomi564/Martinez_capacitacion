@@ -138,6 +138,7 @@ export default function VendedorLayout({
     if (!isAuthenticated()) { router.replace('/login'); return; }
     if (isAdmin()) { router.replace('/admin'); return; }
     if (user?.rol === 'mecanico') { router.replace('/mecanico'); return; }
+    if (user?.rol === 'gomero') { router.replace('/gomero'); return; }
     // Verificar que el token siga siendo válido en el servidor
     refreshUser();
   }, []);

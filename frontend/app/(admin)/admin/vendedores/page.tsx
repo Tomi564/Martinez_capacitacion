@@ -1,10 +1,10 @@
 /**
- * admin/vendedores/page.tsx — Gestión de vendedores
+ * admin/vendedores/page.tsx — Gestión del equipo (vendedores, gomeros, mecánicos)
  *
  * Permite al admin:
- *  - Ver todos los vendedores con su progreso
- *  - Crear nuevos vendedores
- *  - Activar/desactivar vendedores
+ *  - Ver usuarios del equipo con su rol y progreso (solo vendedores)
+ *  - Crear usuarios con selector de rol
+ *  - Activar/desactivar
  */
 
 'use client';
@@ -19,6 +19,7 @@ interface Vendedor {
   email: string;
   activo: boolean;
   created_at: string;
+  rol: string;
   modulosAprobados: number;
   totalModulos: number;
 }
@@ -28,13 +29,21 @@ interface NuevoVendedor {
   apellido: string;
   email: string;
   password: string;
+  rol: 'vendedor' | 'gomero' | 'mecanico';
 }
+
+const ROL_LABEL: Record<string, string> = {
+  vendedor: 'Vendedor',
+  gomero: 'Gomero',
+  mecanico: 'Mecánico',
+};
 
 export default function VendedoresPage() {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  const [filtroRol, setFiltroRol] = useState<'todos' | 'vendedor' | 'gomero' | 'mecanico'>('todos');
   const [showModal, setShowModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -43,6 +52,7 @@ export default function VendedoresPage() {
     apellido: '',
     email: '',
     password: '',
+    rol: 'vendedor',
   });
 
   const fetchVendedores = async () => {
@@ -52,7 +62,7 @@ export default function VendedoresPage() {
       );
       setVendedores(res.vendedores);
     } catch (err) {
-      setError('Error al cargar los vendedores');
+      setError('Error al cargar el equipo');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -75,7 +85,7 @@ export default function VendedoresPage() {
     try {
       await apiClient.post('/admin/vendedores', form);
       setShowModal(false);
-      setForm({ nombre: '', apellido: '', email: '', password: '' });
+      setForm({ nombre: '', apellido: '', email: '', password: '', rol: 'vendedor' });
       fetchVendedores();
     } catch (err) {
       setCreateError(
@@ -111,9 +121,9 @@ export default function VendedoresPage() {
       {/* Encabezado */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Vendedores</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Equipo</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {vendedores.length} vendedores registrados
+            {vendedores.length} usuarios (vendedores, gomería y taller)
           </p>
         </div>
         <button
@@ -124,7 +134,7 @@ export default function VendedoresPage() {
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          Nuevo vendedor
+          Nuevo usuario
         </button>
       </div>
 
@@ -135,26 +145,39 @@ export default function VendedoresPage() {
         </div>
       )}
 
-      {/* Buscador */}
-      <div className="relative">
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre o email..."
-          className="w-full h-11 pl-10 pr-4 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
-        />
+      {/* Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o email..."
+            className="w-full h-11 pl-10 pr-4 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
+          />
+        </div>
+        <select
+          value={filtroRol}
+          onChange={(e) => setFiltroRol(e.target.value as typeof filtroRol)}
+          className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-800"
+        >
+          <option value="todos">Todos los roles</option>
+          <option value="vendedor">Vendedores</option>
+          <option value="gomero">Gomeros</option>
+          <option value="mecanico">Mecánicos</option>
+        </select>
       </div>
 
       {/* Lista de vendedores */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
         {/* Header tabla desktop */}
-        <div className="hidden lg:grid grid-cols-5 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          <span className="col-span-2">Vendedor</span>
+        <div className="hidden lg:grid grid-cols-6 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <span className="col-span-2">Usuario</span>
+          <span className="text-center">Rol</span>
           <span className="text-center">Progreso</span>
           <span className="text-center">Estado</span>
           <span className="text-center">Acciones</span>
@@ -163,12 +186,13 @@ export default function VendedoresPage() {
         {vendedores
           .filter((v) => {
             const q = busqueda.toLowerCase();
-            return (
+            const matchText =
               !q ||
               v.nombre.toLowerCase().includes(q) ||
               v.apellido.toLowerCase().includes(q) ||
-              v.email.toLowerCase().includes(q)
-            );
+              v.email.toLowerCase().includes(q);
+            const matchRol = filtroRol === 'todos' || v.rol === filtroRol;
+            return matchText && matchRol;
           })
           .map((vendedor, index) => {
           const porcentaje =
@@ -177,6 +201,8 @@ export default function VendedoresPage() {
                   (vendedor.modulosAprobados / vendedor.totalModulos) * 100
                 )
               : 0;
+          const rolUi = ROL_LABEL[vendedor.rol] || vendedor.rol;
+          const esVendedor = vendedor.rol === 'vendedor';
 
           return (
             <div
@@ -198,27 +224,42 @@ export default function VendedoresPage() {
                 <p className="text-xs text-gray-400 truncate">
                   {vendedor.email}
                 </p>
+                <p className="text-xs font-medium text-[#C8102E] lg:hidden mt-0.5">{rolUi}</p>
                 <p className="text-xs text-gray-400 lg:hidden mt-0.5">
-                  {vendedor.modulosAprobados}/{vendedor.totalModulos} módulos · {porcentaje}%
+                  {esVendedor
+                    ? `${vendedor.modulosAprobados}/${vendedor.totalModulos} módulos · ${porcentaje}%`
+                    : 'Sin módulos de capacitación'}
                 </p>
               </div>
 
+              <div className="hidden lg:flex w-24 items-center justify-center">
+                <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded-full">
+                  {rolUi}
+                </span>
+              </div>
+
               {/* Progreso desktop */}
-              <div className="hidden lg:block w-32">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-500">
-                    {vendedor.modulosAprobados}/{vendedor.totalModulos}
-                  </span>
-                  <span className="font-semibold text-gray-900">
-                    {porcentaje}%
-                  </span>
-                </div>
-                <div className="w-full h-1.5 bg-gray-100 rounded-full">
-                  <div
-                    className="h-full bg-gray-900 rounded-full"
-                    style={{ width: `${porcentaje}%` }}
-                  />
-                </div>
+              <div className="hidden lg:block w-28">
+                {esVendedor ? (
+                  <>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-500">
+                        {vendedor.modulosAprobados}/{vendedor.totalModulos}
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {porcentaje}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full">
+                      <div
+                        className="h-full bg-gray-900 rounded-full"
+                        style={{ width: `${porcentaje}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-400 block text-center">—</span>
+                )}
               </div>
 
               {/* Badge activo/inactivo desktop */}
@@ -263,25 +304,33 @@ export default function VendedoresPage() {
 
         {vendedores.filter((v) => {
           const q = busqueda.toLowerCase();
-          return !q || v.nombre.toLowerCase().includes(q) || v.apellido.toLowerCase().includes(q) || v.email.toLowerCase().includes(q);
+          const matchText =
+            !q ||
+            v.nombre.toLowerCase().includes(q) ||
+            v.apellido.toLowerCase().includes(q) ||
+            v.email.toLowerCase().includes(q);
+          const matchRol = filtroRol === 'todos' || v.rol === filtroRol;
+          return matchText && matchRol;
         }).length === 0 && (
           <div className="px-4 py-10 text-center">
             <p className="text-2xl mb-2">👥</p>
             <p className="text-gray-500 text-sm">
-              {busqueda ? 'Sin resultados para esa búsqueda' : 'No hay vendedores aún'}
+              {busqueda || filtroRol !== 'todos'
+                ? 'Sin resultados para ese filtro'
+                : 'No hay usuarios del equipo aún'}
             </p>
           </div>
         )}
       </div>
 
-      {/* Modal crear vendedor */}
+      {/* Modal crear usuario */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end lg:items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 flex flex-col gap-4">
 
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">
-                Nuevo vendedor
+                Nuevo usuario
               </h2>
               <button
                 onClick={() => {
@@ -304,6 +353,21 @@ export default function VendedoresPage() {
             )}
 
             <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Rol</label>
+                <select
+                  value={form.rol}
+                  onChange={(e) =>
+                    setForm({ ...form, rol: e.target.value as NuevoVendedor['rol'] })
+                  }
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                >
+                  <option value="vendedor">Vendedor (capacitación + ventas)</option>
+                  <option value="gomero">Gomero (órdenes neumáticos)</option>
+                  <option value="mecanico">Mecánico (taller)</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-gray-700">Nombre</label>
@@ -371,7 +435,7 @@ export default function VendedoresPage() {
                     Creando...
                   </>
                 ) : (
-                  'Crear vendedor'
+                  'Crear usuario'
                 )}
               </button>
             </div>

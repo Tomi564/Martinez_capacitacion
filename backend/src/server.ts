@@ -32,11 +32,14 @@ import comunicadosRoutes from './routes/comunicados.routes';
 import rankingRoutes from './routes/ranking.routes';
 import objetivosRoutes from './routes/objetivos.routes';
 import mecanicoRoutes from './routes/mecanico.routes';
+import gomeroRoutes from './routes/gomero.routes';
+import preguntasDiariasRoutes from './routes/preguntas-diarias.routes';
 import pushRoutes from './routes/push.routes';
 import {
   recordatorioModuloInactivo,
   recordatorioObjetivoMitadMes,
   recordatorioCierreRanking,
+  alertarOrdenesSinMecanico2h,
 } from './services/recordatorios.service';
 import {
   enviarCierreSemanalRanking,
@@ -136,6 +139,8 @@ app.use('/api/ranking', rankingRoutes);
 app.use('/api/objetivos', objetivosRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/mecanico', mecanicoRoutes);
+app.use('/api/gomero', gomeroRoutes);
+app.use('/api/preguntas-diarias', preguntasDiariasRoutes);
 
 // ─────────────────────────────────────────────────────
 // 404 — cualquier ruta no definida cae acá
@@ -194,7 +199,12 @@ app.listen(PORT, () => {
     processScheduledComunicados().catch(console.error);
   }, { timezone: 'America/Argentina/Salta' });
 
-  console.log('   ⏰ Cron jobs activos: módulos, objetivos, ranking, comunicados programados');
+  // Cada 10 minutos — órdenes pendientes_mecanico sin tomar (+2 h desde envío al mecánico)
+  cron.schedule('*/10 * * * *', () => {
+    alertarOrdenesSinMecanico2h().catch(console.error);
+  }, { timezone: 'America/Argentina/Salta' });
+
+  console.log('   ⏰ Cron jobs activos: módulos, objetivos, ranking, comunicados, alerta órdenes taller');
 });
 
 export default app;

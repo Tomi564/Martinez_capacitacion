@@ -13,6 +13,16 @@ import { AppError } from '../middleware/errorHandler';
 import { modulosService } from './modulos.service';
 import bcrypt from 'bcryptjs';
 
+/** Roles que el admin puede crear/gestionar desde el mismo panel que vendedores */
+const ROLES_EQUIPO = ['vendedor', 'gomero', 'mecanico'] as const;
+type RolEquipo = (typeof ROLES_EQUIPO)[number];
+
+function parseRolEquipo(input: unknown): RolEquipo {
+  const r = typeof input === 'string' ? input.trim().toLowerCase() : '';
+  if (r === 'gomero' || r === 'mecanico' || r === 'vendedor') return r;
+  return 'vendedor';
+}
+
 interface ActorAuditoria {
   id: string;
   rol?: string;
@@ -221,13 +231,13 @@ export class AdminService {
    * Lista todos los vendedores con su progreso.
    */
   async getVendedores() {
-    const { data: vendedores, error } = await supabase
+    const { data: usuarios, error } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, created_at')
-      .eq('rol', 'vendedor')
+      .select('id, nombre, apellido, email, activo, created_at, rol')
+      .in('rol', [...ROLES_EQUIPO])
       .order('created_at', { ascending: false });
 
-    if (error) throw new AppError('Error al obtener vendedores', 500);
+    if (error) throw new AppError('Error al obtener usuarios del equipo', 500);
 
     // Total de módulos activos
     const { data: modulos } = await supabase
@@ -243,26 +253,35 @@ export class AdminService {
       .select('user_id, estado, mejor_nota')
       .eq('estado', 'aprobado');
 
-    const vendedoresConProgreso = (vendedores || []).map((vendedor) => {
-      const progresoVendedor = (progresos || []).filter(
-        (p) => p.user_id === vendedor.id
-      );
+    const vendedoresConProgreso = (usuarios || []).map((u: Record<string, unknown>) => {
+      const rol = String(u.rol || 'vendedor');
+      const esVendedor = rol === 'vendedor';
+
+      const progresoVendedor = esVendedor
+        ? (progresos || []).filter((p) => p.user_id === u.id)
+        : [];
 
       const modulosAprobados = progresoVendedor.length;
 
       const notasValidas = progresoVendedor
         .map((p) => p.mejor_nota)
-        .filter((n) => n > 0);
+        .filter((n) => Number(n) > 0);
 
       const promedioNotas =
         notasValidas.length > 0
-          ? notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length
+          ? notasValidas.reduce((a, b) => a + Number(b), 0) / notasValidas.length
           : 0;
 
       return {
-        ...vendedor,
+        id: u.id,
+        nombre: u.nombre,
+        apellido: u.apellido,
+        email: u.email,
+        activo: u.activo,
+        created_at: u.created_at,
+        rol,
         modulosAprobados,
-        totalModulos,
+        totalModulos: esVendedor ? totalModulos : 0,
         promedioNotas: Math.round(promedioNotas * 10) / 10,
       };
     });
@@ -278,7 +297,10 @@ export class AdminService {
     apellido: string;
     email: string;
     password: string;
+    rol?: string;
   }) {
+    const rol = parseRolEquipo(data.rol);
+
     // Verificar que el email no esté en uso
     const { data: existente } = await supabase
       .from('users')
@@ -306,20 +328,23 @@ export class AdminService {
         apellido: data.apellido.trim(),
         email: data.email.toLowerCase().trim(),
         password_hash: passwordHash,
-        rol: 'vendedor',
+        rol,
         activo: true,
       })
       .select('id')
       .single();
 
     if (error || !nuevoUsuario) {
-      throw new AppError('Error al crear el vendedor', 500);
+      throw new AppError('Error al crear el usuario', 500);
     }
 
-    // Inicializar progreso para todos los módulos activos
-    await modulosService.inicializarProgreso(nuevoUsuario.id);
+    if (rol === 'vendedor') {
+      await modulosService.inicializarProgreso(nuevoUsuario.id);
+    }
 
-    return { mensaje: 'Vendedor creado correctamente', id: nuevoUsuario.id };
+    const etiqueta =
+      rol === 'vendedor' ? 'Vendedor' : rol === 'gomero' ? 'Gomero' : 'Mecánico';
+    return { mensaje: `${etiqueta} creado correctamente`, id: nuevoUsuario.id };
   }
 
   /**
@@ -332,24 +357,24 @@ export class AdminService {
   ) {
     const { data: antes } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at')
+      .select('id, nombre, apellido, email, activo, updated_at, rol')
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor')
+      .in('rol', [...ROLES_EQUIPO])
       .single();
 
     const { error } = await supabase
       .from('users')
       .update(data)
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor');
+      .in('rol', [...ROLES_EQUIPO]);
 
-    if (error) throw new AppError('Error al actualizar el vendedor', 500);
+    if (error) throw new AppError('Error al actualizar el usuario', 500);
 
     const { data: despues } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at')
+      .select('id, nombre, apellido, email, activo, updated_at, rol')
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor')
+      .in('rol', [...ROLES_EQUIPO])
       .single();
 
     await this.registrarAuditoria({
@@ -755,7 +780,7 @@ export class AdminService {
       .from('users')
       .update({ password_hash: passwordHash })
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor');
+      .in('rol', [...ROLES_EQUIPO]);
 
     if (error) throw new AppError('Error al cambiar la contraseña', 500);
 
@@ -763,29 +788,29 @@ export class AdminService {
   }
 
   /**
-   * Desactiva un vendedor (soft delete — preserva historial).
+   * Desactiva un usuario del equipo (soft delete — preserva historial).
    */
   async eliminarVendedor(vendedorId: string, actor?: ActorAuditoria) {
     const { data: antes } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at')
+      .select('id, nombre, apellido, email, activo, updated_at, rol')
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor')
+      .in('rol', [...ROLES_EQUIPO])
       .single();
 
     const { error } = await supabase
       .from('users')
       .update({ activo: false })
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor');
+      .in('rol', [...ROLES_EQUIPO]);
 
-    if (error) throw new AppError('Error al desactivar el vendedor', 500);
+    if (error) throw new AppError('Error al desactivar el usuario', 500);
 
     const { data: despues } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at')
+      .select('id, nombre, apellido, email, activo, updated_at, rol')
       .eq('id', vendedorId)
-      .eq('rol', 'vendedor')
+      .in('rol', [...ROLES_EQUIPO])
       .single();
 
     await this.registrarAuditoria({

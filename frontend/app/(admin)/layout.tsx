@@ -49,7 +49,7 @@ const NAV_PRIMARY = [
 const NAV_SECONDARY = [
   {
     href: '/admin/vendedores',
-    label: 'Vendedores',
+    label: 'Equipo',
     exactMatch: false,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -68,6 +68,19 @@ const NAV_SECONDARY = [
       <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/preguntas-diarias',
+    label: 'Preguntas diarias',
+    exactMatch: false,
+    activePathPrefixes: ['/admin/preguntas-diarias'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
     ),
   },
@@ -201,7 +214,9 @@ export default function AdminLayout({
     }
     const u = useAuth.getState().user;
     if (!isAdmin()) {
-      router.replace(u?.rol === 'mecanico' ? '/mecanico' : '/dashboard');
+      router.replace(
+        u?.rol === 'mecanico' ? '/mecanico' : u?.rol === 'gomero' ? '/gomero' : '/dashboard'
+      );
       return;
     }
     // Verificar que el token siga siendo válido en el servidor
