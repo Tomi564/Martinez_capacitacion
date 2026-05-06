@@ -46,12 +46,6 @@ const ORDEN_BADGE: Record<string, { label: string; variant: 'default' | 'warning
   incompleto: { label: 'Incompleto', variant: 'muted' },
 };
 
-const ESTADO_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  ok: { label: 'OK', color: 'text-green-700', bg: 'bg-green-50' },
-  revisar: { label: 'Revisar', color: 'text-amber-700', bg: 'bg-amber-50' },
-  urgente: { label: 'Urgente', color: 'text-red-700', bg: 'bg-red-50' },
-};
-
 function fmt(ts: string | null | undefined) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString('es-AR', {
