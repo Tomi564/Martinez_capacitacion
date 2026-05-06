@@ -7,8 +7,6 @@ import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { ArrowLeft, FileText } from 'lucide-react';
 
-interface ChecklistItem { id: string; descripcion: string; orden: number; }
-interface Respuesta { item_id: string; estado: string; nota: string | null; }
 interface Visita {
   id: string; estado: string; motivo: string | null; observaciones: string | null;
   km: number | null; diagnostico_enviado: boolean; created_at: string;
@@ -18,18 +16,10 @@ interface Visita {
   } | null;
 }
 
-const ESTADO_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  ok:      { label: '✓ OK',       color: 'text-green-700', bg: 'bg-green-50' },
-  revisar: { label: '⚠ Revisar',  color: 'text-amber-700', bg: 'bg-amber-50' },
-  urgente: { label: '🔴 Urgente', color: 'text-red-700',   bg: 'bg-red-50' },
-};
-
 export default function VisitaVendedorDetalle() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [visita, setVisita] = useState<Visita | null>(null);
-  const [items, setItems] = useState<ChecklistItem[]>([]);
-  const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -37,12 +27,8 @@ export default function VisitaVendedorDetalle() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const r = await apiClient.get<{ visita: Visita; items: ChecklistItem[]; respuestas: Respuesta[] }>(`/mecanico/visitas/${id}`);
-        setVisita(r.visita);
-        setItems(r.items);
-        const map: Record<string, Respuesta> = {};
-        r.respuestas.forEach(rr => { map[rr.item_id] = rr; });
-        setRespuestas(map);
+      const r = await apiClient.get<{ visita: Visita }>(`/mecanico/visitas/${id}`);
+      setVisita(r.visita);
     } catch (error) {
       console.error('[VisitaVendedorDetalle] Error cargando visita', error);
       setHasError(true);
@@ -69,9 +55,6 @@ export default function VisitaVendedorDetalle() {
 
   const v = visita.vehiculos;
   const c = v?.clientes;
-  const respondidos = items.filter(i => respuestas[i.id]);
-  const urgentes = respondidos.filter(i => respuestas[i.id]?.estado === 'urgente');
-  const revisar = respondidos.filter(i => respuestas[i.id]?.estado === 'revisar');
 
   return (
     <div className="px-4 py-5 pb-24 flex flex-col gap-5 max-w-lg mx-auto">
@@ -112,33 +95,9 @@ export default function VisitaVendedorDetalle() {
         )}
         {visita.motivo && <p className="text-sm text-gray-500 mt-2 italic">"{visita.motivo}"</p>}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          {urgentes.length > 0 && <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-1 rounded-full">{urgentes.length} urgente{urgentes.length > 1 ? 's' : ''}</span>}
-          {revisar.length > 0 && <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">{revisar.length} a revisar</span>}
           {visita.diagnostico_enviado && <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">✓ Diagnóstico enviado</span>}
         </div>
       </div>
-
-      {respondidos.length > 0 && (
-        <div>
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Checklist ({respondidos.length}/{items.length} ítems)</p>
-          <div className="flex flex-col gap-2">
-            {items.map(item => {
-              const r = respuestas[item.id];
-              if (!r) return null;
-              const cfg = ESTADO_CFG[r.estado];
-              return (
-                <div key={item.id} className={`rounded-xl px-4 py-3 flex items-start justify-between gap-3 ${cfg?.bg || 'bg-gray-50'}`}>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-800">{item.descripcion}</p>
-                    {r.nota && <p className="text-xs text-gray-500 mt-0.5 italic">{r.nota}</p>}
-                  </div>
-                  <span className={`text-xs font-bold shrink-0 ${cfg?.color || 'text-gray-600'}`}>{cfg?.label || r.estado}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {visita.observaciones && (
         <div className="bg-white border border-gray-200 rounded-2xl p-4">

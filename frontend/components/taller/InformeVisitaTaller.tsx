@@ -5,18 +5,6 @@ import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { Badge } from '@/components/ui/badge';
 
-interface ChecklistItem {
-  id: string;
-  descripcion: string;
-  orden: number;
-}
-
-interface Respuesta {
-  item_id: string;
-  estado: string;
-  nota: string | null;
-}
-
 export interface InformeVisita {
   id: string;
   estado: string;
@@ -88,10 +76,13 @@ function trenTxt(v: string | null | undefined) {
   return '—';
 }
 
+const PSI_PER_BAR = 14.5037738;
+function psiToBar(psi: number) {
+  return psi / PSI_PER_BAR;
+}
+
 export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
   const [visita, setVisita] = useState<InformeVisita | null>(null);
-  const [items, setItems] = useState<ChecklistItem[]>([]);
-  const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -99,16 +90,10 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
     setLoading(true);
     setError(false);
     try {
-      const r = await apiClient.get<{ visita: InformeVisita; items: ChecklistItem[]; respuestas: Respuesta[] }>(
+      const r = await apiClient.get<{ visita: InformeVisita }>(
         `/mecanico/visitas/${visitaId}`
       );
       setVisita(r.visita);
-      setItems(r.items || []);
-      const map: Record<string, Respuesta> = {};
-      (r.respuestas || []).forEach((rr) => {
-        map[rr.item_id] = rr;
-      });
-      setRespuestas(map);
     } catch {
       setError(true);
     } finally {
@@ -136,6 +121,14 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
   const c = v?.clientes;
   const ordenCfg = visita.orden_estado ? ORDEN_BADGE[visita.orden_estado] : null;
   const fotos = Array.isArray(visita.fotos_neumatico_urls) ? visita.fotos_neumatico_urls : [];
+  const tieneParteGomero =
+    visita.neumaticos_cambiados != null ||
+    visita.km != null ||
+    !!visita.marca_neumatico ||
+    !!visita.medida_neumatico ||
+    visita.presion_psi != null ||
+    !!visita.observaciones_gomero;
+  const ordenCerrada = visita.orden_estado === 'finalizado' || visita.orden_estado === 'incompleto';
 
   return (
     <div className="px-4 py-5 pb-24 flex flex-col gap-5 max-w-lg mx-auto lg:max-w-3xl">
@@ -146,7 +139,11 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
         ) : (
           <Badge variant="muted">Sin estado de orden</Badge>
         )}
-        <Badge variant={visita.estado === 'entregado' ? 'muted' : 'default'}>{visita.estado.replace(/_/g, ' ')}</Badge>
+        {!ordenCerrada && (
+          <Badge variant={visita.estado === 'entregado' ? 'muted' : 'default'}>
+            {visita.estado.replace(/_/g, ' ')}
+          </Badge>
+        )}
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -168,35 +165,37 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
         )}
       </section>
 
-      <section className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4">
-        <p className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-3">Parte del gomero</p>
-        <ul className="text-sm text-gray-800 space-y-2">
-          <li>
-            <span className="text-gray-500">Neumáticos cambiados:</span>{' '}
-            {visita.neumaticos_cambiados === true ? 'Sí' : visita.neumaticos_cambiados === false ? 'No' : '—'}
-          </li>
-          <li>
-            <span className="text-gray-500">Kilometraje:</span>{' '}
-            {visita.km != null ? `${visita.km.toLocaleString('es-AR')} km` : '—'}
-          </li>
-          <li>
-            <span className="text-gray-500">Marca:</span> {visita.marca_neumatico || '—'}
-          </li>
-          <li>
-            <span className="text-gray-500">Medida:</span> {visita.medida_neumatico || '—'}
-          </li>
-          <li>
-            <span className="text-gray-500">Presión:</span>{' '}
-            {visita.presion_psi != null ? `${visita.presion_psi} PSI` : '—'}
-          </li>
-          {visita.observaciones_gomero && (
-            <li className="pt-2 border-t border-amber-200/80">
-              <span className="text-gray-500 block mb-1">Observaciones</span>
-              <span className="text-gray-800 whitespace-pre-wrap">{visita.observaciones_gomero}</span>
+      {tieneParteGomero && (
+        <section className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4">
+          <p className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-3">Parte del gomero</p>
+          <ul className="text-sm text-gray-800 space-y-2">
+            <li>
+              <span className="text-gray-500">Neumáticos cambiados:</span>{' '}
+              {visita.neumaticos_cambiados === true ? 'Sí' : visita.neumaticos_cambiados === false ? 'No' : '—'}
             </li>
-          )}
-        </ul>
-      </section>
+            <li>
+              <span className="text-gray-500">Kilometraje:</span>{' '}
+              {visita.km != null ? `${visita.km.toLocaleString('es-AR')} km` : '—'}
+            </li>
+            <li>
+              <span className="text-gray-500">Marca:</span> {visita.marca_neumatico || '—'}
+            </li>
+            <li>
+              <span className="text-gray-500">Medida:</span> {visita.medida_neumatico || '—'}
+            </li>
+            <li>
+              <span className="text-gray-500">Presión:</span>{' '}
+              {visita.presion_psi != null ? `${psiToBar(visita.presion_psi).toLocaleString('es-AR', { maximumFractionDigits: 1 })} BAR` : '—'}
+            </li>
+            {visita.observaciones_gomero && (
+              <li className="pt-2 border-t border-amber-200/80">
+                <span className="text-gray-500 block mb-1">Observaciones</span>
+                <span className="text-gray-800 whitespace-pre-wrap">{visita.observaciones_gomero}</span>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Parte del mecánico</p>
@@ -237,28 +236,6 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
           )}
         </ul>
       </section>
-
-      {items.length > 0 && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Checklist</p>
-          <div className="flex flex-col gap-2">
-            {items.map((item) => {
-              const r = respuestas[item.id];
-              if (!r?.estado) return null;
-              const cfg = ESTADO_CFG[r.estado];
-              return (
-                <div
-                  key={item.id}
-                  className={`rounded-xl px-3 py-2 flex items-start justify-between gap-2 ${cfg?.bg || 'bg-gray-50'}`}
-                >
-                  <p className="text-sm text-gray-800 flex-1">{item.descripcion}</p>
-                  <span className={`text-xs font-bold shrink-0 ${cfg?.color}`}>{cfg?.label || r.estado}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Fotos</p>

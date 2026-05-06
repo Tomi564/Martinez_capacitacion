@@ -13,6 +13,7 @@ interface Visita {
   id: string;
   estado: string;
   orden_estado?: string | null;
+  gomero_id?: string | null;
   motivo: string | null;
   created_at: string;
   vehiculos: { patente: string; marca: string; modelo: string; clientes: { nombre: string; apellido: string } | null } | null;
@@ -129,8 +130,8 @@ export default function MecanicoHome() {
   };
 
   const activas = visitas.filter(v => v.estado !== 'entregado');
-  const ordenesDelGomero = activas.filter(v => v.orden_estado === 'pendiente_mecanico');
-  const otrasActivas = activas.filter(v => v.orden_estado !== 'pendiente_mecanico');
+  const ordenesDelGomero = activas.filter(v => v.orden_estado === 'pendiente_mecanico' && v.gomero_id != null);
+  const otrasActivas = activas.filter(v => !(v.orden_estado === 'pendiente_mecanico' && v.gomero_id != null));
   const entregadas = visitas.filter(v => v.estado === 'entregado');
 
   function TarjetaVisita({ v, destacada }: { v: Visita; destacada?: boolean }) {

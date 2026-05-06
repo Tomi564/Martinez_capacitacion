@@ -7,7 +7,6 @@ interface Sugerencia {
   id: string;
   texto: string;
   estado: 'pendiente' | 'visto' | 'en_progreso' | 'listo';
-  rol?: string | null;
   created_at: string;
 }
 
@@ -18,7 +17,7 @@ const ESTADO_CONFIG: Record<Sugerencia['estado'], { label: string; color: string
   listo:       { label: 'Listo',        color: 'bg-green-100 text-green-700' },
 };
 
-export default function SugerenciasPage() {
+export default function SugerenciasVendedorPage() {
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [texto, setTexto] = useState('');
@@ -32,8 +31,8 @@ export default function SugerenciasPage() {
 
   const fetchSugerencias = async () => {
     try {
-      const res = await apiClient.get<{ sugerencias: Sugerencia[] }>('/admin/sugerencias');
-      setSugerencias(res.sugerencias);
+      const res = await apiClient.get<{ sugerencias: Sugerencia[] }>('/vendedor/sugerencias');
+      setSugerencias(res.sugerencias || []);
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +50,7 @@ export default function SugerenciasPage() {
       const res = await apiClient.post<{
         whatsappUrl: string | null;
         mensajeWhatsapp: string;
-      }>('/admin/sugerencias', { texto });
+      }>('/vendedor/sugerencias', { texto });
       setTexto('');
       setWhatsappFallback({
         mensaje: res.mensajeWhatsapp,
@@ -75,7 +74,7 @@ export default function SugerenciasPage() {
 
   const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar esta sugerencia?')) return;
-    await apiClient.delete(`/admin/sugerencias/${id}`);
+    await apiClient.delete(`/vendedor/sugerencias/${id}`);
     setSugerencias((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -91,25 +90,21 @@ export default function SugerenciasPage() {
   }
 
   return (
-    <div className="px-4 lg:px-8 py-6 flex flex-col gap-6 max-w-2xl mx-auto">
-
+    <div className="px-4 py-6 flex flex-col gap-6 max-w-lg mx-auto pb-24">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Sugerencias al desarrollador</h1>
+        <h1 className="text-xl font-bold text-gray-900">Sugerencias</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Escribí acá lo que querés cambiar o mejorar en la app
+          Reportá dudas o problemas de la app. Se envía por WhatsApp.
         </p>
       </div>
 
-      {/* Nueva sugerencia */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3">
         <label className="text-sm font-semibold text-gray-900">Nueva sugerencia</label>
-        {error && (
-          <p className="text-sm text-red-500">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-500">{error}</p>}
         <textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Ej: Quiero que la pantalla de ventas muestre el total del día más grande..."
+          placeholder="Ej: No me aparece X, o estaría bueno agregar Y..."
           rows={4}
           className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none placeholder:text-gray-400"
         />
@@ -130,9 +125,7 @@ export default function SugerenciasPage() {
 
         {whatsappFallback && (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex flex-col gap-2">
-            <p className="text-xs font-medium text-gray-700">
-              Si WhatsApp no se abrió, copiá este mensaje:
-            </p>
+            <p className="text-xs font-medium text-gray-700">Si WhatsApp no se abrió, copiá este mensaje:</p>
             <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans bg-white border border-gray-200 rounded-lg p-2">
               {whatsappFallback.mensaje}
             </pre>
@@ -162,71 +155,41 @@ export default function SugerenciasPage() {
         )}
       </div>
 
-      {/* Lista activas */}
       {pendientes.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Activas ({pendientes.length})
-          </h2>
+          <h2 className="text-sm font-semibold text-gray-700">Activas ({pendientes.length})</h2>
           {pendientes.map((s) => (
             <div key={s.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm text-gray-800 leading-relaxed flex-1">{s.texto}</p>
-                <button
-                  onClick={() => handleEliminar(s.id)}
-                  className="text-gray-400 hover:text-red-500 shrink-0 mt-0.5"
-                >
+                <button onClick={() => handleEliminar(s.id)} className="text-gray-400 hover:text-red-500 shrink-0 mt-0.5">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
                 </button>
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-400">
-                  {new Date(s.created_at).toLocaleDateString('es-AR')}
-                </p>
-                <div className="flex items-center gap-2">
-                  {s.rol && (
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">
-                      {s.rol}
-                    </span>
-                  )}
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ESTADO_CONFIG[s.estado].color}`}>
-                    {ESTADO_CONFIG[s.estado].label}
-                  </span>
-                </div>
+                <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString('es-AR')}</p>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ESTADO_CONFIG[s.estado].color}`}>
+                  {ESTADO_CONFIG[s.estado].label}
+                </span>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Lista listos */}
       {listos.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-gray-400">
-            Implementadas ({listos.length})
-          </h2>
+          <h2 className="text-sm font-semibold text-gray-400">Implementadas ({listos.length})</h2>
           {listos.map((s) => (
             <div key={s.id} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex flex-col gap-2 opacity-60">
               <p className="text-sm text-gray-600 leading-relaxed line-through">{s.texto}</p>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-400">
-                  {new Date(s.created_at).toLocaleDateString('es-AR')}
-                </p>
+                <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString('es-AR')}</p>
                 <div className="flex items-center gap-2">
-                  {s.rol && (
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">
-                      {s.rol}
-                    </span>
-                  )}
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-                    Listo
-                  </span>
-                  <button
-                    onClick={() => handleEliminar(s.id)}
-                    className="text-gray-300 hover:text-red-400"
-                  >
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">Listo</span>
+                  <button onClick={() => handleEliminar(s.id)} className="text-gray-300 hover:text-red-400">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
@@ -240,11 +203,10 @@ export default function SugerenciasPage() {
 
       {sugerencias.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-          <p className="text-3xl mb-2">💡</p>
           <p className="text-gray-500 text-sm">Todavía no hay sugerencias</p>
         </div>
       )}
-
     </div>
   );
 }
+

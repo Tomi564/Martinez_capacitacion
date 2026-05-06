@@ -17,7 +17,6 @@ interface Vehiculo {
 }
 
 type WizardStep = 1 | 2;
-type EstadoChecklist = 'ok' | 'revisar' | 'urgente';
 
 interface WizardForm {
   patente: string;
@@ -32,19 +31,7 @@ interface WizardForm {
   motivo: string;
 }
 
-interface ChecklistItem {
-  id: string;
-  descripcion: string;
-  orden: number;
-}
-
-interface RespuestaChecklist {
-  item_id: string;
-  estado: EstadoChecklist | null;
-  nota: string | null;
-}
-
-const DRAFT_KEY = 'mecanico_nueva_visita_wizard_draft_v1';
+const DRAFT_KEY = 'mecanico_nueva_visita_wizard_draft_v2';
 
 const FORM_INICIAL: WizardForm = {
   patente: '',
@@ -66,11 +53,16 @@ export default function NuevaVisita() {
   const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState<Vehiculo | null>(null);
   const { sugerencias, setSugerencias, isBuscandoSugerencias } = usePatenteSugerencias(form.patente);
   const [isBuscandoExacto, setIsBuscandoExacto] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
-  const [respuestas, setRespuestas] = useState<Record<string, RespuestaChecklist>>({});
-  const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
   const [isGuardando, setIsGuardando] = useState(false);
   const [error, setError] = useState('');
+
+  const [trenDelantero, setTrenDelantero] = useState<'x2' | 'x4' | 'no' | null>(null);
+  const [trenAlineado, setTrenAlineado] = useState(false);
+  const [trenBalanceo, setTrenBalanceo] = useState(false);
+  const [amortiguadores, setAmortiguadores] = useState<boolean | null>(null);
+  const [auxilio, setAuxilio] = useState<boolean | null>(null);
+  const [presupuesto, setPresupuesto] = useState('');
+  const [fotos, setFotos] = useState<string[]>([]);
 
   const setField =
     (key: keyof WizardForm) =>
@@ -111,13 +103,25 @@ export default function NuevaVisita() {
       const draft = JSON.parse(raw) as {
         form?: WizardForm;
         step?: WizardStep;
-        respuestas?: Record<string, RespuestaChecklist>;
         vehiculoSeleccionado?: Vehiculo | null;
+        trenDelantero?: 'x2' | 'x4' | 'no' | null;
+        trenAlineado?: boolean;
+        trenBalanceo?: boolean;
+        amortiguadores?: boolean | null;
+        auxilio?: boolean | null;
+        presupuesto?: string;
+        fotos?: string[];
       };
       if (draft.form) setForm((prev) => ({ ...prev, ...draft.form }));
       if (draft.step && [1, 2].includes(draft.step)) setStep(draft.step);
-      if (draft.respuestas) setRespuestas(draft.respuestas);
       if (draft.vehiculoSeleccionado?.id) setVehiculoSeleccionado(draft.vehiculoSeleccionado);
+      if (draft.trenDelantero) setTrenDelantero(draft.trenDelantero);
+      if (typeof draft.trenAlineado === 'boolean') setTrenAlineado(draft.trenAlineado);
+      if (typeof draft.trenBalanceo === 'boolean') setTrenBalanceo(draft.trenBalanceo);
+      if (draft.amortiguadores != null) setAmortiguadores(draft.amortiguadores);
+      if (draft.auxilio != null) setAuxilio(draft.auxilio);
+      if (typeof draft.presupuesto === 'string') setPresupuesto(draft.presupuesto);
+      if (Array.isArray(draft.fotos)) setFotos(draft.fotos.filter((x) => typeof x === 'string'));
     } catch (draftError) {
       console.error('[NuevaVisitaWizard] Error leyendo borrador local', draftError);
     }
@@ -131,30 +135,20 @@ export default function NuevaVisita() {
         JSON.stringify({
           form,
           step,
-          respuestas,
           vehiculoSeleccionado,
+          trenDelantero,
+          trenAlineado,
+          trenBalanceo,
+          amortiguadores,
+          auxilio,
+          presupuesto,
+          fotos,
         })
       );
     } catch (draftError) {
       console.error('[NuevaVisitaWizard] Error guardando borrador local', draftError);
     }
-  }, [form, step, respuestas, vehiculoSeleccionado]);
-
-  useEffect(() => {
-    const fetchChecklistItems = async () => {
-      setIsLoadingChecklist(true);
-      try {
-        const res = await apiClient.get<{ items: ChecklistItem[] }>('/mecanico/checklist-items');
-        setChecklistItems(res.items || []);
-      } catch (checklistError) {
-        console.error('[NuevaVisitaWizard] Error cargando checklist', checklistError);
-        setChecklistItems([]);
-      } finally {
-        setIsLoadingChecklist(false);
-      }
-    };
-    fetchChecklistItems();
-  }, []);
+  }, [form, step, vehiculoSeleccionado, trenDelantero, trenAlineado, trenBalanceo, amortiguadores, auxilio, presupuesto, fotos]);
 
   const buscarPorPatenteExacta = async () => {
     const patenteCanon = normalizePatenteAr(form.patente);
@@ -214,18 +208,18 @@ export default function NuevaVisita() {
     setStep((prev) => (prev - 1) as WizardStep);
   };
 
-  const setEstadoChecklist = (itemId: string, estado: EstadoChecklist) => {
-    setRespuestas((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], item_id: itemId, estado, nota: prev[itemId]?.nota || null },
-    }));
-  };
-
-  const setNotaChecklist = (itemId: string, nota: string) => {
-    setRespuestas((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], item_id: itemId, estado: prev[itemId]?.estado || null, nota: nota || null },
-    }));
+  const agregarFotos = (files: FileList | null) => {
+    if (!files?.length) return;
+    const toma = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    toma.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = String(reader.result || '');
+        if (!r) return;
+        setFotos((prev) => (prev.length >= 4 ? prev : [...prev, r]));
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const confirmarYGuardar = async () => {
@@ -237,14 +231,6 @@ export default function NuevaVisita() {
     setError('');
     setIsGuardando(true);
     try {
-      const ok = typeof window === 'undefined'
-        ? true
-        : window.confirm('¿Guardar visita con el checklist cargado?');
-      if (!ok) {
-        setIsGuardando(false);
-        return;
-      }
-
       let vehiculoId = vehiculoSeleccionado?.id;
 
       if (vehiculoSeleccionado?.id && !vehiculoSeleccionado.clientes) {
@@ -281,14 +267,14 @@ export default function NuevaVisita() {
         observaciones: null,
         presion_psi: null,
         recomendacion: null,
+        tren_delantero: trenDelantero,
+        tren_alineado: trenAlineado,
+        tren_balanceo: trenBalanceo,
+        amortiguadores_revisados: amortiguadores,
+        auxilio_revisado: auxilio,
+        presupuesto: presupuesto.trim() || null,
+        fotos_neumatico_urls: fotos.length ? fotos : null,
       });
-
-      const rows = Object.values(respuestas)
-        .filter((r) => r.estado)
-        .map((r) => ({ item_id: r.item_id, estado: r.estado as EstadoChecklist, nota: r.nota || undefined }));
-      if (rows.length > 0) {
-        await apiClient.post(`/mecanico/visitas/${visRes.visita.id}/checklist`, { respuestas: rows });
-      }
 
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(DRAFT_KEY);
@@ -442,52 +428,96 @@ export default function NuevaVisita() {
 
       {step === 2 && (
         <div className="flex flex-col gap-4">
-          <Section title="Checklist operativo">
+          <Section title="Diagnóstico (nuevo flujo)">
             <div className="px-4 py-3">
-              {isLoadingChecklist ? (
-                <p className="text-sm text-gray-500">Cargando checklist...</p>
-              ) : checklistItems.length === 0 ? (
-                <p className="text-sm text-gray-500">No hay ítems de checklist activos.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {checklistItems.map((item) => {
-                    const r = respuestas[item.id];
-                    return (
-                      <div key={item.id} className="border border-gray-200 rounded-xl p-3">
-                        <p className="font-semibold text-gray-900 mb-2">{item.descripcion}</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          <EstadoBtn
-                            activo={r?.estado === 'ok'}
-                            onClick={() => setEstadoChecklist(item.id, 'ok')}
-                            color="green"
-                            label="✓ OK"
-                          />
-                          <EstadoBtn
-                            activo={r?.estado === 'revisar'}
-                            onClick={() => setEstadoChecklist(item.id, 'revisar')}
-                            color="amber"
-                            label="⚠ Revisar"
-                          />
-                          <EstadoBtn
-                            activo={r?.estado === 'urgente'}
-                            onClick={() => setEstadoChecklist(item.id, 'urgente')}
-                            color="red"
-                            label="🔴 Urgente"
-                          />
-                        </div>
-                        {(r?.estado === 'revisar' || r?.estado === 'urgente') && (
-                          <input
-                            value={r?.nota || ''}
-                            onChange={(e) => setNotaChecklist(item.id, e.target.value)}
-                            placeholder="Observación (opcional)"
-                            className="mt-2 w-full h-9 px-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C8102E] placeholder-gray-400"
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tren delantero</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['x2', 'x4', 'no'] as const).map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => setTrenDelantero(op)}
+                    className={`py-4 rounded-2xl font-black text-sm border-2 ${
+                      trenDelantero === op ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white border-gray-200 text-gray-800'
+                    }`}
+                  >
+                    {op === 'no' ? 'No' : op.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              {(trenDelantero === 'x2' || trenDelantero === 'x4') && (
+                <div className="mt-4 flex gap-4">
+                  <label className="flex items-center gap-2 text-base font-bold">
+                    <input type="checkbox" checked={trenAlineado} onChange={(e) => setTrenAlineado(e.target.checked)} className="w-6 h-6 rounded" />
+                    Alineado
+                  </label>
+                  <label className="flex items-center gap-2 text-base font-bold">
+                    <input type="checkbox" checked={trenBalanceo} onChange={(e) => setTrenBalanceo(e.target.checked)} className="w-6 h-6 rounded" />
+                    Balanceo
+                  </label>
                 </div>
               )}
+
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-6 mb-3">Amortiguadores revisados</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAmortiguadores(true)}
+                  className={`h-14 rounded-2xl font-black ${amortiguadores === true ? 'bg-green-600 text-white' : 'bg-white border-2 border-gray-200'}`}
+                >
+                  Sí
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAmortiguadores(false)}
+                  className={`h-14 rounded-2xl font-black ${amortiguadores === false ? 'bg-gray-800 text-white' : 'bg-white border-2 border-gray-200'}`}
+                >
+                  No
+                </button>
+              </div>
+
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-6 mb-3">Auxilio revisado</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAuxilio(true)}
+                  className={`h-14 rounded-2xl font-black ${auxilio === true ? 'bg-green-600 text-white' : 'bg-white border-2 border-gray-200'}`}
+                >
+                  Sí
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuxilio(false)}
+                  className={`h-14 rounded-2xl font-black ${auxilio === false ? 'bg-gray-800 text-white' : 'bg-white border-2 border-gray-200'}`}
+                >
+                  No
+                </button>
+              </div>
+
+              <div className="mt-6">
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Fotos del neumático (máx. 4)</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  className="w-full text-sm"
+                  onChange={(e) => agregarFotos(e.target.files)}
+                />
+                <p className="text-xs text-gray-400 mt-1">{fotos.length}/4 guardadas (en este dispositivo)</p>
+              </div>
+
+              <div className="mt-6">
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Presupuesto</p>
+                <textarea
+                  value={presupuesto}
+                  onChange={(e) => setPresupuesto(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 text-base"
+                  placeholder="Texto libre…"
+                />
+              </div>
             </div>
           </Section>
         </div>
@@ -545,25 +575,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <span className="text-sm text-gray-500 w-32 shrink-0">{label}</span>
       {children}
     </div>
-  );
-}
-
-function EstadoBtn({ activo, onClick, color, label }: {
-  activo: boolean;
-  onClick: () => void;
-  color: 'green' | 'amber' | 'red';
-  label: string;
-}) {
-  const base = 'py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all border-2';
-  const styles = {
-    green: activo ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-green-200 text-green-700',
-    amber: activo ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-amber-200 text-amber-700',
-    red: activo ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white border-red-200 text-red-700',
-  };
-  return (
-    <button onClick={onClick} className={`${base} ${styles[color]}`}>
-      {label}
-    </button>
   );
 }
 

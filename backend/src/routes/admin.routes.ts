@@ -710,7 +710,8 @@ router.get('/visitas/:id', async (req, res, next) => {
     const { data, error } = await supabase
       .from('visitas_taller')
       .select(`
-        id, created_at, estado_visita, motivo, observaciones, estado_neumaticos, estado_frenos, presion_psi, recomendacion, updated_by_admin_at,
+        id, created_at, estado_visita, motivo, observaciones, presion_psi, updated_by_admin_at,
+        tren_delantero, tren_alineado, tren_balanceo, amortiguadores_revisados, auxilio_revisado, presupuesto, fotos_neumatico_urls,
         vehiculos(patente, marca, modelo, clientes(nombre, apellido))
       `)
       .eq('id', id)
@@ -729,16 +730,20 @@ router.patch('/visitas/:id', async (req, res, next) => {
     const { id } = req.params;
     const {
       observaciones,
-      estado_neumaticos,
-      estado_frenos,
       presion_psi,
-      recomendacion,
       estado_visita,
+      tren_delantero,
+      tren_alineado,
+      tren_balanceo,
+      amortiguadores_revisados,
+      auxilio_revisado,
+      presupuesto,
+      fotos_neumatico_urls,
     } = req.body;
 
     const { data: antes } = await supabase
       .from('visitas_taller')
-      .select('id, estado_visita, observaciones, estado_neumaticos, estado_frenos, presion_psi, recomendacion, updated_at')
+      .select('id, estado_visita, observaciones, presion_psi, tren_delantero, tren_alineado, tren_balanceo, amortiguadores_revisados, auxilio_revisado, presupuesto, fotos_neumatico_urls, updated_at')
       .eq('id', id)
       .single();
 
@@ -749,11 +754,17 @@ router.patch('/visitas/:id', async (req, res, next) => {
     };
 
     if (observaciones !== undefined) updates.observaciones = observaciones || null;
-    if (estado_neumaticos !== undefined) updates.estado_neumaticos = estado_neumaticos || null;
-    if (estado_frenos !== undefined) updates.estado_frenos = estado_frenos || null;
     if (presion_psi !== undefined) updates.presion_psi = presion_psi != null ? Number(presion_psi) : null;
-    if (recomendacion !== undefined) updates.recomendacion = recomendacion || null;
     if (estado_visita !== undefined) updates.estado_visita = estado_visita;
+    if (tren_delantero !== undefined) updates.tren_delantero = tren_delantero || null;
+    if (tren_alineado !== undefined) updates.tren_alineado = tren_alineado;
+    if (tren_balanceo !== undefined) updates.tren_balanceo = tren_balanceo;
+    if (amortiguadores_revisados !== undefined) updates.amortiguadores_revisados = amortiguadores_revisados;
+    if (auxilio_revisado !== undefined) updates.auxilio_revisado = auxilio_revisado;
+    if (presupuesto !== undefined) updates.presupuesto = presupuesto || null;
+    if (fotos_neumatico_urls !== undefined) {
+      updates.fotos_neumatico_urls = Array.isArray(fotos_neumatico_urls) ? fotos_neumatico_urls : null;
+    }
 
     const { error } = await supabase
       .from('visitas_taller')
@@ -763,7 +774,7 @@ router.patch('/visitas/:id', async (req, res, next) => {
 
     const { data: despues } = await supabase
       .from('visitas_taller')
-      .select('id, estado_visita, observaciones, estado_neumaticos, estado_frenos, presion_psi, recomendacion, updated_at')
+      .select('id, estado_visita, observaciones, presion_psi, tren_delantero, tren_alineado, tren_balanceo, amortiguadores_revisados, auxilio_revisado, presupuesto, fotos_neumatico_urls, updated_at')
       .eq('id', id)
       .single();
 
@@ -844,7 +855,7 @@ router.get('/sugerencias', async (_req, res, next) => {
     const offset = Math.max(0, Number(_req.query.offset) || 0);
     const { data, error, count } = await supabase
       .from('sugerencias_dev')
-      .select('id, texto, estado, created_at', { count: 'exact' })
+      .select('id, texto, estado, created_at, rol, user_id', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw new Error('Error al obtener sugerencias');
@@ -866,9 +877,11 @@ router.post('/sugerencias', async (req, res, next) => {
     if (!texto?.trim()) {
       return res.status(400).json({ error: 'El texto es requerido' });
     }
+    const uid = (req as any).user?.id || null;
+    const rol = (req as any).user?.rol || 'admin';
     const { data, error } = await supabase
       .from('sugerencias_dev')
-      .insert({ texto: texto.trim(), estado: 'pendiente' })
+      .insert({ texto: texto.trim(), estado: 'pendiente', user_id: uid, rol })
       .select()
       .single();
     if (error) throw new Error('Error al guardar sugerencia');
@@ -885,7 +898,8 @@ router.post('/sugerencias', async (req, res, next) => {
     });
     const mensajeWhatsapp = [
       'Nueva sugerencia desde Martínez Capacitación',
-      `Vendedor: ${nombre}`,
+      `Rol: ${rol}`,
+      `Usuario: ${nombre}`,
       `Fecha: ${fechaHora}`,
       '',
       `Sugerencia: ${texto.trim()}`,

@@ -25,20 +25,40 @@ interface Orden {
   } | null;
 }
 
-const marcasEjemplo = ['Bridgestone', 'Pirelli', 'Michelin', 'Fate', 'Goodyear', 'Otros'];
+const marcasEjemplo = [
+  'Pirelli',
+  'Continental',
+  'Dunlop',
+  'Falken',
+  'Corven',
+  'Chao Yang',
+  'Cargo Power',
+  'Guestlake',
+  'SEAT Agrícola',
+  'Otras',
+];
 const medidasEjemplo = ['175/70 R13', '185/65 R14', '195/55 R15', '205/55 R16'];
 const KM_MIN = 0;
 const KM_MAX = 400_000;
 const KM_STEP = 1000;
-const PSI_MIN = 18;
-const PSI_MAX = 55;
-const PSI_STEP = 1;
+const BAR_MIN = 1.5;
+const BAR_MAX = 3.5;
+const BAR_STEP = 0.1;
 
 function snapKm(n: number) {
   return Math.round(Math.max(KM_MIN, Math.min(KM_MAX, n)) / KM_STEP) * KM_STEP;
 }
-function snapPsi(n: number) {
-  return Math.round(Math.max(PSI_MIN, Math.min(PSI_MAX, n)) / PSI_STEP) * PSI_STEP;
+
+const PSI_PER_BAR = 14.5037738;
+function psiToBar(psi: number) {
+  return psi / PSI_PER_BAR;
+}
+function barToPsi(bar: number) {
+  return bar * PSI_PER_BAR;
+}
+function snapBar(n: number) {
+  const clamped = Math.max(BAR_MIN, Math.min(BAR_MAX, n));
+  return Math.round(clamped / BAR_STEP) * BAR_STEP;
 }
 
 export default function OrdenGomeroDetallePage() {
@@ -51,7 +71,7 @@ export default function OrdenGomeroDetallePage() {
   const [km, setKm] = useState(0);
   const [marca, setMarca] = useState('');
   const [medida, setMedida] = useState('');
-  const [presion, setPresion] = useState(32);
+  const [presionBar, setPresionBar] = useState(2.2);
   const [obs, setObs] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -68,7 +88,9 @@ export default function OrdenGomeroDetallePage() {
       setKm(snapKm(o.km ?? 0));
       setMarca(o.marca_neumatico || '');
       setMedida(o.medida_neumatico || '');
-      setPresion(snapPsi(o.presion_psi != null ? Math.round(o.presion_psi) : 32));
+      setPresionBar(
+        snapBar(o.presion_psi != null ? psiToBar(o.presion_psi) : 2.2)
+      );
       setObs(o.observaciones_gomero || '');
     } catch {
       setLoadError(true);
@@ -102,7 +124,7 @@ export default function OrdenGomeroDetallePage() {
         km: km || null,
         marca_neumatico: marca,
         medida_neumatico: neumaticosCambiados ? null : medida,
-        presion_psi: presion,
+        presion_psi: Number((barToPsi(presionBar)).toFixed(1)),
         observaciones_gomero: obs.trim() || null,
       });
       setMsg('Guardado.');
@@ -231,12 +253,12 @@ export default function OrdenGomeroDetallePage() {
               </div>
               <NumberWheelPicker
                 label="Presión"
-                min={PSI_MIN}
-                max={PSI_MAX}
-                step={PSI_STEP}
-                value={presion}
-                onChange={(v) => setPresion(snapPsi(v))}
-                suffix="PSI"
+                min={BAR_MIN}
+                max={BAR_MAX}
+                step={BAR_STEP}
+                value={presionBar}
+                onChange={(v) => setPresionBar(snapBar(v))}
+                suffix="BAR"
               />
             </>
           )}

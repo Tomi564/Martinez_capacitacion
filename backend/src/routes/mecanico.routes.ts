@@ -304,6 +304,13 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
       estado_frenos,
       presion_psi,
       recomendacion,
+      tren_delantero,
+      tren_alineado,
+      tren_balanceo,
+      amortiguadores_revisados,
+      auxilio_revisado,
+      presupuesto,
+      fotos_neumatico_urls,
     } = req.body;
     if (!vehiculo_id) throw new AppError('Vehículo requerido', 400);
     const { data, error } = await supabase
@@ -324,6 +331,13 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
               })()
             : null,
         recomendacion: recomendacion || null,
+        tren_delantero: tren_delantero || null,
+        tren_alineado: tren_alineado ?? false,
+        tren_balanceo: tren_balanceo ?? false,
+        amortiguadores_revisados: amortiguadores_revisados,
+        auxilio_revisado: auxilio_revisado,
+        presupuesto: presupuesto || null,
+        fotos_neumatico_urls: Array.isArray(fotos_neumatico_urls) ? fotos_neumatico_urls : null,
         estado_visita: 'abierta',
         km: km || null,
         estado: 'en_revision',

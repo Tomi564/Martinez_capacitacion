@@ -33,32 +33,24 @@ interface Visita {
   } | null;
 }
 
-interface ChecklistItem {
-  id: string;
-  descripcion: string;
-  orden: number;
+const PSI_PER_BAR = 14.5037738;
+function psiToBar(psi: number) {
+  return psi / PSI_PER_BAR;
 }
-
-interface Respuesta {
-  item_id: string;
-  estado: 'ok' | 'revisar' | 'urgente' | null;
-  nota: string | null;
+function barToPsi(bar: number) {
+  return bar * PSI_PER_BAR;
 }
-
-type EstadoItem = 'ok' | 'revisar' | 'urgente';
 
 export default function VisitaDetallePage() {
   const { id } = useParams<{ id: string }>();
 
   const [visita, setVisita] = useState<Visita | null>(null);
-  const [items, setItems] = useState<ChecklistItem[]>([]);
-  const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({});
   const [observaciones, setObservaciones] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
   const [isEntregando, setIsEntregando] = useState(false);
-  const [presionPsi, setPresionPsi] = useState('');
+  const [presionBar, setPresionBar] = useState('');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [trenDelantero, setTrenDelantero] = useState<'x2' | 'x4' | 'no' | null>(null);
@@ -74,11 +66,14 @@ export default function VisitaDetallePage() {
     setIsLoading(true);
     setLoadError(false);
     try {
-      const res = await apiClient.get<{ visita: Visita; items: ChecklistItem[]; respuestas: Respuesta[] }>(`/mecanico/visitas/${id}`);
+      const res = await apiClient.get<{ visita: Visita }>(`/mecanico/visitas/${id}`);
       setVisita(res.visita);
-      setItems(res.items);
       setObservaciones(res.visita.observaciones || '');
-      setPresionPsi(res.visita.presion_psi != null ? String(res.visita.presion_psi) : '');
+      setPresionBar(
+        res.visita.presion_psi != null
+          ? String(Number(psiToBar(res.visita.presion_psi).toFixed(1)))
+          : ''
+      );
       setTrenDelantero(
         res.visita.tren_delantero === 'x2' || res.visita.tren_delantero === 'x4' || res.visita.tren_delantero === 'no'
           ? res.visita.tren_delantero
@@ -90,9 +85,6 @@ export default function VisitaDetallePage() {
       if (res.visita.auxilio_revisado != null) setAuxilio(!!res.visita.auxilio_revisado);
       setPresupuesto(res.visita.presupuesto || '');
       setFotos(Array.isArray(res.visita.fotos_neumatico_urls) ? res.visita.fotos_neumatico_urls : []);
-      const map: Record<string, Respuesta> = {};
-      res.respuestas.forEach((r) => { map[r.item_id] = r; });
-      setRespuestas(map);
     } catch (error) {
       console.error('[VisitaDetallePage] Error cargando detalle de visita', error);
       setLoadError(true);
@@ -103,31 +95,16 @@ export default function VisitaDetallePage() {
     cargar();
   }, [id]);
 
-  const setEstado = (itemId: string, estado: EstadoItem) => {
-    setRespuestas((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], item_id: itemId, estado, nota: prev[itemId]?.nota || null },
-    }));
-  };
-
-  const setNota = (itemId: string, nota: string) => {
-    setRespuestas((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], item_id: itemId, nota: nota || null, estado: prev[itemId]?.estado || null },
-    }));
-  };
-
   const guardar = async (): Promise<boolean> => {
     setIsSaving(true);
     setMsg(null);
     try {
-      const presionRaw = presionPsi.replace(',', '.').trim();
+      const presionRaw = presionBar.replace(',', '.').trim();
       const presionNum = presionRaw ? Number(presionRaw) : null;
-      const presionPsiBody = presionNum != null && Number.isFinite(presionNum) ? presionNum : null;
-
-      const rows = Object.values(respuestas).filter((r) => r.estado).map((r) => ({
-        item_id: r.item_id, estado: r.estado!, nota: r.nota || undefined,
-      }));
+      const presionPsiBody =
+        presionNum != null && Number.isFinite(presionNum)
+          ? Number(barToPsi(presionNum).toFixed(1))
+          : null;
 
       await apiClient.patch(`/mecanico/visitas/${id}`, {
         observaciones: observaciones.trim() || null,
@@ -140,9 +117,6 @@ export default function VisitaDetallePage() {
         presupuesto: presupuesto.trim() || null,
         fotos_neumatico_urls: fotos.length ? fotos : null,
       });
-      if (rows.length) {
-        await apiClient.post(`/mecanico/visitas/${id}/checklist`, { respuestas: rows });
-      }
       setMsg({ tipo: 'ok', texto: 'Guardado correctamente' });
       return true;
     } catch (error) {
@@ -195,8 +169,8 @@ export default function VisitaDetallePage() {
     try {
       const ok = await guardar();
       if (!ok) return;
-      await apiClient.patch(`/mecanico/visitas/${id}`, { orden_estado: 'finalizado' });
-      setVisita((v) => (v ? { ...v, orden_estado: 'finalizado' } : v));
+      await apiClient.patch(`/mecanico/visitas/${id}`, { orden_estado: 'finalizado', estado: 'listo' });
+      setVisita((v) => (v ? { ...v, orden_estado: 'finalizado', estado: 'listo' } : v));
       setMsg({ tipo: 'ok', texto: 'Orden finalizada. Se notificó a vendedores y administración.' });
     } catch (e: unknown) {
       setMsg({
@@ -241,7 +215,7 @@ export default function VisitaDetallePage() {
     visita.orden_estado === 'incompleto';
   const entregado =
     visita.estado === 'entregado' || visita.estado_visita === 'cerrada' || ordenCerrada;
-  const completado = items.length > 0 && items.every((i) => respuestas[i.id]?.estado);
+  const completado = trenDelantero != null && amortiguadores != null && auxilio != null;
   const mostrarParteGomero =
     visita.neumaticos_cambiados != null ||
     visita.marca_neumatico ||
@@ -385,36 +359,6 @@ export default function VisitaDetallePage() {
         </div>
       )}
 
-      {items.length > 0 && (
-        <div>
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Checklist de revisión</p>
-          <div className="flex flex-col gap-3">
-            {items.map((item) => {
-              const r = respuestas[item.id];
-              return (
-                <div key={item.id} className="bg-white rounded-2xl border border-gray-200 p-4">
-                  <p className="font-bold text-gray-900 mb-3">{item.descripcion}</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <EstadoBtn activo={r?.estado === 'ok'} onClick={() => setEstado(item.id, 'ok')} color="green" label="✓ OK" disabled={entregado} />
-                    <EstadoBtn activo={r?.estado === 'revisar'} onClick={() => setEstado(item.id, 'revisar')} color="amber" label="⚠ Revisar" disabled={entregado} />
-                    <EstadoBtn activo={r?.estado === 'urgente'} onClick={() => setEstado(item.id, 'urgente')} color="red" label="🔴 Urgente" disabled={entregado} />
-                  </div>
-                  {(r?.estado === 'revisar' || r?.estado === 'urgente') && (
-                    <input
-                      placeholder="Observación (opcional)"
-                      value={r?.nota || ''}
-                      onChange={(e) => setNota(item.id, e.target.value)}
-                      disabled={entregado}
-                      className="mt-2 w-full h-9 px-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C8102E] placeholder-gray-300 disabled:opacity-50"
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <div>
         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Observaciones generales</label>
         <textarea
@@ -429,12 +373,15 @@ export default function VisitaDetallePage() {
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Presión de neumáticos</p>
-        <label className="text-sm text-gray-500">Presión (PSI)</label>
+        <label className="text-sm text-gray-500">Presión (BAR)</label>
         <input
           type="number"
+          min={1.5}
+          max={3.5}
+          step={0.1}
           disabled={entregado}
-          value={presionPsi}
-          onChange={(e) => setPresionPsi(e.target.value)}
+          value={presionBar}
+          onChange={(e) => setPresionBar(e.target.value)}
           className="mt-1 w-full h-10 px-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
         />
       </div>
@@ -449,7 +396,7 @@ export default function VisitaDetallePage() {
         {!entregado && (
           <>
             <button onClick={guardar} disabled={isSaving} className="w-full py-4 bg-[#1F1F1F] text-white font-bold text-base rounded-2xl active:scale-95 transition-transform disabled:opacity-50">
-              {isSaving ? 'Guardando...' : 'Guardar checklist'}
+              {isSaving ? 'Guardando...' : 'Guardar visita'}
             </button>
 
             {visita.orden_estado === 'pendiente_mecanico' && (
@@ -497,21 +444,5 @@ export default function VisitaDetallePage() {
         </button>
       </div>
     </div>
-  );
-}
-
-function EstadoBtn({ activo, onClick, color, label, disabled }: {
-  activo: boolean; onClick: () => void; color: 'green' | 'amber' | 'red'; label: string; disabled: boolean;
-}) {
-  const base = 'py-3 rounded-xl text-sm font-bold active:scale-95 transition-all border-2 disabled:opacity-40';
-  const styles = {
-    green: activo ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-green-200 text-green-700',
-    amber: activo ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-amber-200 text-amber-700',
-    red: activo ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white border-red-200 text-red-700',
-  };
-  return (
-    <button onClick={onClick} disabled={disabled} className={`${base} ${styles[color]}`}>
-      {label}
-    </button>
   );
 }

@@ -60,14 +60,14 @@ export function FabMenuSheet({
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`flex ${columns === 3 ? 'flex-col' : 'items-center'} items-center gap-1.5 px-3 py-3 rounded-xl border transition-colors active:scale-[0.99] ${
+              className={`flex ${columns === 3 ? 'flex-col justify-center' : 'items-center'} items-center gap-1.5 px-3 py-3 rounded-xl border transition-colors active:scale-[0.99] ${
                 isActive(item)
                   ? 'bg-[#C8102E] text-white border-[#C8102E]'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
               <span aria-hidden="true">{item.icon}</span>
-              <span className={columns === 3 ? 'text-xs font-medium' : 'text-sm font-medium'}>
+              <span className={columns === 3 ? 'text-xs font-medium text-center leading-tight' : 'text-sm font-medium'}>
                 {item.label}
               </span>
             </Link>
