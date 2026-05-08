@@ -29,6 +29,7 @@ const ACCIONES = [
   '',
   'editar_vendedor',
   'desactivar_vendedor',
+  'eliminar_vendedor',
   'editar_visita',
   'cerrar_visita',
   'eliminar_visita',
@@ -55,6 +56,7 @@ function labelAccion(accion: string) {
   const map: Record<string, string> = {
     editar_vendedor: 'Cambió datos de un vendedor',
     desactivar_vendedor: 'Desactivó un vendedor',
+    eliminar_vendedor: 'Eliminó un usuario del equipo',
     editar_visita: 'Editó una visita de taller',
     cerrar_visita: 'Cerró una visita de taller',
     eliminar_visita: 'Eliminó una visita de taller',

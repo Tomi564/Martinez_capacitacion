@@ -788,7 +788,7 @@ export class AdminService {
   }
 
   /**
-   * Desactiva un usuario del equipo (soft delete — preserva historial).
+   * Elimina definitivamente un usuario del equipo.
    */
   async eliminarVendedor(vendedorId: string, actor?: ActorAuditoria) {
     const { data: antes } = await supabase
@@ -796,33 +796,51 @@ export class AdminService {
       .select('id, nombre, apellido, email, activo, updated_at, rol')
       .eq('id', vendedorId)
       .in('rol', [...ROLES_EQUIPO])
-      .single();
+      .maybeSingle();
+
+    if (!antes) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+
+    // Si es mecánico, se libera de visitas históricas para evitar
+    // restricciones de FK al borrar el usuario.
+    if (antes.rol === 'mecanico') {
+      const { error: liberarVisitasError } = await supabase
+        .from('visitas_taller')
+        .update({ mecanico_id: null })
+        .eq('mecanico_id', vendedorId);
+
+      if (liberarVisitasError) {
+        throw new AppError('No se pudieron liberar las visitas del mecánico', 500);
+      }
+    }
 
     const { error } = await supabase
       .from('users')
-      .update({ activo: false })
+      .delete()
       .eq('id', vendedorId)
       .in('rol', [...ROLES_EQUIPO]);
 
-    if (error) throw new AppError('Error al desactivar el usuario', 500);
-
-    const { data: despues } = await supabase
-      .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at, rol')
-      .eq('id', vendedorId)
-      .in('rol', [...ROLES_EQUIPO])
-      .single();
+    if (error) {
+      if ((error as { code?: string }).code === '23503') {
+        throw new AppError(
+          'No se puede eliminar porque el usuario tiene registros asociados. Desactivá la cuenta en su lugar.',
+          409
+        );
+      }
+      throw new AppError('Error al eliminar el usuario', 500);
+    }
 
     await this.registrarAuditoria({
       actor,
-      accion: 'desactivar_vendedor',
+      accion: 'eliminar_vendedor',
       entidad: 'vendedor',
       entidadId: vendedorId,
       datosAnteriores: antes || null,
-      datosNuevos: despues || null,
+      datosNuevos: null,
     });
 
-    return { mensaje: 'Vendedor desactivado correctamente' };
+    return { mensaje: 'Usuario eliminado correctamente' };
   }
 
   /**

@@ -64,7 +64,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
-      <body className="bg-gray-50 text-gray-900 antialiased">
+      <body className={`${exo.className} bg-gray-50 text-gray-900 antialiased`}>
         {children}
       </body>
     </html>

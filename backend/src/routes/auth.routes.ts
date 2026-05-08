@@ -16,6 +16,7 @@ import { authController } from '../controllers/auth.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
+const isProduction = process.env.NODE_ENV === 'production';
 
 // ─────────────────────────────────────────────────────
 // Rate limiter específico para login
@@ -23,12 +24,15 @@ const router = Router();
 // Protege contra ataques de fuerza bruta sobre contraseñas
 // ─────────────────────────────────────────────────────
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5,
+  windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000, // prod: 15m | dev: 1m
+  max: isProduction ? 5 : 50,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Demasiados intentos de login. Esperá 15 minutos e intentá de nuevo.',
+    error: isProduction
+      ? 'Demasiados intentos de login. Esperá 15 minutos e intentá de nuevo.'
+      : 'Demasiados intentos de login. Esperá 1 minuto e intentá de nuevo.',
   },
 });
 

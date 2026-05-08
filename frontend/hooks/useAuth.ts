@@ -65,6 +65,21 @@ export const useAuth = create<AuthState>()(
             password,
           });
 
+          // Persistir de inmediato para evitar carreras al redirigir:
+          // algunas vistas hacen requests apenas montan y leen el token desde localStorage.
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(
+              'martinez-auth',
+              JSON.stringify({
+                state: {
+                  token: response.token,
+                  user: response.user,
+                },
+                version: 0,
+              })
+            );
+          }
+
           set({
             token: response.token,
             user: response.user as User,
@@ -92,6 +107,10 @@ export const useAuth = create<AuthState>()(
         apiClient.post('/auth/logout').catch((error) => {
           console.error('[useAuth.logout] Error cerrando sesión en backend', error);
         });
+
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('martinez-auth');
+        }
 
         set({
           user: null,
