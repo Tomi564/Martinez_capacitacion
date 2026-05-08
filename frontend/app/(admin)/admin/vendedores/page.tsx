@@ -45,6 +45,15 @@ export default function VendedoresPage() {
   const [busqueda, setBusqueda] = useState('');
   const [filtroRol, setFiltroRol] = useState<'todos' | 'vendedor' | 'gomero' | 'mecanico'>('todos');
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<Vendedor | null>(null);
+  const [editForm, setEditForm] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+  });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [form, setForm] = useState<NuevoVendedor>({
@@ -104,6 +113,41 @@ export default function VendedoresPage() {
       fetchVendedores();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const openEditModal = (vendedor: Vendedor) => {
+    setEditingUser(vendedor);
+    setEditForm({
+      nombre: vendedor.nombre,
+      apellido: vendedor.apellido,
+      email: vendedor.email,
+    });
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!editingUser) return;
+    if (!editForm.nombre.trim() || !editForm.apellido.trim() || !editForm.email.trim()) {
+      setEditError('Nombre, apellido y email son obligatorios');
+      return;
+    }
+    setIsEditing(true);
+    setEditError(null);
+    try {
+      await apiClient.patch(`/admin/vendedores/${editingUser.id}`, {
+        nombre: editForm.nombre.trim(),
+        apellido: editForm.apellido.trim(),
+        email: editForm.email.trim().toLowerCase(),
+      });
+      setShowEditModal(false);
+      setEditingUser(null);
+      fetchVendedores();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'No se pudo guardar');
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -212,7 +256,7 @@ export default function VendedoresPage() {
               } ${!vendedor.activo ? 'opacity-50' : ''}`}
             >
               {/* Avatar */}
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-600 flex-shrink-0">
+              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-600 shrink-0">
                 {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
               </div>
 
@@ -274,7 +318,13 @@ export default function VendedoresPage() {
               </div>
 
               {/* Acciones — mismo ancho/alineación que en módulos */}
-              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-1.5 flex-shrink-0 w-[7.85rem]">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-1.5 shrink-0 w-[7.85rem]">
+              <button
+                onClick={() => openEditModal(vendedor)}
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors text-center"
+              >
+                Editar
+              </button>
               <button
                 onClick={() => handleToggleActivo(vendedor)}
                 className={`w-full text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors text-center ${
@@ -440,6 +490,94 @@ export default function VendedoresPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar perfil */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end lg:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Editar perfil</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingUser(null);
+                  setEditError(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-600">{editError}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Nombre</label>
+                <input
+                  type="text"
+                  value={editForm.nombre}
+                  onChange={(e) => setEditForm((f) => ({ ...f, nombre: e.target.value }))}
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Apellido</label>
+                <input
+                  type="text"
+                  value={editForm.apellido}
+                  onChange={(e) => setEditForm((f) => ({ ...f, apellido: e.target.value }))}
+                  className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingUser(null);
+                  setEditError(null);
+                }}
+                className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarEdicion}
+                disabled={isEditing}
+                className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isEditing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Guardar'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

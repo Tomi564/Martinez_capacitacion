@@ -57,6 +57,14 @@ export default function VendedorDetallePage() {
   const [nuevaContrasena, setNuevaContrasena] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [showEditPerfilModal, setShowEditPerfilModal] = useState(false);
+  const [editPerfilLoading, setEditPerfilLoading] = useState(false);
+  const [editPerfilMsg, setEditPerfilMsg] = useState<string | null>(null);
+  const [editPerfilForm, setEditPerfilForm] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+  });
   const [showResetProgresoModal, setShowResetProgresoModal] = useState(false);
   const [resetProgresoLoading, setResetProgresoLoading] = useState(false);
   const [resetProgresoMsg, setResetProgresoMsg] = useState<string | null>(null);
@@ -77,6 +85,11 @@ export default function VendedorDetallePage() {
           ),
         ]);
         setVendedor(vendRes.vendedor);
+        setEditPerfilForm({
+          nombre: vendRes.vendedor.nombre,
+          apellido: vendRes.vendedor.apellido,
+          email: vendRes.vendedor.email,
+        });
         if (objRes.objetivo) {
           setObjetivo(objRes.objetivo);
           setObjForm({
@@ -104,6 +117,36 @@ export default function VendedorDetallePage() {
       setVendedor({ ...vendedor, activo: !vendedor.activo });
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleGuardarPerfil = async () => {
+    if (!vendedor) return;
+    setEditPerfilLoading(true);
+    setEditPerfilMsg(null);
+    try {
+      const payload = {
+        nombre: editPerfilForm.nombre.trim(),
+        apellido: editPerfilForm.apellido.trim(),
+        email: editPerfilForm.email.trim().toLowerCase(),
+      };
+
+      await apiClient.patch(`/admin/vendedores/${vendedorId}`, payload);
+
+      setVendedor({
+        ...vendedor,
+        ...payload,
+      });
+      setEditPerfilMsg('Perfil actualizado correctamente');
+
+      setTimeout(() => {
+        setShowEditPerfilModal(false);
+        setEditPerfilMsg(null);
+      }, 1200);
+    } catch (err) {
+      setEditPerfilMsg(err instanceof Error ? err.message : 'Error al actualizar el perfil');
+    } finally {
+      setEditPerfilLoading(false);
     }
   };
 
@@ -234,6 +277,20 @@ export default function VendedorDetallePage() {
 
           <div className="flex flex-col gap-2 shrink-0">
             <button
+              onClick={() => {
+                setEditPerfilForm({
+                  nombre: vendedor.nombre,
+                  apellido: vendedor.apellido,
+                  email: vendedor.email,
+                });
+                setEditPerfilMsg(null);
+                setShowEditPerfilModal(true);
+              }}
+              className="text-sm px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium transition-colors"
+            >
+              Editar perfil
+            </button>
+            <button
               onClick={handleToggleActivo}
               className={`text-sm px-4 py-2 rounded-xl border font-medium transition-colors ${
                 vendedor.activo
@@ -306,7 +363,7 @@ export default function VendedorDetallePage() {
               >
                 {/* Indicador de estado */}
                 <div className={`
-                  w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
+                  w-8 h-8 rounded-full flex items-center justify-center shrink-0
                   ${p.estado === 'aprobado'
                     ? 'bg-green-100 text-green-600'
                     : p.estado === 'en_curso'
@@ -355,7 +412,7 @@ export default function VendedorDetallePage() {
 
                 {/* Nota */}
                 {p.mejor_nota > 0 && (
-                  <span className={`text-sm font-bold flex-shrink-0 ${
+                  <span className={`text-sm font-bold shrink-0 ${
                     p.estado === 'aprobado' ? 'text-green-600' : 'text-amber-600'
                   }`}>
                     {p.mejor_nota.toFixed(1)}%
@@ -363,7 +420,7 @@ export default function VendedorDetallePage() {
                 )}
 
                 {/* Badge estado */}
-                <span className={`text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 ${
+                <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${
                   p.estado === 'aprobado'
                     ? 'bg-green-100 text-green-700'
                     : p.estado === 'en_curso'
@@ -580,6 +637,88 @@ export default function VendedorDetallePage() {
       </div>
 
     </div>
+
+    {/* Modal editar perfil */}
+    {showEditPerfilModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end lg:items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">Editar perfil</h2>
+            <button
+              onClick={() => { setShowEditPerfilModal(false); setEditPerfilMsg(null); }}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          {editPerfilMsg && (
+            <div className={`p-3 rounded-xl text-sm ${
+              editPerfilMsg.includes('correctamente')
+                ? 'bg-green-50 border border-green-200 text-green-700'
+                : 'bg-red-50 border border-red-200 text-red-600'
+            }`}>
+              {editPerfilMsg}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">Nombre</label>
+            <input
+              type="text"
+              value={editPerfilForm.nombre}
+              onChange={(e) => setEditPerfilForm((v) => ({ ...v, nombre: e.target.value }))}
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">Apellido</label>
+            <input
+              type="text"
+              value={editPerfilForm.apellido}
+              onChange={(e) => setEditPerfilForm((v) => ({ ...v, apellido: e.target.value }))}
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              value={editPerfilForm.email}
+              onChange={(e) => setEditPerfilForm((v) => ({ ...v, email: e.target.value }))}
+              className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setShowEditPerfilModal(false); setEditPerfilMsg(null); }}
+              className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleGuardarPerfil}
+              disabled={
+                editPerfilLoading ||
+                !editPerfilForm.nombre.trim() ||
+                !editPerfilForm.apellido.trim() ||
+                !editPerfilForm.email.trim()
+              }
+              className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {editPerfilLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Modal reiniciar progreso */}
     {showResetProgresoModal && (

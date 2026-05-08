@@ -348,13 +348,28 @@ export class AdminService {
   }
 
   /**
-   * Actualiza el estado activo/inactivo de un vendedor.
+   * Actualiza datos de un usuario del equipo (nombre/apellido/email/activo).
    */
   async updateVendedor(
     vendedorId: string,
-    data: { activo?: boolean },
+    data: {
+      nombre?: string;
+      apellido?: string;
+      email?: string;
+      activo?: boolean;
+    },
     actor?: ActorAuditoria
   ) {
+    const payload: Record<string, unknown> = {};
+    if (typeof data.activo === 'boolean') payload.activo = data.activo;
+    if (typeof data.nombre === 'string') payload.nombre = data.nombre.trim();
+    if (typeof data.apellido === 'string') payload.apellido = data.apellido.trim();
+    if (typeof data.email === 'string') payload.email = data.email.toLowerCase().trim();
+
+    if (Object.keys(payload).length === 0) {
+      throw new AppError('No hay cambios para actualizar', 400);
+    }
+
     const { data: antes } = await supabase
       .from('users')
       .select('id, nombre, apellido, email, activo, updated_at, rol')
@@ -362,9 +377,23 @@ export class AdminService {
       .in('rol', [...ROLES_EQUIPO])
       .single();
 
+    if (!antes) throw new AppError('Usuario no encontrado', 404);
+
+    if (typeof payload.email === 'string' && payload.email !== antes.email) {
+      const { data: emailEnUso } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', payload.email)
+        .neq('id', vendedorId)
+        .maybeSingle();
+      if (emailEnUso) {
+        throw new AppError('Ya existe un usuario con ese email', 400);
+      }
+    }
+
     const { error } = await supabase
       .from('users')
-      .update(data)
+      .update(payload)
       .eq('id', vendedorId)
       .in('rol', [...ROLES_EQUIPO]);
 
@@ -379,7 +408,7 @@ export class AdminService {
 
     await this.registrarAuditoria({
       actor,
-      accion: data.activo === false ? 'desactivar_vendedor' : 'editar_vendedor',
+      accion: payload.activo === false ? 'desactivar_vendedor' : 'editar_vendedor',
       entidad: 'vendedor',
       entidadId: vendedorId,
       datosAnteriores: antes || null,

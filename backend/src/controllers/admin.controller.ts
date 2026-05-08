@@ -103,17 +103,40 @@ export class AdminController {
 
   /**
    * PATCH /api/admin/vendedores/:id
-   * Actualiza un vendedor (activo/inactivo)
+   * Actualiza un usuario del equipo (activo y/o datos de perfil)
    */
   async updateVendedor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const vendedorId = req.params.id as string;
-      const { activo } = req.body;
+      const { activo, nombre, apellido, email } = req.body as {
+        activo?: boolean;
+        nombre?: string;
+        apellido?: string;
+        email?: string;
+      };
 
-      const result = await adminService.updateVendedor(vendedorId, { activo }, {
-        id: req.user!.id,
-        rol: req.user!.rol,
-      });
+      if (nombre !== undefined && !String(nombre).trim()) {
+        return res.status(400).json({ error: 'El nombre no puede estar vacío' });
+      }
+      if (apellido !== undefined && !String(apellido).trim()) {
+        return res.status(400).json({ error: 'El apellido no puede estar vacío' });
+      }
+      if (email !== undefined) {
+        const emailLimpio = String(email).trim().toLowerCase();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailLimpio)) {
+          return res.status(400).json({ error: 'El formato del email no es válido' });
+        }
+      }
+
+      const result = await adminService.updateVendedor(
+        vendedorId,
+        { activo, nombre, apellido, email },
+        {
+          id: req.user!.id,
+          rol: req.user!.rol,
+        }
+      );
       return res.status(200).json(result);
     } catch (error) {
       next(error);
