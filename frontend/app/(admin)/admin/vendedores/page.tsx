@@ -56,6 +56,7 @@ export default function VendedoresPage() {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [toastOk, setToastOk] = useState<string | null>(null);
   const [form, setForm] = useState<NuevoVendedor>({
     nombre: '',
     apellido: '',
@@ -87,6 +88,10 @@ export default function VendedoresPage() {
       setCreateError('Todos los campos son requeridos');
       return;
     }
+    if (form.password.length < 8) {
+      setCreateError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
 
     setIsCreating(true);
     setCreateError(null);
@@ -106,13 +111,29 @@ export default function VendedoresPage() {
   };
 
   const handleToggleActivo = async (vendedor: Vendedor) => {
+    const pasaráAInactivo = vendedor.activo === true;
+    if (pasaráAInactivo) {
+      const ok = confirm(
+        `¿Desactivar a ${vendedor.nombre} ${vendedor.apellido}? No va a poder iniciar sesión hasta que lo reactives desde acá.`
+      );
+      if (!ok) return;
+    }
+
     try {
+      setError(null);
       await apiClient.patch(`/admin/vendedores/${vendedor.id}`, {
         activo: !vendedor.activo,
       });
-      fetchVendedores();
+      await fetchVendedores();
+      setToastOk(
+        pasaráAInactivo
+          ? `Desactivamos a ${vendedor.nombre} ${vendedor.apellido}.`
+          : `Activamos a ${vendedor.nombre} ${vendedor.apellido}.`
+      );
+      window.setTimeout(() => setToastOk(null), 4500);
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado del usuario');
     }
   };
 
@@ -186,6 +207,15 @@ export default function VendedoresPage() {
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {toastOk && (
+        <div
+          role="status"
+          className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 font-medium"
+        >
+          {toastOk}
         </div>
       )}
 
@@ -326,7 +356,7 @@ export default function VendedoresPage() {
                 Editar
               </button>
               <button
-                onClick={() => handleToggleActivo(vendedor)}
+                onClick={() => void handleToggleActivo(vendedor)}
                 className={`w-full text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors text-center ${
                   vendedor.activo
                     ? 'border-amber-200 text-amber-600 hover:bg-amber-50'
@@ -334,18 +364,6 @@ export default function VendedoresPage() {
                 }`}
               >
                 {vendedor.activo ? 'Desactivar' : 'Activar'}
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm(`¿Eliminar a ${vendedor.nombre} ${vendedor.apellido}? Esta acción no se puede deshacer.`)) {
-                    apiClient.delete(`/admin/vendedores/${vendedor.id}`)
-                      .then(() => fetchVendedores())
-                      .catch((err) => console.error(err));
-                  }
-                }}
-                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors text-center"
-              >
-                Eliminar
               </button>
               </div>
             </div>

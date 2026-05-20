@@ -226,6 +226,7 @@ export interface PreguntaDiariaAdmin {
   respuesta_correcta: string;
   explicacion: string | null;
   activo: boolean;
+  modulo_id: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -15,6 +15,9 @@ import bcrypt from 'bcryptjs';
 
 /** Roles que el admin puede crear/gestionar desde el mismo panel que vendedores */
 const ROLES_EQUIPO = ['vendedor', 'gomero', 'mecanico'] as const;
+
+/** Mismo límite que examenes.service.ts */
+const MAX_INTENTOS_EXAMEN = 3;
 type RolEquipo = (typeof ROLES_EQUIPO)[number];
 
 function parseRolEquipo(input: unknown): RolEquipo {
@@ -47,8 +50,24 @@ export interface DashboardVendedorResumen {
   email: string;
   modulosAprobados: number;
   totalModulos: number;
+  /** Promedio de notas de exámenes (escala ~0–100 puntos), no es % de conversión ni otro KPI. */
   promedioNotas: number;
   ultimaActividad: string | null;
+}
+
+/** Calificación baja (1–2 estrellas) al vendedor en los últimos 7 días. */
+export interface DashboardCalificacionBaja7d {
+  vendedorId: string;
+  nombre: string;
+  apellido: string;
+  estrellas: number;
+}
+
+interface AdminDashboardCalificacionBajaRow {
+  vendedor_id: string;
+  nombre: string;
+  apellido: string;
+  estrellas: number;
 }
 
 /** Fila RPC `admin_reportes_progreso`. */
@@ -193,10 +212,20 @@ export class AdminService {
 
   /**
    * Dashboard con métricas globales del sistema.
+   * `promedioGeneral` es el promedio de notas de exámenes (puntos ~0–100), no un porcentaje de negocio.
    */
   async getDashboard() {
-    const { data, error } = await supabase.rpc('admin_dashboard_resumen');
-    if (error) throw new AppError('Error al obtener dashboard', 500);
+    const [resumenRpc, calificacionesBajasRpc] = await Promise.all([
+      supabase.rpc('admin_dashboard_resumen'),
+      supabase.rpc('admin_dashboard_calificaciones_bajas_7d'),
+    ]);
+
+    if (resumenRpc.error) throw new AppError('Error al obtener dashboard', 500);
+    if (calificacionesBajasRpc.error) {
+      throw new AppError('Error al obtener calificaciones bajas del dashboard', 500);
+    }
+
+    const data = resumenRpc.data;
 
     const vendedores: DashboardVendedorResumen[] = (data || []).map((row: AdminDashboardVendedorRow) => ({
       id: row.id,
@@ -218,12 +247,22 @@ export class AdminService {
         ? vendedores.reduce((acc, v) => acc + v.promedioNotas, 0) / vendedores.length
         : 0;
 
+    const calificacionesBajas7d: DashboardCalificacionBaja7d[] = (
+      calificacionesBajasRpc.data || []
+    ).map((row: AdminDashboardCalificacionBajaRow) => ({
+      vendedorId: row.vendedor_id,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      estrellas: Number(row.estrellas),
+    }));
+
     return {
       totalVendedores: vendedores.length,
       totalModulos,
       vendedoresCompletos,
       promedioGeneral: Math.round(promedioGeneral * 10) / 10,
       vendedores,
+      calificacionesBajas7d,
     };
   }
 
@@ -803,6 +842,10 @@ export class AdminService {
    * Cambia la contraseña de un vendedor.
    */
   async resetPasswordVendedor(vendedorId: string, nuevaContrasena: string) {
+    if (!nuevaContrasena || nuevaContrasena.length < 8) {
+      throw new AppError('La contraseña debe tener al menos 8 caracteres', 400);
+    }
+
     const passwordHash = await bcrypt.hash(nuevaContrasena, 12);
 
     const { error } = await supabase
@@ -870,6 +913,135 @@ export class AdminService {
     });
 
     return { mensaje: 'Usuario eliminado correctamente' };
+  }
+
+  /**
+   * Vendedores que agotaron intentos en al menos un módulo sin aprobar.
+   */
+  async getVendedoresBloqueados() {
+    const { data: filas, error } = await supabase
+      .from('progreso')
+      .select(`
+        user_id,
+        modulo_id,
+        intentos,
+        estado,
+        users!inner (
+          id,
+          nombre,
+          apellido,
+          email,
+          rol,
+          activo
+        ),
+        modulos!inner (
+          id,
+          titulo,
+          orden,
+          activo
+        )
+      `)
+      .gte('intentos', MAX_INTENTOS_EXAMEN)
+      .neq('estado', 'aprobado');
+
+    if (error) throw new AppError('Error al obtener vendedores bloqueados', 500);
+
+    const bloqueados = (filas || [])
+      .filter((f: any) => f.users?.rol === 'vendedor' && f.users?.activo !== false)
+      .filter((f: any) => f.modulos?.activo !== false)
+      .map((f: any) => ({
+        vendedorId: f.user_id as string,
+        vendedorNombre: `${f.users.nombre} ${f.users.apellido}`.trim(),
+        vendedorEmail: f.users.email as string,
+        moduloId: f.modulo_id as string,
+        moduloTitulo: f.modulos.titulo as string,
+        moduloOrden: f.modulos.orden as number,
+        intentos: f.intentos || 0,
+        estado: f.estado as string,
+      }))
+      .sort((a, b) => {
+        const byName = a.vendedorNombre.localeCompare(b.vendedorNombre, 'es');
+        if (byName !== 0) return byName;
+        return a.moduloOrden - b.moduloOrden;
+      });
+
+    return { vendedoresBloqueados: bloqueados };
+  }
+
+  /**
+   * Permite un nuevo intento de examen en un módulo: intentos = 0, estado = disponible.
+   */
+  async resetIntentosModulo(
+    vendedorId: string,
+    moduloId: string,
+    actor?: ActorAuditoria
+  ) {
+    const { data: vendedor } = await supabase
+      .from('users')
+      .select('id, nombre, apellido, email')
+      .eq('id', vendedorId)
+      .eq('rol', 'vendedor')
+      .single();
+
+    if (!vendedor) throw new AppError('Vendedor no encontrado', 404);
+
+    const { data: progresoAntes, error: progresoError } = await supabase
+      .from('progreso')
+      .select('estado, intentos, mejor_nota, completado_at')
+      .eq('user_id', vendedorId)
+      .eq('modulo_id', moduloId)
+      .single();
+
+    if (progresoError || !progresoAntes) {
+      throw new AppError('No hay progreso registrado para este módulo', 404);
+    }
+
+    if (progresoAntes.estado === 'aprobado') {
+      throw new AppError('Este módulo ya está aprobado. No se pueden resetear los intentos.', 400);
+    }
+
+    if ((progresoAntes.intentos || 0) < MAX_INTENTOS_EXAMEN) {
+      throw new AppError(
+        `Solo se puede resetear cuando el vendedor agotó los ${MAX_INTENTOS_EXAMEN} intentos.`,
+        400
+      );
+    }
+
+    const { data: progresoDespues, error: updateError } = await supabase
+      .from('progreso')
+      .update({
+        intentos: 0,
+        estado: 'disponible',
+        completado_at: null,
+      })
+      .eq('user_id', vendedorId)
+      .eq('modulo_id', moduloId)
+      .select('estado, intentos, mejor_nota, completado_at')
+      .single();
+
+    if (updateError || !progresoDespues) {
+      throw new AppError('Error al resetear los intentos', 500);
+    }
+
+    await this.registrarAuditoria({
+      actor,
+      accion: 'reset_intentos_modulo',
+      entidad: 'progreso',
+      entidadId: `${vendedorId}:${moduloId}`,
+      datosAnteriores: progresoAntes,
+      datosNuevos: progresoDespues,
+    });
+
+    return {
+      mensaje: 'Intentos reseteados. El vendedor puede rendir el examen nuevamente.',
+      progreso: {
+        modulo_id: moduloId,
+        estado: progresoDespues.estado,
+        intentos: progresoDespues.intentos,
+        mejor_nota: progresoDespues.mejor_nota,
+        completado_at: progresoDespues.completado_at,
+      },
+    };
   }
 
   /**

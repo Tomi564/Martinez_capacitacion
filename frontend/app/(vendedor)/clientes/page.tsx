@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
+import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
+import { TabVentasClientes } from '@/components/clientes/TabVentasClientes';
 
 interface Visita {
   id: string; estado: string; motivo: string | null; observaciones: string | null;
@@ -11,7 +13,7 @@ interface Visita {
 }
 interface Vehiculo {
   id: string; patente: string; marca: string; modelo: string; anio: number | null;
-  clientes: { nombre: string; apellido: string; telefono: string | null; email: string | null } | null;
+  clientes: { nombre: string; apellido: string; dni: string | null; telefono: string | null; email: string | null } | null;
   visitas_taller: Visita[];
 }
 interface Participante {
@@ -33,7 +35,7 @@ export default function ClientesVendedorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [expandido, setExpandido] = useState<string | null>(null);
-  const [tab, setTab] = useState<'taller' | 'qr'>('taller');
+  const [tab, setTab] = useState<'taller' | 'qr' | 'ventas'>('taller');
   const [hasError, setHasError] = useState(false);
 
   const cargarClientes = async () => {
@@ -65,7 +67,7 @@ export default function ClientesVendedorPage() {
     const c = v.clientes;
     return v.patente.toLowerCase().includes(q) || v.marca.toLowerCase().includes(q) ||
       (c?.nombre || '').toLowerCase().includes(q) || (c?.apellido || '').toLowerCase().includes(q) ||
-      (c?.telefono || '').includes(q);
+      (c?.telefono || '').includes(q) || (c?.dni || '').includes(q);
   });
 
   const filtradosParticipantes = participantes.filter(p => {
@@ -78,7 +80,7 @@ export default function ClientesVendedorPage() {
     <div className="px-4 py-5 pb-24 flex flex-col gap-4 max-w-lg mx-auto">
       <div>
         <h1 className="text-lg font-bold text-gray-900">Clientes</h1>
-        <p className="text-sm text-gray-500">Taller y QR de calificación</p>
+        <p className="text-sm text-gray-500">Taller, QR y clientes de atenciones</p>
       </div>
 
       <input
@@ -94,9 +96,12 @@ export default function ClientesVendedorPage() {
         <button onClick={() => setTab('qr')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${tab === 'qr' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
           QR ({filtradosParticipantes.length})
         </button>
+        <button onClick={() => setTab('ventas')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${tab === 'ventas' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+          Ventas
+        </button>
       </div>
 
-      <PageState state={isLoading ? 'loading' : hasError ? 'error' : 'content'} onRetry={cargarClientes}>
+      <PageState state={isLoading && tab !== 'ventas' ? 'loading' : hasError && tab !== 'ventas' ? 'error' : 'content'} onRetry={cargarClientes}>
       {tab === 'taller' && (
         <PageState
           state={filtradosVehiculos.length === 0 ? 'empty' : 'content'}
@@ -113,8 +118,17 @@ export default function ClientesVendedorPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-black text-gray-900 tracking-wider">{v.patente}</p>
                       <p className="text-sm text-gray-600">{v.marca} {v.modelo}{v.anio && ` · ${v.anio}`}</p>
-                      {c ? <p className="text-xs text-gray-500 mt-0.5">{c.nombre} {c.apellido}{c.telefono && ` · ${c.telefono}`}</p>
-                         : <p className="text-xs text-gray-300 mt-0.5">Sin cliente</p>}
+                      {c ? (
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <p className="text-xs text-gray-500">
+                            {c.nombre} {c.apellido}
+                            {c.telefono && ` · ${c.telefono}`}
+                          </p>
+                          <BadgeRangoEtario dni={c.dni} />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-300 mt-0.5">Sin cliente</p>
+                      )}
                       <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mt-1 inline-block">{v.visitas_taller.length} {v.visitas_taller.length === 1 ? 'visita' : 'visitas'}</span>
                     </div>
                     <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 text-gray-400 shrink-0 mt-1 transition-transform ${abierto ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -160,7 +174,10 @@ export default function ClientesVendedorPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-bold text-gray-900">{p.nombre} {p.apellido}</p>
-                    <p className="text-xs text-gray-500">DNI: {p.dni}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <p className="text-xs text-gray-500">DNI: {p.dni}</p>
+                      <BadgeRangoEtario dni={p.dni} />
+                    </div>
                   </div>
                   <p className="text-xs text-gray-400 shrink-0">{new Date(p.created_at).toLocaleDateString('es-AR')}</p>
                 </div>
@@ -173,6 +190,8 @@ export default function ClientesVendedorPage() {
           </div>
         </PageState>
       )}
+
+      {tab === 'ventas' && <TabVentasClientes busqueda={busqueda} />}
       </PageState>
     </div>
   );

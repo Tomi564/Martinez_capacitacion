@@ -10,21 +10,69 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-/**
- * Obtiene el token JWT guardado en localStorage.
- * Zustand persist lo guarda bajo la key 'martinez-auth'.
- */
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null; // SSR guard
+const AUTH_STORAGE_KEY = 'martinez-auth';
 
+/** Endpoints donde un 401 debe disparar limpieza global + redirect (sin pasar por el caller). */
+function isSessionCriticalEndpoint(endpoint: string): boolean {
+  const path = endpoint.split('?')[0];
+  // /auth/me lo maneja useAuth.refreshUser (banner en layout vendedor + redirect ordenado).
+  return path === '/auth/login';
+}
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** Registrado por useAuth al crear el store — evita import circular. */
+let readTokenFromStore: (() => string | null) | null = null;
+
+export function bindAuthTokenSource(getter: () => string | null) {
+  readTokenFromStore = getter;
+}
+
+function readTokenFromLocalStorage(): string | null {
   try {
-    const stored = localStorage.getItem('martinez-auth');
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored);
     return parsed?.state?.token || null;
   } catch (error) {
     console.error('[api.getToken] Error leyendo token de localStorage', error);
     return null;
+  }
+}
+
+/**
+ * Token JWT: primero el store de Zustand en memoria, luego localStorage (persist).
+ */
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  if (readTokenFromStore) {
+    const fromStore = readTokenFromStore();
+    if (fromStore) return fromStore;
+  }
+
+  return readTokenFromLocalStorage();
+}
+
+function clearPersistedAuth() {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch (error) {
+    console.error('[api.request] Error limpiando sesión tras 401', error);
+  }
+}
+
+function redirectToLogin() {
+  if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+    window.location.href = '/login';
   }
 }
 
@@ -45,7 +93,6 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   };
 
-  // Agregar el token si existe
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -55,26 +102,24 @@ async function request<T>(
     headers,
   });
 
-  // Si la respuesta no es OK, extraemos el mensaje de error del backend
   if (!response.ok) {
-    // 401 = token expirado o inválido → limpiar sesión y redirigir al login
-    if (response.status === 401) {
-      try {
-        localStorage.removeItem('martinez-auth');
-      } catch (error) {
-        console.error('[api.request] Error limpiando sesión tras 401', error);
-      }
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
-      }
-    }
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.error || `Error ${response.status}: ${response.statusText}`
-    );
+    const message =
+      errorData.error || `Error ${response.status}: ${response.statusText}`;
+
+    if (response.status === 401 && isSessionCriticalEndpoint(endpoint)) {
+      const path = endpoint.split('?')[0];
+      // Login fallido: no hay sesión que invalidar ni redirect
+      if (path === '/auth/login') {
+        throw new ApiError(message, 401);
+      }
+      clearPersistedAuth();
+      redirectToLogin();
+    }
+
+    throw new ApiError(message, response.status);
   }
 
-  // 204 No Content — no hay body para parsear
   if (response.status === 204) {
     return {} as T;
   }
@@ -84,9 +129,6 @@ async function request<T>(
 
 /**
  * Cliente de API con métodos HTTP tipados.
- * Uso:
- *  const data = await apiClient.get<TipoRespuesta>('/modulos')
- *  const result = await apiClient.post<TipoRespuesta>('/auth/login', { email, password })
  */
 export const apiClient = {
   get: <T>(endpoint: string) =>
@@ -112,4 +154,39 @@ export const apiClient = {
 
   delete: <T>(endpoint: string) =>
     request<T>(endpoint, { method: 'DELETE' }),
+
+  /** Descarga un archivo (p. ej. PDF) con autenticación y dispara guardar en el navegador. */
+  downloadFile: async (endpoint: string, fallbackFilename: string): Promise<void> => {
+    if (typeof window === 'undefined') return;
+
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${API_URL}${endpoint}`, { method: 'GET', headers });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message =
+        errorData.error || `Error ${response.status}: ${response.statusText}`;
+      throw new ApiError(message, response.status);
+    }
+
+    const blob = await response.blob();
+    let filename = fallbackFilename;
+    const cd = response.headers.get('Content-Disposition');
+    if (cd) {
+      const match = cd.match(/filename="([^"]+)"/i);
+      if (match?.[1]) filename = match[1];
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

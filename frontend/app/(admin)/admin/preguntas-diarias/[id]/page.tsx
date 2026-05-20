@@ -8,6 +8,7 @@ import type { OpcionPregunta, PreguntaDiariaAdmin, CategoriaPreguntaDiaria } fro
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SelectorModuloOpcional } from '@/components/admin/SelectorModuloOpcional';
 
 const OPCIONES_VACIAS: OpcionPregunta[] = [
   { id: 'a', texto: '' },
@@ -26,6 +27,7 @@ export default function EditarPreguntaDiariaPage() {
   const [respuesta_correcta, setRespuesta_correcta] = useState('');
   const [explicacion, setExplicacion] = useState('');
   const [activo, setActivo] = useState(true);
+  const [moduloId, setModuloId] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -46,6 +48,7 @@ export default function EditarPreguntaDiariaPage() {
         setRespuesta_correcta(p.respuesta_correcta);
         setExplicacion(p.explicacion || '');
         setActivo(p.activo);
+        setModuloId(p.modulo_id || '');
       } catch {
         setErr('No se pudo cargar la pregunta.');
       } finally {
@@ -79,6 +82,7 @@ export default function EditarPreguntaDiariaPage() {
         respuesta_correcta: respuesta_correcta.trim(),
         explicacion: explicacion.trim() || null,
         activo,
+        modulo_id: moduloId || null,
       });
       router.push('/admin/preguntas-diarias');
     } catch (e) {
@@ -112,6 +116,8 @@ export default function EditarPreguntaDiariaPage() {
 
       <Card className="rounded-xl">
         <CardContent className="p-4 flex flex-col gap-4">
+          <SelectorModuloOpcional value={moduloId} onChange={setModuloId} />
+
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Categoría</label>
             <select

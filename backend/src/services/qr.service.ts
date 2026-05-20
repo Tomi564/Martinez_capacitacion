@@ -128,7 +128,7 @@ export class QRService {
       .eq('vendedor_id', qr.user_id)
       .eq('ip_cliente', ipCliente)
       .gte('created_at', unaHoraAtras)
-      .single();
+      .maybeSingle();
 
     if (calificacionReciente) {
       throw new AppError(
@@ -151,6 +151,7 @@ export class QRService {
       throw new AppError('Error al guardar la calificación', 500);
     }
 
+    let sorteoInscripto = false;
     let participanteYaRegistrado = false;
 
     // Guardar datos del participante para el sorteo (si los proporcionó)
@@ -164,20 +165,30 @@ export class QRService {
 
       if (existentes && existentes.length > 0) {
         participanteYaRegistrado = true;
+        sorteoInscripto = true;
       } else {
-        await supabase.from('participantes_sorteo').insert({
+        const ins = await supabase.from('participantes_sorteo').insert({
           nombre: participante.nombre.trim(),
           apellido: participante.apellido.trim(),
           dni: dniNormalizado,
           contacto: participante.contacto.trim(),
           vendedor_id: qr.user_id,
         });
+        if (ins.error) {
+          console.error('[QRService] Error insert participantes_sorteo', ins.error);
+          throw new AppError(
+            'Tu calificación se guardó, pero no pudimos registrar tu participación en el sorteo. Intentá de nuevo más tarde.',
+            500
+          );
+        }
+        sorteoInscripto = true;
       }
     }
 
     return {
       mensaje: '¡Gracias por tu calificación!',
       participanteYaRegistrado,
+      sorteoInscripto,
     };
   }
 

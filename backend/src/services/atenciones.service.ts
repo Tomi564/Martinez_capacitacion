@@ -4,6 +4,8 @@
 
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { validarCanalAtencion, mensajeCanalInvalido } from '../constants/atenciones';
+import { clientesService, type ClienteInput } from './clientes.service';
 import { procesarCambioRankingPorVenta } from './ranking-notificaciones.service';
 
 /** Envía push a todos los admins activos */
@@ -56,38 +58,67 @@ async function notificarAdmins(titulo: string, cuerpo: string) {
   }
 }
 
+function mapErrorSupabaseAtencion(error: { code?: string; message?: string }): AppError {
+  if (error.code === '23514') {
+    return new AppError(
+      'Datos inválidos para la atención. Verificá el canal y el resultado seleccionados.',
+      400
+    );
+  }
+  if (error.code === '23503') {
+    return new AppError('Referencia inválida (cliente o usuario).', 400);
+  }
+  return new AppError(error.message || 'Error al guardar la atención', 500);
+}
+
+export interface AtencionPayload {
+  canal: string;
+  resultado: string;
+  producto?: string | null;
+  monto?: number | null;
+  observaciones?: string;
+  cliente_id?: string | null;
+  cliente: ClienteInput;
+  participante_qr_id?: string | null;
+}
+
 export class AtencionesService {
+  private assertCanal(canal: string) {
+    if (!validarCanalAtencion(canal)) {
+      throw new AppError(mensajeCanalInvalido(canal), 400);
+    }
+  }
+
   /**
    * Registra una nueva atención del vendedor.
    */
-  async crear(
-    userId: string,
-    data: {
-      canal: string;
-      resultado: string;
-      producto?: string;
-      monto?: number;
-      observaciones?: string;
-    }
-  ) {
+  async crear(userId: string, data: AtencionPayload) {
+    this.assertCanal(data.canal);
+
+    const clienteId = await clientesService.resolverClienteParaAtencion({
+      cliente_id: data.cliente_id,
+      cliente: data.cliente,
+      participante_qr_id: data.participante_qr_id,
+    });
+
     const { error } = await supabase.from('atenciones').insert({
       user_id: userId,
       canal: data.canal,
       resultado: data.resultado,
       producto: data.producto || null,
-      monto: data.monto || null,
+      monto: data.monto ?? null,
       observaciones: data.observaciones || null,
+      cliente_id: clienteId,
     });
 
-    if (error) throw new AppError('Error al registrar la atención', 500);
+    if (error) throw mapErrorSupabaseAtencion(error);
 
-    // Chequear hitos de objetivo si fue una venta cerrada
     if (data.resultado === 'venta_cerrada') {
-      this.checkObjetivoHito(userId).catch((error) => {
-        console.error('[AtencionesService] Error verificando hitos de objetivo', { userId, error });
+      this.checkObjetivoHito(userId).catch((err) => {
+        console.error('[AtencionesService] Error verificando hitos de objetivo', { userId, err });
       });
-      procesarCambioRankingPorVenta().catch((error) => {
-        console.error('[AtencionesService] Error procesando cambio de ranking por venta', { userId, error });
+      procesarCambioRankingPorVenta().catch((err) => {
+        console.error('[AtencionesService] Error procesando cambio de ranking por venta', { userId, err });
       });
     }
 
@@ -97,32 +128,31 @@ export class AtencionesService {
   /**
    * Actualiza una atención existente del vendedor.
    */
-  async actualizar(
-    userId: string,
-    atencionId: string,
-    data: {
-      canal: string;
-      resultado: string;
-      producto?: string;
-      monto?: number;
-      observaciones?: string;
-    }
-  ) {
+  async actualizar(userId: string, atencionId: string, data: AtencionPayload) {
+    this.assertCanal(data.canal);
+
+    const clienteId = await clientesService.resolverClienteParaAtencion({
+      cliente_id: data.cliente_id,
+      cliente: data.cliente,
+      participante_qr_id: data.participante_qr_id,
+    });
+
     const { data: updated, error } = await supabase
       .from('atenciones')
       .update({
         canal: data.canal,
         resultado: data.resultado,
         producto: data.producto || null,
-        monto: data.monto || null,
+        monto: data.monto ?? null,
         observaciones: data.observaciones || null,
+        cliente_id: clienteId,
       })
       .eq('id', atencionId)
       .eq('user_id', userId)
       .select('id')
       .maybeSingle();
 
-    if (error) throw new AppError('Error al actualizar la atención', 500);
+    if (error) throw mapErrorSupabaseAtencion(error);
     if (!updated) throw new AppError('Atención no encontrada', 404);
 
     return { mensaje: 'Atención actualizada correctamente' };
@@ -134,7 +164,18 @@ export class AtencionesService {
   async getMisAtenciones(userId: string) {
     const { data, error } = await supabase
       .from('atenciones')
-      .select('*')
+      .select(
+        `
+        *,
+        clientes (
+          id,
+          nombre,
+          apellido,
+          telefono,
+          email
+        )
+      `
+      )
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -147,8 +188,8 @@ export class AtencionesService {
     const noVentas = atenciones.filter((a) => a.resultado === 'no_venta').length;
     const pendientes = atenciones.filter((a) => a.resultado === 'pendiente').length;
     const montoTotal = atenciones
-      .filter((a) => a.monto)
-      .reduce((acc, a) => acc + (a.monto || 0), 0);
+      .filter((a) => a.resultado === 'venta_cerrada' && a.monto != null)
+      .reduce((acc, a) => acc + Number(a.monto || 0), 0);
     const tasaConversion = total > 0 ? Math.round((ventas / total) * 100) : 0;
 
     const stats = { total, ventas, noVentas, pendientes, montoTotal, tasaConversion };
@@ -165,7 +206,6 @@ export class AtencionesService {
     const mes = ahora.getMonth() + 1;
     const anio = ahora.getFullYear();
 
-    // Obtener objetivo del mes
     const { data: objetivo } = await supabase
       .from('objetivos')
       .select('meta_ventas')
@@ -176,7 +216,6 @@ export class AtencionesService {
 
     if (!objetivo?.meta_ventas || objetivo.meta_ventas === 0) return;
 
-    // Contar ventas del mes
     const inicioMes = new Date(anio, mes - 1, 1).toISOString();
     const { count } = await supabase
       .from('atenciones')
@@ -188,7 +227,6 @@ export class AtencionesService {
     const ventasActuales = count || 0;
     const pct = Math.round((ventasActuales / objetivo.meta_ventas) * 100);
 
-    // Obtener nombre del vendedor
     const { data: vendedor } = await supabase
       .from('users')
       .select('nombre, apellido')
@@ -197,7 +235,6 @@ export class AtencionesService {
 
     const nombre = vendedor ? `${vendedor.nombre} ${vendedor.apellido}` : 'Un vendedor';
 
-    // Notificar en hitos exactos
     if (ventasActuales === objetivo.meta_ventas) {
       await notificarAdmins(
         '🏆 Objetivo cumplido',
@@ -219,7 +256,8 @@ export class AtencionesService {
       .from('atenciones')
       .select(`
         *,
-        users (nombre, apellido, email)
+        users (nombre, apellido, email),
+        clientes (id, nombre, apellido, telefono, email)
       `)
       .order('created_at', { ascending: false });
 

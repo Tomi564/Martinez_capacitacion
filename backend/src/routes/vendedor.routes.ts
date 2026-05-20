@@ -4,6 +4,7 @@ import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
+import { presupuestoVisitaController } from '../controllers/presupuesto-visita.controller';
 
 const router = Router();
 router.use(authMiddleware);
@@ -87,6 +88,13 @@ router.post('/sugerencias', requireRole('vendedor'), async (req: AuthRequest, re
     next(e);
   }
 });
+
+// GET /api/vendedor/visitas/:id/presupuesto.pdf — PDF de presupuesto (antes de /visitas/:id si se agrega)
+router.get(
+  '/visitas/:id/presupuesto.pdf',
+  requireRole('vendedor'),
+  (req, res, next) => presupuestoVisitaController.descargar(req, res, next)
+);
 
 // DELETE /api/vendedor/sugerencias/:id — eliminar propia
 router.delete('/sugerencias/:id', requireRole('vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {

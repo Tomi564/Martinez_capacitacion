@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 
 interface Comunicado {
   id: string;
@@ -98,9 +98,12 @@ export default function ComunicadosPage() {
       programadoIso = cuando.toISOString();
     }
 
+    const tituloTrim = titulo.trim();
+    const contenidoTrim = contenido.trim();
+
     try {
       if (editando) {
-        const body: Record<string, unknown> = { titulo, contenido };
+        const body: Record<string, unknown> = { titulo: tituloTrim, contenido: contenidoTrim };
         if (!editando.activo) {
           body.programado_para = programadoIso;
         }
@@ -108,18 +111,29 @@ export default function ComunicadosPage() {
         setMsg({ tipo: 'ok', texto: 'Comunicado actualizado' });
       } else {
         if (programadoIso && new Date(programadoIso).getTime() > Date.now()) {
-          await apiClient.post('/admin/comunicados', { titulo, contenido, programado_para: programadoIso });
+          await apiClient.post('/admin/comunicados', {
+            titulo: tituloTrim,
+            contenido: contenidoTrim,
+            programado_para: programadoIso,
+          });
           setMsg({ tipo: 'ok', texto: 'Comunicado programado correctamente' });
         } else {
-          await apiClient.post('/admin/comunicados', { titulo, contenido });
+          await apiClient.post('/admin/comunicados', { titulo: tituloTrim, contenido: contenidoTrim });
           setMsg({ tipo: 'ok', texto: 'Comunicado publicado y enviado a todos los vendedores' });
         }
       }
       cerrarFormulario();
       fetchComunicados();
       setTimeout(() => setMsg(null), 4000);
-    } catch {
-      setMsg({ tipo: 'error', texto: editando ? 'Error al guardar cambios' : 'Error al publicar el comunicado' });
+    } catch (err) {
+      const fallback = editando ? 'Error al guardar cambios' : 'Error al publicar el comunicado';
+      const texto =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error && err.message
+            ? err.message
+            : fallback;
+      setMsg({ tipo: 'error', texto });
     } finally {
       setGuardando(false);
     }
@@ -144,8 +158,19 @@ export default function ComunicadosPage() {
   };
 
   const handleToggle = async (id: string, activo: boolean) => {
-    await apiClient.patch(`/admin/comunicados/${id}`, { activo: !activo });
-    await fetchComunicados();
+    setMsg(null);
+    try {
+      await apiClient.patch(`/admin/comunicados/${id}`, { activo: !activo });
+      await fetchComunicados();
+    } catch (err) {
+      const texto =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error && err.message
+            ? err.message
+            : 'No se pudo cambiar el estado del comunicado. Reintentá.';
+      setMsg({ tipo: 'error', texto });
+    }
   };
 
   const textoProgramacion = (iso: string | null | undefined) => {

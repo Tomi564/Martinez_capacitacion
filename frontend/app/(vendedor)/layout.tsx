@@ -89,17 +89,6 @@ const NAV_SECONDARY = [
     ),
   },
   {
-    href: '/stock',
-    label: 'Catálogo',
-    exactMatch: false,
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="11" cy="11" r="8"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-    ),
-  },
-  {
     href: '/ranking',
     label: 'Ranking',
     exactMatch: false,
@@ -144,19 +133,73 @@ export default function VendedorLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const sessionExpiredBanner = useAuth((s) => s.sessionExpiredBanner);
+  const clearSessionExpiredBanner = useAuth((s) => s.clearSessionExpiredBanner);
+  const token = useAuth((s) => s.token);
   const { isAuthenticated, isAdmin, user, nombreCompleto, logout, refreshUser } = useAuth();
 
   useEffect(() => {
-    if (!isAuthenticated()) { router.replace('/login'); return; }
-    if (isAdmin()) { router.replace('/admin'); return; }
-    if (user?.rol === 'mecanico') { router.replace('/mecanico'); return; }
-    if (user?.rol === 'gomero') { router.replace('/gomero'); return; }
-    // Verificar que el token siga siendo válido en el servidor
-    refreshUser();
-  }, []);
+    if (sessionExpiredBanner) return;
+
+    if (!isAuthenticated()) {
+      router.replace('/login');
+      return;
+    }
+    if (isAdmin()) {
+      router.replace('/admin');
+      return;
+    }
+    if (user?.rol === 'mecanico') {
+      router.replace('/mecanico');
+      return;
+    }
+    if (user?.rol === 'gomero') {
+      router.replace('/gomero');
+      return;
+    }
+    void refreshUser();
+  }, [sessionExpiredBanner, router, user?.rol, token]);
+
+  useEffect(() => {
+    if (!sessionExpiredBanner) return;
+    const id = window.setTimeout(() => {
+      clearSessionExpiredBanner();
+      router.replace('/login');
+    }, 2800);
+    return () => window.clearTimeout(id);
+  }, [sessionExpiredBanner, router, clearSessionExpiredBanner]);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  if (sessionExpiredBanner) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 py-12 gap-5">
+        <div
+          role="alert"
+          className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-center shadow-sm"
+        >
+          <p className="text-base font-semibold text-amber-950 leading-snug">
+            Tu sesión expiró. Ingresá de nuevo.
+          </p>
+          <p className="text-sm text-amber-900/90 mt-2">
+            Te llevamos al login en unos segundos…
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            clearSessionExpiredBanner();
+            router.replace('/login');
+          }}
+          className="w-full max-w-md py-3.5 rounded-xl bg-[#C8102E] text-white font-semibold text-base"
+        >
+          Ir al login ahora
+        </button>
+      </div>
+    );
+  }
+
   if (!mounted || !isAuthenticated()) return null;
 
   return (

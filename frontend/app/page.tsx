@@ -4,8 +4,7 @@
  * No muestra contenido propio.
  * Solo redirige según el estado de autenticación:
  *  - Sin sesión → /login
- *  - Vendedor   → /dashboard
- *  - Admin      → /admin
+ *  - Por rol → /admin | /mecanico | /gomero | /dashboard (vendedor)
  *
  * Por qué lo hacemos acá y no en middleware.ts:
  *  El middleware de Next.js corre en el edge y no tiene acceso
@@ -21,20 +20,36 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function RootPage() {
   const router = useRouter();
-  const { isAuthenticated, isAdmin } = useAuth();
+  const token = useAuth((s) => s.token);
+  const user = useAuth((s) => s.user);
 
   useEffect(() => {
+    const { isAuthenticated } = useAuth.getState();
+
+    if (!token || !user) {
+      router.replace('/login');
+      return;
+    }
+
     if (!isAuthenticated()) {
       router.replace('/login');
       return;
     }
 
-    if (isAdmin()) {
-      router.replace('/admin');
-    } else {
-      router.replace('/dashboard');
+    switch (user.rol) {
+      case 'admin':
+        router.replace('/admin');
+        break;
+      case 'mecanico':
+        router.replace('/mecanico');
+        break;
+      case 'gomero':
+        router.replace('/gomero');
+        break;
+      default:
+        router.replace('/dashboard');
     }
-  }, []);
+  }, [router, token, user]);
 
   // Pantalla de carga mientras redirige
   return (

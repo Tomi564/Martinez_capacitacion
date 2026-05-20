@@ -275,7 +275,17 @@ router.patch('/ordenes/:id', requireRole('gomero', 'admin'), async (req: AuthReq
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
     if (neumaticos_cambiados !== undefined) updates.neumaticos_cambiados = Boolean(neumaticos_cambiados);
-    if (km !== undefined) updates.km = km == null || km === '' ? null : Number(km);
+    if (km !== undefined) {
+      if (km == null || km === '') {
+        updates.km = null;
+      } else {
+        const kmNum = Number(km);
+        if (!Number.isFinite(kmNum) || kmNum < 0) {
+          throw new AppError('El kilometraje debe ser un número mayor o igual a 0', 400);
+        }
+        updates.km = kmNum;
+      }
+    }
     if (marca_neumatico !== undefined) updates.marca_neumatico = marca_neumatico || null;
     if (medida_neumatico !== undefined) updates.medida_neumatico = medida_neumatico || null;
     if (observaciones_gomero !== undefined) updates.observaciones_gomero = observaciones_gomero || null;

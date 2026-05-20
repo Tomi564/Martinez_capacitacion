@@ -353,12 +353,40 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
 // GET /api/mecanico/visitas/:id — detalle de visita con checklist (vendedor: solo lectura en el front)
 router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const rawId = req.params.id;
+    const visitaId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    if (!visitaId) throw new AppError('ID de visita inválido', 400);
+
     const { data: visita, error } = await supabase
       .from('visitas_taller')
-      .select(`*, vehiculos(patente, marca, modelo, anio, medida_rueda, clientes(nombre, apellido, email, telefono))`)
-      .eq('id', req.params.id)
+      .select(
+        `*, vehiculos(patente, marca, modelo, anio, medida_rueda, cliente_id, clientes(nombre, apellido, dni, email, telefono))`
+      )
+      .eq('id', visitaId)
       .single();
     if (error || !visita) throw new AppError('Visita no encontrada', 404);
+
+    const rol = req.user!.rol;
+    if (rol === 'mecanico') {
+      if (!visita.mecanico_id || String(visita.mecanico_id) !== String(req.user!.id)) {
+        throw new AppError('No autorizado', 403);
+      }
+    } else if (rol === 'vendedor') {
+      const veh = visita.vehiculos as { cliente_id?: string | null } | null;
+      const clienteId = veh?.cliente_id;
+      if (!clienteId) {
+        throw new AppError('No autorizado', 403);
+      }
+      const { count, error: atErr } = await supabase
+        .from('atenciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', req.user!.id)
+        .eq('cliente_id', clienteId);
+      if (atErr) throw new AppError('Error al verificar acceso', 500);
+      if (!count || count < 1) {
+        throw new AppError('No autorizado', 403);
+      }
+    }
 
     const { data: items } = await supabase
       .from('checklist_items')
@@ -369,7 +397,7 @@ router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (
     const { data: respuestas } = await supabase
       .from('checklist_respuestas')
       .select('*')
-      .eq('visita_id', req.params.id);
+      .eq('visita_id', visitaId);
 
     return res.json({ visita, items: items || [], respuestas: respuestas || [] });
   } catch (e) { next(e); }

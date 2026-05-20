@@ -52,6 +52,8 @@ export default function ExamenPage() {
   const tieneRespuestaActual =
     typeof respuestaActual === 'string' && respuestaActual.trim().length > 0;
 
+  const pantallaErrorCarga = estado === 'error_carga';
+
   // Formatear timer MM:SS
   const formatTiempo = (seg: number) => {
     const m = Math.floor(seg / 60).toString().padStart(2, '0');
@@ -60,6 +62,30 @@ export default function ExamenPage() {
   };
 
   // ─── ESTADOS DE PANTALLA ───────────────────────────
+
+  if (pantallaErrorCarga && error) {
+    return (
+      <div className="p-6 max-w-lg mx-auto flex flex-col gap-4">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void reintentar()}
+          className="w-full py-3 bg-gray-900 text-white rounded-xl font-semibold"
+        >
+          Reintentar
+        </button>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="w-full py-3 bg-[#C8102E] text-white rounded-xl font-semibold"
+        >
+          Volver al módulo
+        </button>
+      </div>
+    );
+  }
 
   if (estado === 'cargando') {
     return (

@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api';
 import type { OpcionPregunta, CategoriaPreguntaDiaria } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { SelectorModuloOpcional } from '@/components/admin/SelectorModuloOpcional';
 
 const OPCIONES_VACIAS: OpcionPregunta[] = [
   { id: 'a', texto: '' },
@@ -23,6 +24,7 @@ export default function NuevaPreguntaDiariaPage() {
   const [respuesta_correcta, setRespuesta_correcta] = useState('');
   const [explicacion, setExplicacion] = useState('');
   const [activo, setActivo] = useState(true);
+  const [moduloId, setModuloId] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -50,6 +52,7 @@ export default function NuevaPreguntaDiariaPage() {
         respuesta_correcta: respuesta_correcta.trim(),
         explicacion: explicacion.trim() || null,
         activo,
+        modulo_id: moduloId || null,
       });
       router.push('/admin/preguntas-diarias');
     } catch (e) {
@@ -74,6 +77,8 @@ export default function NuevaPreguntaDiariaPage() {
 
       <Card className="rounded-xl">
         <CardContent className="p-4 flex flex-col gap-4">
+          <SelectorModuloOpcional value={moduloId} onChange={setModuloId} />
+
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Categoría</label>
             <select

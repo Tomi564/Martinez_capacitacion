@@ -10,9 +10,11 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+
+const MAX_INTENTOS_EXAMEN = 3;
 
 interface VendedorDetalle {
   id: string;
@@ -68,45 +70,49 @@ export default function VendedorDetallePage() {
   const [showResetProgresoModal, setShowResetProgresoModal] = useState(false);
   const [resetProgresoLoading, setResetProgresoLoading] = useState(false);
   const [resetProgresoMsg, setResetProgresoMsg] = useState<string | null>(null);
+  const [resetIntentosModuloId, setResetIntentosModuloId] = useState<string | null>(null);
 
   // Objetivos del mes
   const [objetivo, setObjetivo] = useState<{ meta_ventas: number; meta_conversion: number } | null>(null);
   const [editandoObjetivo, setEditandoObjetivo] = useState(false);
   const [objForm, setObjForm] = useState({ meta_ventas: '', meta_conversion: '' });
   const [guardandoObj, setGuardandoObj] = useState(false);
+  const [objetivoError, setObjetivoError] = useState<string | null>(null);
+
+  const fetchVendedor = useCallback(async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      const [vendRes, objRes] = await Promise.all([
+        apiClient.get<{ vendedor: VendedorDetalle }>(`/admin/vendedores/${vendedorId}`),
+        apiClient.get<{ objetivo: { meta_ventas: number; meta_conversion: number } | null }>(
+          `/admin/vendedores/${vendedorId}/objetivo`
+        ),
+      ]);
+      setVendedor(vendRes.vendedor);
+      setEditPerfilForm({
+        nombre: vendRes.vendedor.nombre,
+        apellido: vendRes.vendedor.apellido,
+        email: vendRes.vendedor.email,
+      });
+      setError(null);
+      if (objRes.objetivo) {
+        setObjetivo(objRes.objetivo);
+        setObjForm({
+          meta_ventas: String(objRes.objetivo.meta_ventas || ''),
+          meta_conversion: String(objRes.objetivo.meta_conversion || ''),
+        });
+      }
+    } catch (err) {
+      setError('Error al cargar el vendedor');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [vendedorId]);
 
   useEffect(() => {
-    const fetchVendedor = async () => {
-      try {
-        const [vendRes, objRes] = await Promise.all([
-          apiClient.get<{ vendedor: VendedorDetalle }>(`/admin/vendedores/${vendedorId}`),
-          apiClient.get<{ objetivo: { meta_ventas: number; meta_conversion: number } | null }>(
-            `/admin/vendedores/${vendedorId}/objetivo`
-          ),
-        ]);
-        setVendedor(vendRes.vendedor);
-        setEditPerfilForm({
-          nombre: vendRes.vendedor.nombre,
-          apellido: vendRes.vendedor.apellido,
-          email: vendRes.vendedor.email,
-        });
-        if (objRes.objetivo) {
-          setObjetivo(objRes.objetivo);
-          setObjForm({
-            meta_ventas: String(objRes.objetivo.meta_ventas || ''),
-            meta_conversion: String(objRes.objetivo.meta_conversion || ''),
-          });
-        }
-      } catch (err) {
-        setError('Error al cargar el vendedor');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchVendedor();
-  }, [vendedorId]);
+    fetchVendedor(true);
+  }, [fetchVendedor]);
 
   const handleToggleActivo = async () => {
     if (!vendedor) return;
@@ -151,7 +157,7 @@ export default function VendedorDetallePage() {
   };
 
   const handleResetPassword = async () => {
-    if (nuevaContrasena.length < 6) return;
+    if (nuevaContrasena.length < 8) return;
     setResetLoading(true);
     setResetMsg(null);
     try {
@@ -173,6 +179,7 @@ export default function VendedorDetallePage() {
 
   const handleGuardarObjetivo = async () => {
     setGuardandoObj(true);
+    setObjetivoError(null);
     try {
       const ahora = new Date();
       await apiClient.post(`/admin/vendedores/${vendedorId}/objetivo`, {
@@ -186,8 +193,39 @@ export default function VendedorDetallePage() {
         meta_conversion: objForm.meta_conversion ? Number(objForm.meta_conversion) : 0,
       });
       setEditandoObjetivo(false);
-    } catch { /* silencioso */ }
-    finally { setGuardandoObj(false); }
+    } catch (err) {
+      setObjetivoError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'No se pudo guardar el objetivo. Reintentá.'
+      );
+    } finally {
+      setGuardandoObj(false);
+    }
+  };
+
+  const puedeResetearIntentos = (p: VendedorDetalle['progreso'][number]) =>
+    p.estado !== 'aprobado' && p.intentos >= MAX_INTENTOS_EXAMEN;
+
+  const handleResetIntentosModulo = async (moduloId: string, moduloTitulo: string) => {
+    const confirmar = window.confirm(
+      `¿Permitir un nuevo intento en "${moduloTitulo}"?\n\n` +
+        `Se reiniciará el contador de intentos a 0 y el módulo quedará disponible para rendir el examen.`
+    );
+    if (!confirmar) return;
+
+    setResetIntentosModuloId(moduloId);
+    try {
+      await apiClient.post(
+        `/admin/vendedores/${vendedorId}/modulos/${moduloId}/reset-intentos`,
+        {}
+      );
+      await fetchVendedor();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al resetear los intentos');
+    } finally {
+      setResetIntentosModuloId(null);
+    }
   };
 
   const handleResetProgreso = async () => {
@@ -434,6 +472,19 @@ export default function VendedorDetallePage() {
                     : p.estado === 'disponible' ? 'Disponible'
                     : 'Bloqueado'}
                 </span>
+
+                {puedeResetearIntentos(p) && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetIntentosModulo(p.modulo_id, p.modulo_titulo)}
+                    disabled={resetIntentosModuloId === p.modulo_id}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#C8102E] text-white flex-shrink-0 disabled:opacity-50 active:scale-95 transition-transform"
+                  >
+                    {resetIntentosModuloId === p.modulo_id
+                      ? 'Procesando...'
+                      : 'Permitir nuevo intento'}
+                  </button>
+                )}
               </div>
             ))}
         </div>
@@ -576,7 +627,10 @@ export default function VendedorDetallePage() {
             Objetivo del mes
           </p>
           <button
-            onClick={() => setEditandoObjetivo(v => !v)}
+            onClick={() => {
+              setObjetivoError(null);
+              setEditandoObjetivo((v) => !v);
+            }}
             className="text-xs text-gray-500 hover:text-gray-900 font-medium"
           >
             {editandoObjetivo ? 'Cancelar' : objetivo ? 'Editar' : '+ Asignar'}
@@ -617,6 +671,11 @@ export default function VendedorDetallePage() {
             >
               {guardandoObj ? 'Guardando...' : 'Guardar objetivo'}
             </button>
+            {objetivoError && (
+              <p className="text-sm text-red-600" role="alert">
+                {objetivoError}
+              </p>
+            )}
           </div>
         ) : objetivo ? (
           <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-2 gap-4">
@@ -809,7 +868,7 @@ export default function VendedorDetallePage() {
               type="password"
               value={nuevaContrasena}
               onChange={(e) => setNuevaContrasena(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mínimo 8 caracteres"
               className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
             />
           </div>
@@ -823,7 +882,7 @@ export default function VendedorDetallePage() {
             </button>
             <button
               onClick={handleResetPassword}
-              disabled={resetLoading || nuevaContrasena.length < 6}
+              disabled={resetLoading || nuevaContrasena.length < 8}
               className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {resetLoading ? (

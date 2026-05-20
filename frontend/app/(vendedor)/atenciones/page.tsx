@@ -12,15 +12,15 @@
 
 import { useState } from 'react';
 import { FormAtencion } from '@/components/atenciones/FormAtencion';
-import { Atencion, useAtenciones } from '@/hooks/useAtenciones';
-import { apiClient } from '@/lib/api';
+import { Atencion, formFromAtencion, useAtenciones } from '@/hooks/useAtenciones';
 
 const CANALES = [
   { id: 'whatsapp',     label: 'WhatsApp',      icono: '💬' },
   { id: 'mercadolibre', label: 'Mercado Libre',  icono: '🛒' },
   { id: 'instagram',    label: 'Instagram',      icono: '📸' },
   { id: 'presencial',   label: 'Presencial',     icono: '🏪' },
-  { id: 'otro',         label: 'Otro',           icono: '📞' },
+  { id: 'telefono',     label: 'Teléfono',       icono: '📞' },
+  { id: 'otro',         label: 'Otro',           icono: '⋯' },
 ];
 
 const RESULTADOS = [
@@ -33,10 +33,14 @@ export default function AtencionesPage() {
   const {
     data,
     isLoading,
+    loadError,
+    reintentarCarga,
+    listReloading,
     showForm,
     setShowForm,
     isGuardando,
     error,
+    setError,
     successMsg,
     atencionDetalle,
     setAtencionDetalle,
@@ -44,18 +48,25 @@ export default function AtencionesPage() {
     setMostrarDetalles,
     sugerencias,
     setSugerencias,
+    sugerenciasCliente,
+    setSugerenciasCliente,
     buscandoProducto,
+    buscandoCliente,
     form,
     setForm,
-    fetchAtenciones,
     buscarProductos,
+    onClienteNombreChange,
+    onClienteApellidoChange,
+    onClienteTelefonoChange,
+    onClienteEmailChange,
+    seleccionarCliente,
     seleccionarProducto,
     handleGuardar,
+    actualizarAtencion,
     cerrarForm,
   } = useAtenciones();
   const [editandoAtencion, setEditandoAtencion] = useState<Atencion | null>(null);
   const [mostrarConfirmacionEdicion, setMostrarConfirmacionEdicion] = useState(false);
-  const [isGuardandoEdicion, setIsGuardandoEdicion] = useState(false);
 
   const formatCanal = (canal: string) =>
     CANALES.find(c => c.id === canal) || { label: canal, icono: '📞' };
@@ -65,15 +76,11 @@ export default function AtencionesPage() {
 
   const abrirEdicion = (atencion: Atencion) => {
     setEditandoAtencion(atencion);
-    setForm({
-      canal: atencion.canal || '',
-      resultado: atencion.resultado || '',
-      producto: atencion.producto || '',
-      monto: atencion.monto != null ? String(atencion.monto) : '',
-      observaciones: atencion.observaciones || '',
-    });
+    setForm(formFromAtencion(atencion));
     setMostrarDetalles(!!atencion.observaciones);
     setSugerencias([]);
+    setSugerenciasCliente([]);
+    setError(null);
     setAtencionDetalle(null);
     setShowForm(true);
   };
@@ -94,23 +101,10 @@ export default function AtencionesPage() {
 
   const confirmarEdicion = async () => {
     if (!editandoAtencion) return;
-    setIsGuardandoEdicion(true);
-    try {
-      await apiClient.patch(`/atenciones/${editandoAtencion.id}`, {
-        canal: form.canal,
-        resultado: form.resultado,
-        producto: form.producto || null,
-        monto: form.monto ? Number(form.monto) : null,
-        observaciones: form.observaciones || null,
-      });
+    const ok = await actualizarAtencion(editandoAtencion.id);
+    if (ok) {
       setMostrarConfirmacionEdicion(false);
       setEditandoAtencion(null);
-      cerrarForm();
-      fetchAtenciones();
-    } catch (e) {
-      console.error('[AtencionesPage] Error editando atención', e);
-    } finally {
-      setIsGuardandoEdicion(false);
     }
   };
 
@@ -152,8 +146,29 @@ export default function AtencionesPage() {
         </div>
       )}
 
+      {/* Error al cargar lista / estadísticas */}
+      {loadError && (
+        <div
+          role="alert"
+          className="p-4 bg-red-50 border border-red-200 rounded-2xl flex flex-col gap-3"
+        >
+          <p className="text-sm text-red-800 font-medium">
+            No pudimos cargar tus atenciones
+          </p>
+          <p className="text-sm text-red-700">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void reintentarCarga()}
+            disabled={listReloading}
+            className="self-start px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+          >
+            {listReloading ? 'Cargando...' : 'Reintentar'}
+          </button>
+        </div>
+      )}
+
       {/* Stats de conversión */}
-      {data && (
+      {data && !loadError && (
         <div className="flex flex-col gap-3">
           {/* Tasa de conversión destacada */}
           <div className="bg-[#C8102E] text-white rounded-2xl p-5">
@@ -191,7 +206,7 @@ export default function AtencionesPage() {
       )}
 
       {/* Historial */}
-      {data && data.atenciones.length > 0 && (
+      {data && !loadError && data.atenciones.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Historial reciente
@@ -216,6 +231,11 @@ export default function AtencionesPage() {
                         {resultado.icono} {resultado.label}
                       </span>
                     </div>
+                    {atencion.clientes && (
+                      <p className="text-xs text-gray-600 mt-0.5 truncate">
+                        {atencion.clientes.nombre} {atencion.clientes.apellido}
+                      </p>
+                    )}
                     {atencion.producto && (
                       <p className="text-xs text-gray-500 mt-0.5 truncate">
                         {atencion.producto}
@@ -247,7 +267,7 @@ export default function AtencionesPage() {
       )}
 
       {/* Sin atenciones */}
-      {data && data.atenciones.length === 0 && (
+      {data && !loadError && data.atenciones.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
           <p className="text-3xl mb-2">📋</p>
           <p className="font-semibold text-gray-700">Sin atenciones registradas</p>
@@ -289,6 +309,14 @@ export default function AtencionesPage() {
                     {resultado.icono} {resultado.label}
                   </span>
                 </div>
+                {atencionDetalle.clientes && (
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Cliente</span>
+                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[60%]">
+                      {atencionDetalle.clientes.nombre} {atencionDetalle.clientes.apellido}
+                    </span>
+                  </div>
+                )}
                 {atencionDetalle.producto && (
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Producto</span>
@@ -349,16 +377,24 @@ export default function AtencionesPage() {
           form={form}
           setForm={setForm}
           error={error}
-          isGuardando={isGuardando || isGuardandoEdicion}
+          isGuardando={isGuardando}
           mostrarDetalles={mostrarDetalles}
           setMostrarDetalles={setMostrarDetalles}
           sugerencias={sugerencias}
+          sugerenciasCliente={sugerenciasCliente}
           buscandoProducto={buscandoProducto}
+          buscandoCliente={buscandoCliente}
           onBuscarProductos={buscarProductos}
+          onClienteNombreChange={onClienteNombreChange}
+          onClienteApellidoChange={onClienteApellidoChange}
+          onClienteTelefonoChange={onClienteTelefonoChange}
+          onClienteEmailChange={onClienteEmailChange}
           onSeleccionarProducto={seleccionarProducto}
+          onSeleccionarCliente={seleccionarCliente}
           onCerrar={cerrarFormConContexto}
           onGuardar={handleGuardarConContexto}
           onLimpiarSugerencias={() => setSugerencias([])}
+          onLimpiarSugerenciasCliente={() => setSugerenciasCliente([])}
           title={editandoAtencion ? 'Editar atención' : 'Registrar atención'}
           submitLabel={editandoAtencion ? 'Guardar cambios' : 'Guardar'}
         />
@@ -371,20 +407,28 @@ export default function AtencionesPage() {
             <p className="text-sm text-gray-600">
               ¿Seguro querés guardar los cambios de esta atención?
             </p>
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
-                onClick={() => setMostrarConfirmacionEdicion(false)}
-                disabled={isGuardandoEdicion}
+                onClick={() => {
+                  setMostrarConfirmacionEdicion(false);
+                  setError(null);
+                }}
+                disabled={isGuardando}
                 className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmarEdicion}
-                disabled={isGuardandoEdicion}
+                disabled={isGuardando}
                 className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50"
               >
-                {isGuardandoEdicion ? 'Guardando...' : 'Confirmar'}
+                {isGuardando ? 'Guardando...' : 'Confirmar'}
               </button>
             </div>
           </div>

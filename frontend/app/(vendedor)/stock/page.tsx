@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { BuscadorProductos } from '@/components/ui/BuscadorProductos';
+import { CatalogoStockProximamente } from '@/components/stock/CatalogoStockProximamente';
 import { apiClient } from '@/lib/api';
+import { CATALOGO_STOCK_HABILITADO } from '@/lib/features';
 import { Expand, ImageIcon, Minimize2, Search } from 'lucide-react';
 
 interface ProductoCatalogo {
@@ -18,6 +20,13 @@ interface ProductoCatalogo {
 }
 
 export default function StockVendedorPage() {
+  if (!CATALOGO_STOCK_HABILITADO) {
+    return <CatalogoStockProximamente inicioHref="/dashboard" />;
+  }
+  return <StockVendedorPageContent />;
+}
+
+function StockVendedorPageContent() {
   const [modoCliente, setModoCliente] = useState(false);
   const [query, setQuery] = useState('');
   const [productos, setProductos] = useState<ProductoCatalogo[]>([]);

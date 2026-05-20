@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { apiClient } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 import Image from 'next/image';
 
 interface VendedorPublico {
@@ -42,6 +42,7 @@ export default function EncuestaPage() {
   const [contacto, setContacto] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [participanteYaRegistrado, setParticipanteYaRegistrado] = useState(false);
+  const [sorteoInscripto, setSorteoInscripto] = useState(false);
 
   useEffect(() => {
     const fetchVendedor = async () => {
@@ -65,7 +66,10 @@ export default function EncuestaPage() {
 
     setEstado('enviando');
     try {
-      const res = await apiClient.post<{ participanteYaRegistrado?: boolean }>(`/qr/calificar/${codigo}`, {
+      const res = await apiClient.post<{
+        participanteYaRegistrado?: boolean;
+        sorteoInscripto?: boolean;
+      }>(`/qr/calificar/${codigo}`, {
         estrellasVendedor,
         estrellasEmpresa,
         comentario: comentario.trim() || null,
@@ -75,10 +79,13 @@ export default function EncuestaPage() {
         contacto: contacto.trim() || undefined,
       });
       setParticipanteYaRegistrado(!!res.participanteYaRegistrado);
+      setSorteoInscripto(res.sorteoInscripto === true);
       setEstado('gracias');
-    } catch {
+    } catch (err) {
       setEstado('respondiendo');
-      setErrorMsg('Error al enviar la calificación. Intentá de nuevo.');
+      setErrorMsg(
+        err instanceof ApiError ? err.message : 'Error al enviar la calificación. Intentá de nuevo.'
+      );
     }
   };
 
@@ -138,16 +145,30 @@ export default function EncuestaPage() {
             <p className="text-sm font-semibold text-gray-900 mt-1">Tu valoración de Martínez: {estrellasEmpresa}/5</p>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
-            <p className="text-sm font-semibold text-amber-800">
-              {participanteYaRegistrado ? '🎁 Ya estabas registrado en el sorteo' : '🎁 ¡Ya estás participando!'}
-            </p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              {participanteYaRegistrado
-                ? 'Mantenemos tu participación vigente para el próximo sorteo mensual.'
-                : 'Tu calificación te inscribió automáticamente en el sorteo mensual de Martínez Neumáticos.'}
-            </p>
-          </div>
+          {sorteoInscripto ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+              <p className="text-sm font-semibold text-amber-800">
+                {participanteYaRegistrado
+                  ? '🎁 Ya estabas registrado en el sorteo'
+                  : '🎁 ¡Ya estás participando!'}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {participanteYaRegistrado
+                  ? 'Mantenemos tu participación vigente para el próximo sorteo mensual.'
+                  : 'Tu calificación completó tu inscripción en el sorteo mensual de Martínez Neumáticos.'}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center">
+              <p className="text-sm font-medium text-gray-800 leading-snug">
+                Tu calificación quedó registrada.
+              </p>
+              <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+                Para participar del sorteo mensual hace falta completar nombre, apellido, DNI y contacto en el formulario.
+                Si no los completaste, podés volver a escanear el QR cuando tengas los datos.
+              </p>
+            </div>
+          )}
 
           <p className="text-sm text-gray-400">
             Podés cerrar esta página

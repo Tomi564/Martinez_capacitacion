@@ -11,6 +11,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { BuscadorProductos } from '@/components/ui/BuscadorProductos';
+import { CatalogoStockProximamente } from '@/components/stock/CatalogoStockProximamente';
+import { CATALOGO_STOCK_HABILITADO } from '@/lib/features';
 
 interface Producto {
   id: string;
@@ -26,6 +28,13 @@ interface Producto {
 const FORM_VACIO = { nombre: '', marca: '', descripcion: '', codigo: '', precio: '', stock: '', stock_minimo: '' };
 
 export default function StockAdminPage() {
+  if (!CATALOGO_STOCK_HABILITADO) {
+    return <CatalogoStockProximamente inicioHref="/admin" />;
+  }
+  return <StockAdminPageContent />;
+}
+
+function StockAdminPageContent() {
   const [tab, setTab] = useState<'buscar' | 'gestionar'>('buscar');
   const [productos, setProductos] = useState<Producto[]>([]);
   const [isLoading, setIsLoading] = useState(false);

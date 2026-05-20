@@ -23,12 +23,40 @@ function formatMonto(val: number) {
 export default function EstadisticasPage() {
   const [data, setData] = useState<Estadisticas | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+
+  const cargar = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true);
+    try {
+      const res = await apiClient.get<Estadisticas>('/admin/estadisticas');
+      setData(res);
+      setLoadError(null);
+    } catch (err) {
+      console.error('[Estadisticas] Error cargando datos', err);
+      const mensaje =
+        err instanceof Error && err.message
+          ? err.message
+          : 'No pudimos cargar las estadísticas. Reintentá o revisá la conexión.';
+      setLoadError(mensaje);
+    } finally {
+      if (!opts?.silent) setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    apiClient.get<Estadisticas>('/admin/estadisticas')
-      .then(setData)
-      .finally(() => setIsLoading(false));
+    void cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial
   }, []);
+
+  const reintentar = async () => {
+    setRetrying(true);
+    try {
+      await cargar({ silent: true });
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -38,7 +66,45 @@ export default function EstadisticasPage() {
     );
   }
 
-  if (!data) return null;
+  if (loadError) {
+    return (
+      <div className="px-4 lg:px-8 py-6 max-w-4xl mx-auto">
+        <div
+          role="alert"
+          className="p-6 bg-red-50 border border-red-200 rounded-2xl flex flex-col gap-4"
+        >
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Estadísticas</h1>
+            <p className="text-sm text-red-800 font-medium mt-2">No pudimos cargar los datos</p>
+            <p className="text-sm text-red-700 mt-1">{loadError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void reintentar()}
+            disabled={retrying}
+            className="self-start px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+          >
+            {retrying ? 'Cargando...' : 'Reintentar'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="px-4 lg:px-8 py-6 max-w-4xl mx-auto">
+        <p className="text-sm text-gray-600">No hay datos para mostrar.</p>
+        <button
+          type="button"
+          onClick={() => void reintentar()}
+          className="mt-3 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   const totalVentasHistorico = data.ventasPorSemana.reduce((acc, s) => acc + s.ventas, 0);
   const totalMontoHistorico = data.montoPorMes.reduce((acc, m) => acc + m.monto, 0);

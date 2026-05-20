@@ -6,12 +6,12 @@
 
 import { Router } from 'express';
 import { examenesController } from '../controllers/examenes.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
-router.use(authMiddleware);
+// Todas las rutas requieren autenticación y rol vendedor (exámenes de capacitación)
+router.use(authMiddleware, requireRole('vendedor'));
 
 // GET /api/examenes/:moduloId/preguntas
 router.get(

@@ -5,11 +5,28 @@
 import { Response, NextFunction } from 'express';
 import { atencionesService } from '../services/atenciones.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { validarDatosCliente } from '../utils/validarCliente';
+import { validarProductoMontoPorResultado } from '../utils/validarAtencion';
+import { mensajeResultadoInvalido, validarResultadoAtencion } from '../constants/atenciones';
+
+function parseClienteBody(body: Record<string, unknown>) {
+  const cliente = validarDatosCliente({
+    nombre: body.cliente_nombre as string | undefined,
+    apellido: body.cliente_apellido as string | undefined,
+    telefono: body.cliente_telefono as string | undefined,
+    email: body.cliente_email as string | undefined,
+  });
+
+  return {
+    cliente_id: (body.cliente_id as string) || null,
+    participante_qr_id: (body.participante_qr_id as string) || null,
+    cliente,
+  };
+}
 
 export class AtencionesController {
   /**
    * POST /api/atenciones
-   * Registra una nueva atención
    */
   async crear(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -22,12 +39,25 @@ export class AtencionesController {
         });
       }
 
+      const resultadoStr = String(resultado).trim();
+      if (!validarResultadoAtencion(resultadoStr)) {
+        return res.status(400).json({ error: mensajeResultadoInvalido(resultadoStr) });
+      }
+
+      const clienteFields = parseClienteBody(req.body);
+      const { producto: productoVal, monto: montoVal } = validarProductoMontoPorResultado(
+        resultadoStr,
+        producto,
+        monto
+      );
+
       const result = await atencionesService.crear(userId, {
         canal,
-        resultado,
-        producto,
-        monto: monto ? Number(monto) : undefined,
+        resultado: resultadoStr,
+        producto: productoVal,
+        monto: montoVal,
         observaciones,
+        ...clienteFields,
       });
 
       return res.status(201).json(result);
@@ -38,7 +68,6 @@ export class AtencionesController {
 
   /**
    * PATCH /api/atenciones/:id
-   * Edita una atención existente del vendedor
    */
   async actualizar(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -57,12 +86,25 @@ export class AtencionesController {
         });
       }
 
+      const resultadoStr = String(resultado).trim();
+      if (!validarResultadoAtencion(resultadoStr)) {
+        return res.status(400).json({ error: mensajeResultadoInvalido(resultadoStr) });
+      }
+
+      const clienteFields = parseClienteBody(req.body);
+      const { producto: productoVal, monto: montoVal } = validarProductoMontoPorResultado(
+        resultadoStr,
+        producto,
+        monto
+      );
+
       const result = await atencionesService.actualizar(userId, atencionId, {
         canal,
-        resultado,
-        producto,
-        monto: monto ? Number(monto) : undefined,
+        resultado: resultadoStr,
+        producto: productoVal,
+        monto: montoVal,
         observaciones,
+        ...clienteFields,
       });
 
       return res.status(200).json(result);
@@ -73,7 +115,6 @@ export class AtencionesController {
 
   /**
    * GET /api/atenciones/mias
-   * Historial y estadísticas del vendedor
    */
   async getMias(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -86,8 +127,7 @@ export class AtencionesController {
   }
 
   /**
-   * GET /api/atenciones/todas
-   * Todas las atenciones — solo admin
+   * GET /api/atenciones/todas — solo admin
    */
   async getTodas(req: AuthRequest, res: Response, next: NextFunction) {
     try {

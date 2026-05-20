@@ -143,7 +143,7 @@ export default function MiQRPage() {
             'Atendé al cliente y cerrá la venta',
             'Mostrá este QR con la pantalla del celular',
             'El cliente lo escanea con su cámara',
-            'Califica tu atención de forma anónima',
+            'Calificá tu atención de forma anónima',
           ].map((paso, i) => (
             <div key={i} className="flex items-start gap-2">
               <span className="w-5 h-5 bg-blue-200 text-blue-800 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
+import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { FileText } from 'lucide-react';
 
 interface Visita {
@@ -12,7 +13,7 @@ interface Visita {
   km: number | null; diagnostico_enviado: boolean; created_at: string;
   vehiculos: {
     patente: string; marca: string; modelo: string; anio: number | null; medida_rueda: string | null;
-    clientes: { nombre: string; apellido: string; email: string | null; telefono: string | null } | null;
+    clientes: { nombre: string; apellido: string; dni: string | null; email: string | null; telefono: string | null } | null;
   } | null;
 }
 
@@ -81,7 +82,11 @@ export default function VisitaAdminDetalle() {
         </div>
         {c && (
           <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="font-bold text-gray-800">{c.nombre} {c.apellido}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-bold text-gray-800">{c.nombre} {c.apellido}</p>
+              <BadgeRangoEtario dni={c.dni} />
+            </div>
+            {c.dni && <p className="text-xs text-gray-500">DNI: {c.dni}</p>}
             {c.telefono && <p className="text-sm text-gray-500">{c.telefono}</p>}
             {c.email && <p className="text-sm text-gray-400">{c.email}</p>}
           </div>

@@ -13,18 +13,21 @@ router.use(authMiddleware);
 // POST /api/atenciones
 router.post(
   '/',
+  requireRole('vendedor'),
   atencionesController.crear.bind(atencionesController)
 );
 
 // PATCH /api/atenciones/:id
 router.patch(
   '/:id',
+  requireRole('vendedor'),
   atencionesController.actualizar.bind(atencionesController)
 );
 
 // GET /api/atenciones/mias
 router.get(
   '/mias',
+  requireRole('vendedor'),
   atencionesController.getMias.bind(atencionesController)
 );
 

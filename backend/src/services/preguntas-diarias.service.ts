@@ -42,19 +42,39 @@ export class PreguntasDiariasService {
     return this.normalizeOpcionId(stored) === this.normalizeOpcionId(elegida);
   }
 
-  /** IDs activos por categoría (para sorteo). */
-  private async idsActivosPorCategoria(cat: CategoriaPreguntaDiaria): Promise<string[]> {
-    const { data, error } = await supabase
+  /**
+   * Pool de sorteo: activas de la categoría con modulo_id en módulos aprobados
+   * o modulo_id null (fallback mientras el admin asigna módulos).
+   */
+  private async idsActivosPorCategoria(
+    cat: CategoriaPreguntaDiaria,
+    modulosAprobadosIds: string[]
+  ): Promise<string[]> {
+    let query = supabase
       .from('preguntas_diarias')
       .select('id')
       .eq('categoria', cat)
       .eq('activo', true);
+
+    if (modulosAprobadosIds.length > 0) {
+      query = query.or(
+        `modulo_id.is.null,modulo_id.in.(${modulosAprobadosIds.join(',')})`
+      );
+    } else {
+      query = query.is('modulo_id', null);
+    }
+
+    const { data, error } = await query;
     if (error) throw new AppError('Error al obtener preguntas diarias', 500);
     return (data || []).map((r) => r.id as string);
   }
 
   /** Obtiene o crea la asignación del día (desempata condición única con relectura). */
-  private async obtenerOCrearAsignacion(userId: string, fecha: string) {
+  private async obtenerOCrearAsignacion(
+    userId: string,
+    fecha: string,
+    modulosAprobadosIds: string[]
+  ) {
     const { data: existente } = await supabase
       .from('asignaciones_pregunta_diaria')
       .select('*')
@@ -64,8 +84,8 @@ export class PreguntasDiariasService {
 
     if (existente) return existente;
 
-    const ventasIds = await this.idsActivosPorCategoria('ventas');
-    const productoIds = await this.idsActivosPorCategoria('producto');
+    const ventasIds = await this.idsActivosPorCategoria('ventas', modulosAprobadosIds);
+    const productoIds = await this.idsActivosPorCategoria('producto', modulosAprobadosIds);
     if (!ventasIds.length || !productoIds.length) {
       throw new AppError(
         'No hay preguntas diarias activas suficientes (necesitás al menos una de ventas y una de producto).',
@@ -105,8 +125,8 @@ export class PreguntasDiariasService {
   }
 
   async getEstadoVendedor(userId: string) {
-    const ok = await modulosService.capacitacionCompleta(userId);
-    if (!ok) {
+    const modulosAprobadosIds = await modulosService.idsModulosAprobados(userId);
+    if (modulosAprobadosIds.length === 0) {
       return { eligible: false as const };
     }
 
@@ -120,7 +140,7 @@ export class PreguntasDiariasService {
 
     if (errResp) throw new AppError('Error al leer respuestas del día', 500);
 
-    const asignacion = await this.obtenerOCrearAsignacion(userId, fecha);
+    const asignacion = await this.obtenerOCrearAsignacion(userId, fecha, modulosAprobadosIds);
     const idsHoy = new Set([asignacion.pregunta_ventas_id, asignacion.pregunta_producto_id]);
     const respuestasDelPar = (respuestasHoy || []).filter((r) =>
       idsHoy.has(r.pregunta_diaria_id)
@@ -199,12 +219,14 @@ export class PreguntasDiariasService {
     const opcion_id = String(opcionIdRaw || '').trim();
     if (!opcion_id) throw new AppError('opcion_id es requerido', 400);
 
-    const ok = await modulosService.capacitacionCompleta(userId);
-    if (!ok) throw new AppError('No tenés acceso a las preguntas diarias', 403);
+    const modulosAprobadosIds = await modulosService.idsModulosAprobados(userId);
+    if (modulosAprobadosIds.length === 0) {
+      throw new AppError('No tenés acceso a las preguntas diarias', 403);
+    }
 
     const fecha = fechaLocalArgentinaISO();
 
-    const asignacion = await this.obtenerOCrearAsignacion(userId, fecha);
+    const asignacion = await this.obtenerOCrearAsignacion(userId, fecha, modulosAprobadosIds);
     const permitidas = new Set([
       asignacion.pregunta_ventas_id,
       asignacion.pregunta_producto_id,
@@ -294,6 +316,7 @@ export class PreguntasDiariasService {
     respuesta_correcta: string;
     explicacion?: string | null;
     activo?: boolean;
+    modulo_id?: string | null;
   }) {
     const enunciado = String(body.enunciado || '').trim();
     if (!enunciado) throw new AppError('Enunciado requerido', 400);
@@ -307,6 +330,11 @@ export class PreguntasDiariasService {
       throw new AppError('respuesta_correcta debe coincidir con el id de una opción', 400);
     }
 
+    const modulo_id =
+      body.modulo_id === undefined || body.modulo_id === null || body.modulo_id === ''
+        ? null
+        : String(body.modulo_id).trim();
+
     const { data, error } = await supabase
       .from('preguntas_diarias')
       .insert({
@@ -316,6 +344,7 @@ export class PreguntasDiariasService {
         respuesta_correcta: rc,
         explicacion: body.explicacion?.trim() || null,
         activo: body.activo !== false,
+        modulo_id,
       })
       .select('*')
       .single();
@@ -333,6 +362,7 @@ export class PreguntasDiariasService {
       respuesta_correcta: string;
       explicacion: string | null;
       activo: boolean;
+      modulo_id: string | null;
     }>
   ) {
     const { data: actual, error: errAct } = await supabase
@@ -357,6 +387,12 @@ export class PreguntasDiariasService {
     const explicacion =
       body.explicacion !== undefined ? body.explicacion : (actual.explicacion as string | null);
     const activo = body.activo !== undefined ? body.activo : (actual.activo === true);
+    const modulo_id =
+      body.modulo_id !== undefined
+        ? body.modulo_id === null || body.modulo_id === ''
+          ? null
+          : String(body.modulo_id).trim()
+        : (actual.modulo_id as string | null) ?? null;
 
     if (!enunciado.trim()) throw new AppError('Enunciado requerido', 400);
     if (opciones.length < 2) throw new AppError('Al menos 2 opciones', 400);
@@ -373,6 +409,7 @@ export class PreguntasDiariasService {
         respuesta_correcta,
         explicacion: explicacion ?? null,
         activo,
+        modulo_id,
       })
       .eq('id', id)
       .select('*')

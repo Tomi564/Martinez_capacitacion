@@ -17,7 +17,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { apiClient } from '@/lib/api';
+import { ApiError, apiClient, bindAuthTokenSource } from '@/lib/api';
 import type { User, LoginResponse } from '@/types';
 
 interface AuthState {
@@ -26,11 +26,14 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   error: string | null;
+  /** True cuando /auth/me devolvió 401 — el layout vendedor muestra aviso y redirige al login */
+  sessionExpiredBanner: boolean;
 
   // Acciones
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  clearSessionExpiredBanner: () => void;
   refreshUser: () => Promise<void>;
 
   // Guards
@@ -52,6 +55,7 @@ export const useAuth = create<AuthState>()(
       token: null,
       isLoading: false,
       error: null,
+      sessionExpiredBanner: false,
 
       // ─────────────────────────────────────────────────────
       // Login: llama al backend y guarda token + user
@@ -85,6 +89,7 @@ export const useAuth = create<AuthState>()(
             user: response.user as User,
             isLoading: false,
             error: null,
+            sessionExpiredBanner: false,
           });
         } catch (error) {
           set({
@@ -116,6 +121,7 @@ export const useAuth = create<AuthState>()(
           user: null,
           token: null,
           error: null,
+          sessionExpiredBanner: false,
         });
 
         // Redirigir al login
@@ -129,12 +135,23 @@ export const useAuth = create<AuthState>()(
       refreshUser: async () => {
         try {
           const response = await apiClient.get<{ user: User }>('/auth/me');
-          set({ user: response.user });
+          set({ user: response.user, error: null });
         } catch (error) {
+          if (error instanceof ApiError && error.status === 401) {
+            console.error('[useAuth.refreshUser] Sesión inválida o expirada', error);
+            set({
+              token: null,
+              user: null,
+              error: null,
+              sessionExpiredBanner: true,
+            });
+            return;
+          }
           console.error('[useAuth.refreshUser] Error refrescando usuario', error);
-          set({ error: 'La sesión venció. Iniciá sesión nuevamente.' });
-          // Si falla (token expirado), hacer logout
-          get().logout();
+          set({
+            error:
+              'No pudimos actualizar tus datos. Revisá tu conexión e intentá de nuevo.',
+          });
         }
       },
 
@@ -142,6 +159,8 @@ export const useAuth = create<AuthState>()(
       // Limpiar mensaje de error
       // ─────────────────────────────────────────────────────
       clearError: () => set({ error: null }),
+
+      clearSessionExpiredBanner: () => set({ sessionExpiredBanner: false }),
 
       // ─────────────────────────────────────────────────────
       // Guards de rol
@@ -186,3 +205,5 @@ export const useAuth = create<AuthState>()(
     }
   )
 );
+
+bindAuthTokenSource(() => useAuth.getState().token);

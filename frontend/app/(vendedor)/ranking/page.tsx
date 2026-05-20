@@ -27,15 +27,41 @@ export default function RankingPage() {
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [semana, setSemana] = useState<Semana | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+
+  const cargarRanking = async (opts?: { conSpinnerInicial?: boolean }) => {
+    if (opts?.conSpinnerInicial) setIsLoading(true);
+    try {
+      const res = await apiClient.get<{ ranking: RankingEntry[]; semana: Semana }>('/ranking/semanal');
+      setRanking(res.ranking);
+      setSemana(res.semana);
+      setLoadError(null);
+    } catch (err) {
+      console.error('[Ranking] Error cargando ranking semanal', err);
+      const mensaje =
+        err instanceof Error && err.message
+          ? err.message
+          : 'No pudimos cargar el ranking. Revisá la conexión y reintentá.';
+      setLoadError(mensaje);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    apiClient.get<{ ranking: RankingEntry[]; semana: Semana }>('/ranking/semanal')
-      .then(res => {
-        setRanking(res.ranking);
-        setSemana(res.semana);
-      })
-      .finally(() => setIsLoading(false));
+    void cargarRanking({ conSpinnerInicial: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial
   }, []);
+
+  const reintentar = async () => {
+    setRetrying(true);
+    try {
+      await cargarRanking();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -73,8 +99,26 @@ export default function RankingPage() {
         )}
       </div>
 
+      {loadError && (
+        <div
+          role="alert"
+          className="p-4 bg-red-50 border border-red-200 rounded-2xl flex flex-col gap-3"
+        >
+          <p className="text-sm text-red-800 font-medium">No pudimos cargar el ranking</p>
+          <p className="text-sm text-red-700">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void reintentar()}
+            disabled={retrying}
+            className="self-start px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+          >
+            {retrying ? 'Cargando...' : 'Reintentar'}
+          </button>
+        </div>
+      )}
+
       {/* Mi posición destacada */}
-      {miEntry && (
+      {!loadError && miEntry && (
         <div className="bg-[#C8102E] text-white rounded-2xl p-4 flex items-center gap-4">
           <div className="text-3xl font-black w-12 text-center shrink-0">
             {miPosicion < 3 ? MEDALLAS[miPosicion] : `#${miPosicion + 1}`}
@@ -91,7 +135,7 @@ export default function RankingPage() {
 
       {/* Lista completa */}
       <div className="flex flex-col gap-2">
-        {ranking.map((entry, i) => {
+        {!loadError && ranking.map((entry, i) => {
           const esMio = entry.id === user?.id;
           const pct = maxVentas > 0 ? Math.round((entry.cantidadVentas / maxVentas) * 100) : 0;
 
@@ -142,6 +186,11 @@ export default function RankingPage() {
             </div>
           );
         })}
+        {!loadError && ranking.length === 0 && (
+          <p className="text-sm text-gray-500 text-center py-6">
+            Todavía no hay datos de ventas esta semana.
+          </p>
+        )}
       </div>
 
       {semana?.estado === 'cerrada' && (

@@ -61,7 +61,7 @@ export default function AdminPreguntasDiariasPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Preguntas diarias</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Refuerzo para vendedores que completaron la capacitación (1 ventas + 1 producto por día).
+            Refuerzo progresivo: 1 ventas + 1 producto por día, del pool de módulos que cada vendedor aprobó.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

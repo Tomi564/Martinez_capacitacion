@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { apiClient } from '@/lib/api';
 
 interface VisitaDetalle {
@@ -19,7 +20,7 @@ interface VisitaDetalle {
   auxilio_revisado?: boolean | null;
   presupuesto?: string | null;
   fotos_neumatico_urls?: string[] | null;
-  vehiculos: { patente: string; marca: string; modelo: string; clientes: { nombre: string; apellido: string } | null } | null;
+  vehiculos: { patente: string; marca: string; modelo: string; clientes: { nombre: string; apellido: string; dni: string | null } | null } | null;
 }
 
 const PSI_PER_BAR = 14.5037738;
@@ -117,9 +118,17 @@ export default function AdminVisitaDetallePage() {
         <p className="font-semibold text-gray-900">
           {visita.vehiculos?.patente} · {visita.vehiculos?.marca} {visita.vehiculos?.modelo}
         </p>
-        <p className="text-xs text-gray-500">
-          Cliente: {visita.vehiculos?.clientes ? `${visita.vehiculos.clientes.nombre} ${visita.vehiculos.clientes.apellido}` : 'Sin cliente'}
-        </p>
+        <div className="text-xs text-gray-500 flex flex-wrap items-center gap-2 mt-0.5">
+          <span>
+            Cliente:{' '}
+            {visita.vehiculos?.clientes
+              ? `${visita.vehiculos.clientes.nombre} ${visita.vehiculos.clientes.apellido}`
+              : 'Sin cliente'}
+          </span>
+          {visita.vehiculos?.clientes && (
+            <BadgeRangoEtario dni={visita.vehiculos.clientes.dni} />
+          )}
+        </div>
         <p className="text-xs text-gray-500">
           Creada: {new Date(visita.created_at).toLocaleString('es-AR')}
         </p>

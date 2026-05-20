@@ -1,13 +1,19 @@
 'use client';
 
-import type { ProductoSugerencia } from '@/hooks/useAtenciones';
+import {
+  puedeGuardarAtencion,
+  type ClienteSugerencia,
+  type FormAtencionState,
+  type ProductoSugerencia,
+} from '@/hooks/useAtenciones';
 
 const CANALES = [
   { id: 'whatsapp', label: 'WhatsApp', icono: '💬' },
   { id: 'mercadolibre', label: 'Mercado Libre', icono: '🛒' },
   { id: 'instagram', label: 'Instagram', icono: '📸' },
   { id: 'presencial', label: 'Presencial', icono: '🏪' },
-  { id: 'otro', label: 'Otro', icono: '📞' },
+  { id: 'telefono', label: 'Teléfono', icono: '📞' },
+  { id: 'otro', label: 'Otro', icono: '⋯' },
 ];
 
 const RESULTADOS = [
@@ -16,28 +22,28 @@ const RESULTADOS = [
   { id: 'pendiente', label: 'Pendiente', icono: '⏳' },
 ];
 
-interface FormState {
-  canal: string;
-  resultado: string;
-  producto: string;
-  monto: string;
-  observaciones: string;
-}
-
 interface FormAtencionProps {
-  form: FormState;
-  setForm: React.Dispatch<React.SetStateAction<FormState>>;
+  form: FormAtencionState;
+  setForm: React.Dispatch<React.SetStateAction<FormAtencionState>>;
   error: string | null;
   isGuardando: boolean;
   mostrarDetalles: boolean;
   setMostrarDetalles: (v: boolean) => void;
   sugerencias: ProductoSugerencia[];
+  sugerenciasCliente: ClienteSugerencia[];
   buscandoProducto: boolean;
+  buscandoCliente: boolean;
   onBuscarProductos: (texto: string) => void;
+  onClienteNombreChange: (texto: string) => void;
+  onClienteApellidoChange: (texto: string) => void;
+  onClienteTelefonoChange: (texto: string) => void;
+  onClienteEmailChange: (texto: string) => void;
   onSeleccionarProducto: (producto: ProductoSugerencia) => void;
+  onSeleccionarCliente: (cliente: ClienteSugerencia) => void;
   onCerrar: () => void;
   onGuardar: () => void;
   onLimpiarSugerencias: () => void;
+  onLimpiarSugerenciasCliente: () => void;
   title?: string;
   submitLabel?: string;
 }
@@ -50,15 +56,26 @@ export function FormAtencion({
   mostrarDetalles,
   setMostrarDetalles,
   sugerencias,
+  sugerenciasCliente,
   buscandoProducto,
+  buscandoCliente,
   onBuscarProductos,
+  onClienteNombreChange,
+  onClienteApellidoChange,
+  onClienteTelefonoChange,
+  onClienteEmailChange,
   onSeleccionarProducto,
+  onSeleccionarCliente,
   onCerrar,
   onGuardar,
   onLimpiarSugerencias,
+  onLimpiarSugerenciasCliente,
   title = 'Registrar atención',
   submitLabel = 'Guardar',
 }: FormAtencionProps) {
+  const esVentaCerrada = form.resultado === 'venta_cerrada';
+  const puedeGuardar = puedeGuardarAtencion(form);
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md p-5 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
@@ -100,7 +117,7 @@ export function FormAtencion({
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-gray-900">¿Por dónde llegó?</label>
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {CANALES.map((canal) => (
               <button
                 key={canal.id}
@@ -118,19 +135,89 @@ export function FormAtencion({
           </div>
         </div>
 
+        
+        <div className="flex flex-col gap-2 relative">
+          <label className="text-sm font-semibold text-gray-900">Cliente</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={form.cliente_nombre}
+                onChange={(e) => onClienteNombreChange(e.target.value)}
+                onBlur={() => setTimeout(onLimpiarSugerenciasCliente, 150)}
+                placeholder="Nombre *"
+                className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
+              />
+            </div>
+            <input
+              type="text"
+              required
+              value={form.cliente_apellido}
+              onChange={(e) => onClienteApellidoChange(e.target.value)}
+              placeholder="Apellido *"
+              className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
+            />
+            <div className="relative">
+              <input
+                type="tel"
+                required
+                value={form.cliente_telefono}
+                onChange={(e) => onClienteTelefonoChange(e.target.value)}
+                onBlur={() => setTimeout(onLimpiarSugerenciasCliente, 150)}
+                placeholder="Teléfono *"
+                className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
+              />
+              {buscandoCliente && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+            <input
+              type="email"
+              required
+              value={form.cliente_email}
+              onChange={(e) => onClienteEmailChange(e.target.value)}
+              placeholder="Mail *"
+              className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
+            />
+          </div>
+          {sugerenciasCliente.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+              {sugerenciasCliente.map((s) => (
+                <button
+                  key={`${s.tipo}-${s.id}`}
+                  type="button"
+                  onMouseDown={() => onSeleccionarCliente(s)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                >
+                  <p className="text-sm font-medium text-gray-900 truncate">{s.etiqueta}</p>
+                  <p className="text-xs text-gray-400">{s.tipo === 'qr' ? 'Participante QR' : 'Cliente registrado'}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {form.resultado && (
           <div className="flex flex-col gap-1.5 relative">
             <label className="text-sm font-semibold text-gray-900">
-              Producto
-              <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+              Producto vendido
+              {esVentaCerrada ? (
+                <span className="text-[#C8102E] font-normal ml-1">*</span>
+              ) : (
+                <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+              )}
             </label>
             <div className="relative">
               <input
                 type="text"
+                required={esVentaCerrada}
                 value={form.producto}
                 onChange={(e) => onBuscarProductos(e.target.value)}
                 onBlur={() => setTimeout(onLimpiarSugerencias, 150)}
-                placeholder="Buscar por marca o medida…"
+                placeholder={esVentaCerrada ? 'Qué se vendió…' : 'Buscar por marca o medida… (opcional)'}
                 className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
               />
               {buscandoProducto && (
@@ -168,16 +255,18 @@ export function FormAtencion({
           </div>
         )}
 
-        {form.resultado === 'venta_cerrada' && (
+        {esVentaCerrada && (
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-gray-900">
               Monto
-              <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+              <span className="text-[#C8102E] font-normal ml-1">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
               <input
                 type="number"
+                required
+                min={1}
                 value={form.monto}
                 onChange={(e) => setForm((prev) => ({ ...prev, monto: e.target.value }))}
                 placeholder="85000"
@@ -214,7 +303,7 @@ export function FormAtencion({
           </button>
           <button
             onClick={onGuardar}
-            disabled={isGuardando || !form.canal || !form.resultado}
+            disabled={isGuardando || !puedeGuardar}
             className="flex-1 py-3 bg-[#C8102E] text-white font-semibold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isGuardando ? (

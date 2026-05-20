@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { Download } from 'lucide-react';
+import { apiClient, ApiError } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
+import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { Badge } from '@/components/ui/badge';
 
 export interface InformeVisita {
@@ -35,7 +37,7 @@ export interface InformeVisita {
     modelo: string;
     anio: number | null;
     medida_rueda: string | null;
-    clientes: { nombre: string; apellido: string; email: string | null; telefono: string | null } | null;
+    clientes: { nombre: string; apellido: string; dni: string | null; email: string | null; telefono: string | null } | null;
   } | null;
 }
 
@@ -75,10 +77,28 @@ function psiToBar(psi: number) {
   return psi / PSI_PER_BAR;
 }
 
-export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
+export type PresupuestoPdfApiBase = '/vendedor/visitas' | '/admin/visitas';
+
+function nombrePresupuestoPdf(patente: string, createdAt: string): string {
+  const pat = patente.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'SIN-PATENTE';
+  const f = new Date(createdAt)
+    .toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    .replace(/\//g, '-');
+  return `presupuesto-${pat}-${f}.pdf`;
+}
+
+export function InformeVisitaTaller({
+  visitaId,
+  presupuestoApiBase,
+}: {
+  visitaId: string;
+  presupuestoApiBase: PresupuestoPdfApiBase;
+}) {
   const [visita, setVisita] = useState<InformeVisita | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
 
   const cargar = async () => {
     setLoading(true);
@@ -98,6 +118,25 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
   useEffect(() => {
     cargar();
   }, [visitaId]);
+
+  const descargarPresupuesto = async () => {
+    if (!visita) return;
+    setDescargandoPdf(true);
+    setErrorPdf(null);
+    try {
+      const patente = visita.vehiculos?.patente || 'sin-patente';
+      const fallback = nombrePresupuestoPdf(patente, visita.created_at);
+      await apiClient.downloadFile(
+        `${presupuestoApiBase}/${visitaId}/presupuesto.pdf`,
+        fallback
+      );
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'No se pudo descargar el presupuesto.';
+      setErrorPdf(msg);
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
 
   if (loading || error || !visita) {
     return (
@@ -140,6 +179,19 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
         )}
       </div>
 
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={descargarPresupuesto}
+          disabled={descargandoPdf}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#a50d26] disabled:opacity-60"
+        >
+          <Download className="w-4 h-4" />
+          {descargandoPdf ? 'Generando PDF…' : 'Descargar presupuesto'}
+        </button>
+        {errorPdf && <p className="text-sm text-red-600">{errorPdf}</p>}
+      </div>
+
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Vehículo y cliente</p>
         <p className="text-3xl font-black tracking-widest text-gray-900">{v?.patente}</p>
@@ -150,9 +202,13 @@ export function InformeVisitaTaller({ visitaId }: { visitaId: string }) {
         {v?.medida_rueda && <p className="text-sm text-gray-500 mt-1">Medida rueda: {v.medida_rueda}</p>}
         {c && (
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="font-bold text-gray-900">
-              {c.nombre} {c.apellido}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-bold text-gray-900">
+                {c.nombre} {c.apellido}
+              </p>
+              <BadgeRangoEtario dni={c.dni} />
+            </div>
+            {c.dni && <p className="text-xs text-gray-500">DNI: {c.dni}</p>}
             {c.telefono && <p className="text-sm text-gray-600">{c.telefono}</p>}
             {c.email && <p className="text-sm text-gray-500">{c.email}</p>}
           </div>

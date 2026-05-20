@@ -136,6 +136,23 @@ export class ModulosService {
     return modulos.every((m) => m.estado === 'aprobado');
   }
 
+  /** IDs de módulos con progreso.estado = 'aprobado' para este vendedor. */
+  async idsModulosAprobados(userId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('progreso')
+      .select('modulo_id')
+      .eq('user_id', userId)
+      .eq('estado', 'aprobado');
+
+    if (error) throw new AppError('Error al obtener módulos aprobados', 500);
+    return (data || []).map((r) => r.modulo_id as string);
+  }
+
+  async tieneAlMenosUnModuloAprobado(userId: string): Promise<boolean> {
+    const ids = await this.idsModulosAprobados(userId);
+    return ids.length > 0;
+  }
+
   /**
    * Obtiene el detalle de un módulo específico con el progreso
    * del vendedor autenticado.

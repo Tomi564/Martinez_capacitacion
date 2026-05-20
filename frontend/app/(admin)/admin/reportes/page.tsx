@@ -9,7 +9,8 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 
 interface ReporteProgreso {
@@ -52,33 +53,96 @@ interface ReportesData {
   calificaciones: ReporteCalificaciones[];
 }
 
+interface VendedorBloqueado {
+  vendedorId: string;
+  vendedorNombre: string;
+  vendedorEmail: string;
+  moduloId: string;
+  moduloTitulo: string;
+  moduloOrden: number;
+  intentos: number;
+  estado: string;
+}
+
+type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados';
+
+const TAB_LABELS: Record<TabAnaliticas, string> = {
+  progreso: 'Capacitación',
+  calificaciones: 'Calificaciones QR',
+  bloqueados: 'Bloqueados',
+};
+
 export default function ReportesPage() {
   const [data, setData] = useState<ReportesData | null>(null);
+  const [vendedoresBloqueados, setVendedoresBloqueados] = useState<VendedorBloqueado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tabActiva, setTabActiva] = useState<'progreso' | 'calificaciones'>(
-    'progreso'
-  );
+  const [errorReportes, setErrorReportes] = useState<string | null>(null);
+  const [errorBloqueados, setErrorBloqueados] = useState<string | null>(null);
+  const [csvExportError, setCsvExportError] = useState<string | null>(null);
+  const [tabActiva, setTabActiva] = useState<TabAnaliticas>('progreso');
+  const [resetKey, setResetKey] = useState<string | null>(null);
+
+  const loadBloqueados = useCallback(async () => {
+    const res = await apiClient.get<{ vendedoresBloqueados: VendedorBloqueado[] }>(
+      '/admin/vendedores-bloqueados'
+    );
+    setVendedoresBloqueados(res.vendedoresBloqueados);
+  }, []);
 
   useEffect(() => {
     const fetchReportes = async () => {
-      try {
-        const res = await apiClient.get<ReportesData>('/admin/reportes');
-        setData(res);
-      } catch (err) {
-        setError('Error al cargar los reportes');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(true);
+      setErrorReportes(null);
+      setErrorBloqueados(null);
+
+      const reqReportes = apiClient
+        .get<ReportesData>('/admin/reportes')
+        .then((reportesRes) => setData(reportesRes))
+        .catch((err) => {
+          console.error('[ReportesPage] Error cargando reportes', err);
+          setErrorReportes(
+            'No se pudieron cargar capacitación ni calificaciones. Podés reintentar desde acá o revisar la conexión.'
+          );
+        });
+
+      const reqBloqueados = loadBloqueados().catch((err) => {
+        console.error('[ReportesPage] Error cargando bloqueados', err);
+        setErrorBloqueados('No se pudo cargar la lista de vendedores bloqueados.');
+      });
+
+      await Promise.all([reqReportes, reqBloqueados]);
+      setIsLoading(false);
     };
 
-    fetchReportes();
-  }, []);
+    void fetchReportes();
+  }, [loadBloqueados]);
+
+  const handleResetIntentos = async (item: VendedorBloqueado) => {
+    const confirmar = window.confirm(
+      `¿Permitir un nuevo intento a ${item.vendedorNombre} en "${item.moduloTitulo}"?\n\n` +
+        `Se reiniciará el contador de intentos a 0 y el módulo quedará disponible.`
+    );
+    if (!confirmar) return;
+
+    const key = `${item.vendedorId}:${item.moduloId}`;
+    setResetKey(key);
+    try {
+      await apiClient.post(
+        `/admin/vendedores/${item.vendedorId}/modulos/${item.moduloId}/reset-intentos`,
+        {}
+      );
+      await loadBloqueados();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al resetear los intentos');
+    } finally {
+      setResetKey(null);
+    }
+  };
 
   // Exportar a CSV
   const exportarCSV = (tipo: 'progreso' | 'calificaciones') => {
     const download = async () => {
+      setCsvExportError(null);
       try {
         const authRaw = localStorage.getItem('martinez-auth');
         const token = authRaw ? JSON.parse(authRaw)?.state?.token : null;
@@ -106,7 +170,7 @@ export default function ReportesPage() {
         window.URL.revokeObjectURL(url);
       } catch (error) {
         console.error('[ReportesPage] Error exportando CSV', error);
-        setError('No se pudo exportar el CSV');
+        setCsvExportError('No se pudo exportar el CSV');
       }
     };
 
@@ -121,18 +185,14 @@ export default function ReportesPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-6 max-w-6xl mx-auto">
+
+      {csvExportError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" role="alert">
+          {csvExportError}
+        </div>
+      )}
 
       {/* Encabezado */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -142,6 +202,7 @@ export default function ReportesPage() {
             Intentos, promedios y calificaciones del equipo
           </p>
         </div>
+        {tabActiva !== 'bloqueados' && (
         <button
           onClick={() => exportarCSV(tabActiva)}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
@@ -153,21 +214,27 @@ export default function ReportesPage() {
           </svg>
           Exportar CSV
         </button>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
-        {(['progreso', 'calificaciones'] as const).map((tab) => (
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
+        {(['progreso', 'calificaciones', 'bloqueados'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setTabActiva(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tabActiva === tab
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {tab === 'progreso' ? 'Capacitación' : 'Calificaciones QR'}
+            {TAB_LABELS[tab]}
+            {tab === 'bloqueados' && vendedoresBloqueados.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
+                {vendedoresBloqueados.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -175,9 +242,14 @@ export default function ReportesPage() {
       {/* Tabla de progreso */}
       {tabActiva === 'progreso' && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          {errorReportes && (
+            <div className="p-4 bg-amber-50 border-b border-amber-100 text-sm text-amber-900" role="alert">
+              {errorReportes}
+            </div>
+          )}
           {/* Vista mobile — cards */}
           <div className="lg:hidden divide-y divide-gray-100">
-            {data?.progreso.map((row) => (
+            {(data?.progreso ?? []).map((row) => (
               <div key={row.email} className="px-4 py-3 flex flex-col gap-1">
                 <p className="font-semibold text-gray-900 text-sm">{row.vendedor}</p>
                 <p className="text-xs text-gray-400">{row.email}</p>
@@ -214,7 +286,7 @@ export default function ReportesPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.progreso.map((row, index) => (
+                {(data?.progreso ?? []).map((row, index) => (
                   <tr key={row.email} className={index !== 0 ? 'border-t border-gray-100' : ''}>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-gray-900">{row.vendedor}</p>
@@ -245,12 +317,74 @@ export default function ReportesPage() {
         </div>
       )}
 
+      {/* Vendedores bloqueados */}
+      {tabActiva === 'bloqueados' && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          {errorBloqueados && (
+            <div className="p-3 mb-4 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-900" role="alert">
+              {errorBloqueados}
+            </div>
+          )}
+          <p className="text-xs text-gray-500 mb-4">
+            Vendedores que agotaron los 3 intentos en un módulo sin aprobar. Podés habilitar un nuevo intento desde acá.
+          </p>
+          {vendedoresBloqueados.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">
+              No hay vendedores bloqueados por intentos en este momento.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {vendedoresBloqueados.map((item) => {
+                const rowKey = `${item.vendedorId}:${item.moduloId}`;
+                return (
+                  <div
+                    key={rowKey}
+                    className="border border-gray-100 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/admin/vendedores/${item.vendedorId}`}
+                        className="text-sm font-semibold text-gray-900 hover:underline"
+                      >
+                        {item.vendedorNombre}
+                      </Link>
+                      <p className="text-xs text-gray-500 truncate">{item.vendedorEmail}</p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        Módulo {item.moduloOrden}: {item.moduloTitulo}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs font-medium text-red-700 bg-red-50 px-2.5 py-1 rounded-full">
+                        {item.intentos} intentos
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleResetIntentos(item)}
+                        disabled={resetKey === rowKey}
+                        className="text-xs font-semibold px-3 py-2 rounded-lg bg-[#C8102E] text-white disabled:opacity-50 active:scale-95 transition-transform"
+                      >
+                        {resetKey === rowKey ? 'Procesando...' : 'Permitir nuevo intento'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tabla de calificaciones */}
       {tabActiva === 'calificaciones' && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          {errorReportes && (
+            <div className="p-4 bg-amber-50 border-b border-amber-100 text-sm text-amber-900" role="alert">
+              {errorReportes}
+            </div>
+          )}
           {/* Vista mobile — cards */}
           <div className="lg:hidden divide-y divide-gray-100">
-            {data?.calificaciones.map((row) => (
+            {(data?.calificaciones ?? []).map((row) => (
               <div key={row.email} className="px-4 py-3 flex flex-col gap-1">
                 <p className="font-semibold text-gray-900 text-sm">{row.vendedor}</p>
                 <p className="text-xs text-gray-400">{row.email}</p>
@@ -288,7 +422,7 @@ export default function ReportesPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.calificaciones.map((row, index) => (
+                {(data?.calificaciones ?? []).map((row, index) => (
                   <tr key={row.email} className={index !== 0 ? 'border-t border-gray-100' : ''}>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-gray-900">{row.vendedor}</p>

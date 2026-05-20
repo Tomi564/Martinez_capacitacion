@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso, ResumenCalificaciones } from '@/types';
-import { NivelBadge, type InfoNivel } from '@/components/ui/NivelBadge';
+import type { InfoNivel } from '@/components/ui/NivelBadge';
 import { Insignias } from '@/components/ui/Insignias';
 import { suscribirPush } from '@/hooks/usePushNotifications';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +24,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bell, Megaphone } from 'lucide-react';
-import { ModuloIcon, QrIcon } from '@/components/ui/icons';
 import { PreguntasDiariasDashboard } from '@/components/vendedor/PreguntasDiariasDashboard';
 
 interface Comunicado {
@@ -151,9 +150,6 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">{user?.nombre}</h1>
       </div>
 
-      {/* First fold: nivel actual */}
-      {data?.nivel && <NivelBadge info={data.nivel} size="md" />}
-
       {/* First fold: CTA principal */}
       {resumen?.disponible && (
         <Link href={`/modulos/${resumen.disponible.id}`}>
@@ -263,7 +259,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {resumen && resumen.total > 0 && resumen.aprobados === resumen.total && (
+      {resumen && resumen.aprobados > 0 && (
         <div className="flex flex-col gap-3 pt-2 border-t border-gray-100">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Refuerzo diario
@@ -331,26 +327,6 @@ export default function DashboardPage() {
           </div>
         </Button>
       )}
-
-      {/* Accesos rápidos */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/modulos">
-          <Card className="rounded-xl p-4 active:scale-[0.99] transition-transform">
-            <ModuloIcon className="w-5 h-5 text-[#C8102E]" />
-            <p className="font-semibold text-gray-900 mt-2 text-sm">
-              Ver módulos
-            </p>
-          </Card>
-        </Link>
-        <Link href="/mi-qr">
-          <Card className="rounded-xl p-4 active:scale-[0.99] transition-transform">
-            <QrIcon className="w-5 h-5 text-[#C8102E]" />
-            <p className="font-semibold text-gray-900 mt-2 text-sm">
-              Mi código QR
-            </p>
-          </Card>
-        </Link>
-      </div>
 
     </div>
   );

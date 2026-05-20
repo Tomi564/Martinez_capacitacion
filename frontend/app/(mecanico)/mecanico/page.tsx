@@ -133,6 +133,14 @@ export default function MecanicoHome() {
   const ordenesDelGomero = activas.filter(v => v.orden_estado === 'pendiente_mecanico' && v.gomero_id != null);
   const otrasActivas = activas.filter(v => !(v.orden_estado === 'pendiente_mecanico' && v.gomero_id != null));
   const entregadas = visitas.filter(v => v.estado === 'entregado');
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0, 0, 0, 0);
+  const finHoy = new Date();
+  finHoy.setHours(23, 59, 59, 999);
+  const entregadasHoy = entregadas.filter((v) => {
+    const t = new Date(v.created_at).getTime();
+    return t >= inicioHoy.getTime() && t <= finHoy.getTime();
+  });
 
   function TarjetaVisita({ v, destacada }: { v: Visita; destacada?: boolean }) {
     const cfg = ESTADO_CONFIG[v.estado] || ESTADO_CONFIG.en_espera;
@@ -271,7 +279,7 @@ export default function MecanicoHome() {
         )}
 
         {/* Entregados */}
-        {entregadas.length > 0 && <EntregadosList entregadas={entregadas} router={router} />}
+        {entregadasHoy.length > 0 && <EntregadosList entregadas={entregadasHoy} router={router} />}
       </div>
 
       {/* Historial */}

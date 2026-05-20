@@ -2,14 +2,14 @@
  * admin/page.tsx — Dashboard principal del administrador
  *
  * Muestra:
- *  - Métricas globales (vendedores, módulos aprobados, promedio)
+ *  - Métricas globales (vendedores, módulos aprobados, nota promedio de exámenes en pts)
  *  - Tabla de progreso de todos los vendedores
  *  - Últimas calificaciones QR recibidas
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import { NotificacionesAdmin } from '@/components/admin/NotificacionesAdmin';
@@ -42,72 +42,122 @@ interface VendedorResumen {
   ultimaActividad: string | null;
 }
 
+interface CalificacionBaja7d {
+  vendedorId: string;
+  nombre: string;
+  apellido: string;
+  estrellas: number;
+}
+
 interface DashboardAdminData {
   totalVendedores: number;
   totalModulos: number;
   vendedoresCompletos: number;
   promedioGeneral: number;
   vendedores: VendedorResumen[];
+  calificacionesBajas7d?: CalificacionBaja7d[];
+}
+
+interface AlertaCritica {
+  id: string;
+  titulo: string;
+  descripcion: string;
+}
+
+function buildAlertasCriticas(data: DashboardAdminData | null): AlertaCritica[] {
+  if (!data) return [];
+
+  const alertas: AlertaCritica[] = [];
+  const ahora = new Date();
+
+  for (const c of data.calificacionesBajas7d ?? []) {
+    alertas.push({
+      id: `calificacion-baja-${c.vendedorId}`,
+      titulo: 'Calificación baja',
+      descripcion: `${c.nombre} ${c.apellido} recibió una calificación baja de ${c.estrellas} estrellas`,
+    });
+  }
+
+  for (const v of data.vendedores) {
+    if (v.promedioNotas > 0 && v.promedioNotas < 60) {
+      alertas.push({
+        id: `rendimiento-${v.id}`,
+        titulo: 'Alerta de rendimiento (notas)',
+        descripcion: `${v.nombre} ${v.apellido} tiene nota promedio baja (${v.promedioNotas.toFixed(1)} pts).`,
+      });
+    }
+  }
+
+  for (const v of data.vendedores) {
+    if (!v.ultimaActividad || v.modulosAprobados >= v.totalModulos) continue;
+    const ultimaActividad = new Date(v.ultimaActividad);
+    const diffDias = (ahora.getTime() - ultimaActividad.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDias > 7) {
+      alertas.push({
+        id: `seguimiento-${v.id}`,
+        titulo: 'Alerta de seguimiento',
+        descripcion: `${v.nombre} ${v.apellido} lleva más de 7 días sin completar módulos pendientes.`,
+      });
+    }
+  }
+
+  return alertas;
 }
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardAdminData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorDashboard, setErrorDashboard] = useState<string | null>(null);
+  const [errorRanking, setErrorRanking] = useState<string | null>(null);
+  const [errorOrdenesRetrasadas, setErrorOrdenesRetrasadas] = useState<string | null>(null);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [ordenesMecanicoRetrasadas, setOrdenesMecanicoRetrasadas] = useState<number>(0);
 
-  const alertaCritica = (() => {
-    if (!data?.vendedores?.length) return null;
-
-    const ahora = new Date();
-    const vendedorConPromedioBajo = data.vendedores.find(
-      (v) => v.promedioNotas > 0 && v.promedioNotas < 60
-    );
-    if (vendedorConPromedioBajo) {
-      return {
-        titulo: 'Alerta de rendimiento',
-        descripcion: `${vendedorConPromedioBajo.nombre} ${vendedorConPromedioBajo.apellido} tiene promedio bajo (${vendedorConPromedioBajo.promedioNotas.toFixed(1)}%).`,
-      };
-    }
-
-    const vendedorInactivoConPendientes = data.vendedores.find((v) => {
-      if (!v.ultimaActividad || v.modulosAprobados >= v.totalModulos) return false;
-      const ultimaActividad = new Date(v.ultimaActividad);
-      const diffDias = (ahora.getTime() - ultimaActividad.getTime()) / (1000 * 60 * 60 * 24);
-      return diffDias > 7;
-    });
-
-    if (vendedorInactivoConPendientes) {
-      return {
-        titulo: 'Alerta de seguimiento',
-        descripcion: `${vendedorInactivoConPendientes.nombre} ${vendedorInactivoConPendientes.apellido} lleva más de 7 días sin completar módulos pendientes.`,
-      };
-    }
-
-    return null;
-  })();
+  const alertasCriticas = useMemo(() => buildAlertasCriticas(data), [data]);
 
   useEffect(() => {
     const fetchDashboard = async () => {
-      try {
-        const [dashRes, rankRes, retrasadasRes] = await Promise.all([
-          apiClient.get<DashboardAdminData>('/admin/dashboard'),
-          apiClient.get<{ stats: RankingEntry[] }>('/ranking/historico'),
-          apiClient.get<{ count: number }>('/admin/taller/ordenes-mecanico-retrasadas-count').catch(() => ({ count: 0 })),
-        ]);
-        setData(dashRes);
-        setRanking(rankRes.stats.slice(0, 5));
-        setOrdenesMecanicoRetrasadas(typeof retrasadasRes.count === 'number' ? retrasadasRes.count : 0);
-      } catch (err) {
-        setError('Error al cargar el dashboard');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(true);
+      setErrorDashboard(null);
+      setErrorRanking(null);
+      setErrorOrdenesRetrasadas(null);
+
+      const reqDashboard = apiClient
+        .get<DashboardAdminData>('/admin/dashboard')
+        .then((dashRes) => setData(dashRes))
+        .catch((err) => {
+          console.error('[AdminDashboard] /admin/dashboard', err);
+          setErrorDashboard('No se pudo cargar el resumen del panel. El resto de las secciones puede seguir disponible.');
+          setData(null);
+        });
+
+      const reqRanking = apiClient
+        .get<{ stats: RankingEntry[] }>('/ranking/historico')
+        .then((rankRes) => {
+          setRanking((rankRes.stats || []).slice(0, 5));
+        })
+        .catch((err) => {
+          console.error('[AdminDashboard] /ranking/historico', err);
+          setErrorRanking('No se pudo cargar el ranking histórico del equipo.');
+          setRanking([]);
+        });
+
+      const reqRetrasadas = apiClient
+        .get<{ count: number }>('/admin/taller/ordenes-mecanico-retrasadas-count')
+        .then((retrasadasRes) => {
+          setOrdenesMecanicoRetrasadas(typeof retrasadasRes.count === 'number' ? retrasadasRes.count : 0);
+        })
+        .catch((err) => {
+          console.error('[AdminDashboard] ordenes-mecanico-retrasadas-count', err);
+          setErrorOrdenesRetrasadas('No se pudo cargar el conteo de órdenes retrasadas.');
+          setOrdenesMecanicoRetrasadas(0);
+        });
+
+      await Promise.all([reqDashboard, reqRanking, reqRetrasadas]);
+      setIsLoading(false);
     };
 
-    fetchDashboard();
+    void fetchDashboard();
   }, []);
 
   if (isLoading) {
@@ -125,21 +175,6 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="flex items-center justify-between gap-3">
-            <p className="text-sm text-red-700">{error}</p>
-            <Button variant="danger" onClick={() => window.location.reload()}>
-              Reintentar
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-6 max-w-6xl mx-auto">
 
@@ -151,6 +186,30 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
+      {errorDashboard && (
+        <Card className="rounded-xl border-amber-200 bg-amber-50">
+          <CardContent className="py-3">
+            <p className="text-sm text-amber-900">{errorDashboard}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {errorRanking && (
+        <Card className="rounded-xl border-amber-200 bg-amber-50">
+          <CardContent className="py-3">
+            <p className="text-sm text-amber-900">{errorRanking}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {errorOrdenesRetrasadas && (
+        <Card className="rounded-xl border-amber-200 bg-amber-50">
+          <CardContent className="py-3">
+            <p className="text-sm text-amber-900">{errorOrdenesRetrasadas}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* First fold: KPI principal */}
       <Card className="rounded-xl bg-white">
         <CardContent>
@@ -158,9 +217,9 @@ export default function AdminDashboardPage() {
             KPI principal
           </p>
           <p className="mt-1 text-3xl font-bold text-gray-900">
-            {data?.promedioGeneral ? `${data.promedioGeneral.toFixed(1)}%` : '—'}
+            {data?.promedioGeneral ? `${data.promedioGeneral.toFixed(1)} pts` : '—'}
           </p>
-          <p className="text-sm text-gray-500 mt-1">Promedio general del equipo</p>
+          <p className="text-sm text-gray-500 mt-1">Nota promedio del equipo (exámenes)</p>
         </CardContent>
       </Card>
 
@@ -196,20 +255,23 @@ export default function AdminDashboardPage() {
         </Card>
       </Link>
 
-      {/* First fold: alerta crítica */}
-      {alertaCritica ? (
+      {alertasCriticas.length > 0 && (
         <Card className="rounded-xl border-amber-200 bg-amber-50">
-          <CardContent>
-            <p className="text-sm font-semibold text-amber-900">{alertaCritica.titulo}</p>
-            <p className="text-sm text-amber-800 mt-1">{alertaCritica.descripcion}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="rounded-xl border-green-200 bg-green-50">
-          <CardContent>
-            <p className="text-sm font-semibold text-green-800">
-              No hay alertas críticas en este momento.
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
+              Alertas críticas
             </p>
+            <ul className="flex flex-col gap-3">
+              {alertasCriticas.map((alerta) => (
+                <li
+                  key={alerta.id}
+                  className="border-t border-amber-200/80 first:border-t-0 first:pt-0 pt-3"
+                >
+                  <p className="text-sm font-semibold text-amber-900">{alerta.titulo}</p>
+                  <p className="text-sm text-amber-800 mt-0.5">{alerta.descripcion}</p>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}
@@ -301,12 +363,12 @@ export default function AdminDashboardPage() {
           <div className="hidden lg:grid grid-cols-5 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
             <span className="col-span-2">Vendedor</span>
             <span className="text-center">Módulos</span>
-            <span className="text-center">Promedio</span>
+            <span className="text-center">Nota prom.</span>
             <span className="text-center">Estado</span>
           </div>
 
           {/* Filas */}
-          {data?.vendedores.map((vendedor, index) => {
+          {data && (data.vendedores ?? []).map((vendedor, index) => {
             const porcentaje =
               vendedor.totalModulos > 0
                 ? Math.round(
@@ -351,11 +413,11 @@ export default function AdminDashboardPage() {
                       <Progress value={porcentaje} className="w-full mt-1 h-1" indicatorClassName="bg-gray-900" />
                     </div>
 
-                    {/* Promedio */}
+                    {/* Nota promedio exámenes (puntos, no %) */}
                     <div className="text-center w-20">
                       <p className="text-sm font-semibold text-gray-900">
                         {vendedor.promedioNotas > 0
-                          ? `${vendedor.promedioNotas.toFixed(1)}%`
+                          ? `${vendedor.promedioNotas.toFixed(1)} pts`
                           : '—'}
                       </p>
                     </div>
@@ -383,7 +445,7 @@ export default function AdminDashboardPage() {
           })}
 
           {/* Sin vendedores */}
-          {data?.vendedores.length === 0 && (
+          {data && (data.vendedores ?? []).length === 0 && (
             <div className="px-4 py-8 text-center">
               <p className="text-gray-400 text-sm">
                 No hay vendedores registrados aún

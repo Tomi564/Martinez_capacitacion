@@ -28,6 +28,7 @@ export default function SugerenciasVendedorPage() {
     whatsappUrl: string | null;
   } | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   const fetchSugerencias = async () => {
     try {
@@ -46,6 +47,7 @@ export default function SugerenciasVendedorPage() {
     if (!texto.trim()) return;
     setGuardando(true);
     setError(null);
+    setErrorEliminar(null);
     try {
       const res = await apiClient.post<{
         whatsappUrl: string | null;
@@ -74,8 +76,19 @@ export default function SugerenciasVendedorPage() {
 
   const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar esta sugerencia?')) return;
-    await apiClient.delete(`/vendedor/sugerencias/${id}`);
-    setSugerencias((prev) => prev.filter((s) => s.id !== id));
+    const prev = sugerencias;
+    setSugerencias((p) => p.filter((s) => s.id !== id));
+    setErrorEliminar(null);
+    try {
+      await apiClient.delete(`/vendedor/sugerencias/${id}`);
+    } catch (err) {
+      setSugerencias(prev);
+      const mensaje =
+        err instanceof Error && err.message
+          ? err.message
+          : 'No se pudo eliminar la sugerencia. Reintentá.';
+      setErrorEliminar(mensaje);
+    }
   };
 
   const pendientes = sugerencias.filter((s) => s.estado !== 'listo');
@@ -97,6 +110,15 @@ export default function SugerenciasVendedorPage() {
           Reportá dudas o problemas de la app. Se envía por WhatsApp.
         </p>
       </div>
+
+      {errorEliminar && (
+        <div
+          role="alert"
+          className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"
+        >
+          {errorEliminar}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3">
         <label className="text-sm font-semibold text-gray-900">Nueva sugerencia</label>

@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { ApiError, apiClient } from '@/lib/api';
 import type { Pregunta, RespuestasExamen, ResultadoExamen } from '@/types';
 
-export type EstadoExamen = 'cargando' | 'respondiendo' | 'enviando' | 'resultado';
+export type EstadoExamen = 'cargando' | 'error_carga' | 'respondiendo' | 'enviando' | 'resultado';
 
 export function useExamen(moduloId: string) {
   const [estado, setEstado] = useState<EstadoExamen>('cargando');
@@ -18,11 +18,13 @@ export function useExamen(moduloId: string) {
 
   const cargarPreguntas = useCallback(async () => {
     try {
+      setError(null);
       const res = await apiClient.get<{ preguntas: Pregunta[] }>(`/examenes/${moduloId}/preguntas`);
       setPreguntas(res.preguntas);
       setEstado('respondiendo');
     } catch (err) {
       setError('Error al cargar el examen. Intentá de nuevo.');
+      setEstado('error_carga');
       console.error('[useExamen] Error cargando preguntas', err);
     }
   }, [moduloId]);
@@ -58,7 +60,11 @@ export function useExamen(moduloId: string) {
       if (res.aprobado) setMostrarCelebracion(true);
       setEstado('resultado');
     } catch (err) {
-      setError('Error al enviar el examen. Intentá de nuevo.');
+      const msg =
+        err instanceof ApiError && err.status === 503
+          ? err.message
+          : 'Error al enviar el examen. Intentá de nuevo.';
+      setError(msg);
       setEstado('respondiendo');
       console.error('[useExamen] Error enviando examen', err);
     }
@@ -66,15 +72,12 @@ export function useExamen(moduloId: string) {
 
   const reintentar = async () => {
     setEstado('cargando');
+    setError(null);
     setRespuestas({});
     setPreguntaActual(0);
     setSegundos(0);
     setResultado(null);
-    try {
-      await cargarPreguntas();
-    } catch {
-      setError('Error al recargar el examen.');
-    }
+    await cargarPreguntas();
   };
 
   const preguntasRespondidas = useMemo(

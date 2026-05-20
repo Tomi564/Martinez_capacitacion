@@ -6,11 +6,13 @@
 
 import { Router } from 'express';
 import { adminController } from '../controllers/admin.controller';
+import { adminService } from '../services/admin.service';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
 import { supabase } from '../config/database';
 import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
 import { enviarPushComunicado } from '../services/comunicados-scheduler.service';
 import { preguntasDiariasService } from '../services/preguntas-diarias.service';
+import { presupuestoVisitaController } from '../controllers/presupuesto-visita.controller';
 
 const router = Router();
 
@@ -152,6 +154,18 @@ router.delete('/modulos/:id/preguntas/:preguntaId', async (req, res, next) => {
 });
 
 // GET /api/admin/vendedores/:id
+// GET /api/admin/vendedores-bloqueados
+router.get(
+  '/vendedores-bloqueados',
+  adminController.getVendedoresBloqueados.bind(adminController)
+);
+
+// POST /api/admin/vendedores/:vendedorId/modulos/:moduloId/reset-intentos
+router.post(
+  '/vendedores/:vendedorId/modulos/:moduloId/reset-intentos',
+  adminController.resetIntentosModulo.bind(adminController)
+);
+
 router.get(
   '/vendedores/:id',
   adminController.getVendedorById.bind(adminController)
@@ -561,8 +575,18 @@ router.patch('/comunicados/:id', async (req, res, next) => {
 
     const updates: Record<string, unknown> = {};
 
-    if (typeof titulo === 'string' && titulo.trim()) updates.titulo = titulo.trim();
-    if (typeof contenido === 'string' && contenido.trim()) updates.contenido = contenido.trim();
+    if ('titulo' in req.body) {
+      if (typeof titulo !== 'string' || !titulo.trim()) {
+        return res.status(400).json({ error: 'El título es requerido' });
+      }
+      updates.titulo = titulo.trim();
+    }
+    if ('contenido' in req.body) {
+      if (typeof contenido !== 'string' || !contenido.trim()) {
+        return res.status(400).json({ error: 'El contenido es requerido' });
+      }
+      updates.contenido = contenido.trim();
+    }
 
     if ('programado_para' in req.body) {
       if (programadoRaw === null || programadoRaw === '') {
@@ -591,7 +615,17 @@ router.patch('/comunicados/:id', async (req, res, next) => {
     }
 
     const { error: upErr } = await supabase.from('comunicados').update(updates).eq('id', id);
-    if (upErr) throw new Error('Error al actualizar comunicado');
+    if (upErr) {
+      console.error('[PATCH /admin/comunicados/:id] Error Supabase al actualizar', {
+        id,
+        updates,
+        code: upErr.code,
+        message: upErr.message,
+        details: upErr.details,
+        hint: upErr.hint,
+      });
+      throw new Error(upErr.message || 'Error al actualizar comunicado');
+    }
 
     const { data: nuevo } = await supabase
       .from('comunicados')
@@ -703,6 +737,11 @@ router.get('/taller/ordenes-mecanico-retrasadas-count', async (req, res, next) =
   }
 });
 
+// GET /api/admin/visitas/:id/presupuesto.pdf
+router.get('/visitas/:id/presupuesto.pdf', (req, res, next) =>
+  presupuestoVisitaController.descargar(req, res, next)
+);
+
 // GET /api/admin/visitas/:id
 router.get('/visitas/:id', async (req, res, next) => {
   try {
@@ -712,7 +751,7 @@ router.get('/visitas/:id', async (req, res, next) => {
       .select(`
         id, created_at, estado_visita, motivo, observaciones, presion_psi, updated_by_admin_at,
         tren_delantero, tren_alineado, tren_balanceo, amortiguadores_revisados, auxilio_revisado, presupuesto, fotos_neumatico_urls,
-        vehiculos(patente, marca, modelo, clientes(nombre, apellido))
+        vehiculos(patente, marca, modelo, clientes(nombre, apellido, dni))
       `)
       .eq('id', id)
       .single();

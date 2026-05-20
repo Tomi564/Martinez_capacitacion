@@ -93,7 +93,7 @@ export function PreguntasDiariasDashboard() {
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Preguntas del día</p>
         <p className="text-sm text-gray-600 mt-1">
-          Dos preguntas rápidas — una de ventas y una de producto. Feedback al instante.
+          Dos preguntas rápidas — una de ventas y una de producto — de los módulos que ya aprobaste.
         </p>
       </div>
 

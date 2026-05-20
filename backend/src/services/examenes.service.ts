@@ -10,7 +10,31 @@ import { AppError } from '../middleware/errorHandler';
 
 const NOTA_MINIMA_APROBACION_DEFAULT = 80;
 type TipoPregunta = 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
-const examenesServidos = new Map<string, string[]>();
+function shuffleArray<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const copia = arr[j];
+    arr[j] = arr[i];
+    arr[i] = copia;
+  }
+  return arr;
+}
+
+function parseOpciones(raw: unknown): { id: string; texto: string }[] {
+  if (Array.isArray(raw)) {
+    return raw as { id: string; texto: string }[];
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 function normalizarTexto(texto: string): string {
   return (texto || '')
@@ -42,12 +66,61 @@ function puntuarDesarrollo(respuesta: string, clave: string, puntajeMaximo: numb
 }
 
 export class ExamenesService {
-  private getExamenKey(userId: string, moduloId: string) {
-    return `${userId}:${moduloId}`;
+  /** Persiste el orden real de preguntas para validar el submit tras restart del servidor. */
+  private async persistirPreguntasServidas(
+    userId: string,
+    moduloId: string,
+    preguntaIds: string[]
+  ): Promise<void> {
+    const { error } = await supabase.from('examenes_servidos').upsert(
+      {
+        user_id: userId,
+        modulo_id: moduloId,
+        pregunta_ids: preguntaIds,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,modulo_id' }
+    );
+    if (error) {
+      console.error('[ExamenesService] Error persistiendo sesión de examen', error);
+      throw new AppError('No pudimos preparar el examen. Intentá de nuevo.', 500);
+    }
   }
+
+  private async obtenerPreguntasServidas(userId: string, moduloId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('examenes_servidos')
+      .select('pregunta_ids')
+      .eq('user_id', userId)
+      .eq('modulo_id', moduloId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[ExamenesService] Error leyendo sesión de examen', error);
+      return [];
+    }
+
+    const raw = data?.pregunta_ids;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((id) => String(id));
+  }
+
+  private async borrarSesionExamen(userId: string, moduloId: string): Promise<void> {
+    const { error } = await supabase
+      .from('examenes_servidos')
+      .delete()
+      .eq('user_id', userId)
+      .eq('modulo_id', moduloId);
+    if (error) {
+      console.error('[ExamenesService] Error borrando sesión de examen', error);
+    }
+  }
+
   /**
-   * Obtiene todas las preguntas activas del módulo en orden fijo (created_at ASC,
-   * igual que el listado del editor admin). NUNCA incluye respuesta_correcta.
+   * Obtiene preguntas activas del módulo para rendir el examen.
+   * El orden de preguntas y de opciones se aleatoriza solo en la respuesta HTTP;
+   * Los IDs en orden original (created_at) se guardan en la tabla examenes_servidos para validar el submit.
+   * NUNCA incluye respuesta_correcta.
    */
   async getPreguntasExamen(moduloId: string, userId: string) {
     // Verificar que el módulo esté disponible para este usuario
@@ -106,11 +179,9 @@ export class ExamenesService {
       );
     }
 
-    const preguntasExamen = preguntas;
-    examenesServidos.set(
-      this.getExamenKey(userId, moduloId),
-      preguntasExamen.map((p: any) => p.id)
-    );
+    const preguntasOriginales = preguntas;
+    const idsOrdenOriginal = preguntasOriginales.map((p: any) => p.id as string);
+    await this.persistirPreguntasServidas(userId, moduloId, idsOrdenOriginal);
 
     // Marcar el módulo como 'en_curso' si estaba 'disponible'
     if (progreso.estado === 'disponible') {
@@ -121,13 +192,17 @@ export class ExamenesService {
         .eq('modulo_id', moduloId);
     }
 
-    return {
-      preguntas: preguntasExamen.map((p) => ({
-        ...p,
+    const preguntasPresentacion = shuffleArray(
+      preguntasOriginales.map((p: any) => ({
+        id: p.id,
+        enunciado: p.enunciado,
         tipo: (p.tipo as TipoPregunta | undefined) || 'opcion_unica',
         puntaje: Number(p.puntaje ?? 1),
-      })),
-    };
+        opciones: shuffleArray(parseOpciones(p.opciones)),
+      }))
+    );
+
+    return { preguntas: preguntasPresentacion };
   }
 
   /**
@@ -181,10 +256,12 @@ export class ExamenesService {
     }
 
     // 2. Validar que estén respondidas todas las preguntas del examen servido
-    const examKey = this.getExamenKey(userId, moduloId);
-    const preguntaIdsEsperadas = examenesServidos.get(examKey) || [];
+    const preguntaIdsEsperadas = await this.obtenerPreguntasServidas(userId, moduloId);
     if (!preguntaIdsEsperadas.length) {
-      throw new AppError('Debés responder todas las preguntas antes de enviar', 400);
+      throw new AppError(
+        'La sesión del examen expiró. Recargá la página para volver a intentarlo.',
+        503
+      );
     }
 
     const respuestasNormalizadas = Object.fromEntries(
@@ -359,7 +436,7 @@ export class ExamenesService {
     if (!aprobado && nuevosIntentos >= MAX_INTENTOS && !yaEstabaAprobado) {
       await this.notificarAdminLimiteIntentos(userId, moduloId);
     }
-    examenesServidos.delete(examKey);
+    await this.borrarSesionExamen(userId, moduloId);
 
     return {
       nota,

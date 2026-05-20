@@ -410,8 +410,8 @@ export class AdminController {
       const vendedorId = req.params.id as string;
       const { nuevaContrasena } = req.body;
 
-      if (!nuevaContrasena || nuevaContrasena.length < 6) {
-        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+      if (!nuevaContrasena || nuevaContrasena.length < 8) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
       }
 
       const result = await adminService.resetPasswordVendedor(vendedorId, nuevaContrasena);
@@ -428,6 +428,35 @@ export class AdminController {
     try {
       const vendedorId = req.params.id as string;
       const result = await adminService.eliminarVendedor(vendedorId, {
+        id: req.user!.id,
+        rol: req.user!.rol,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/admin/vendedores-bloqueados
+   */
+  async getVendedoresBloqueados(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await adminService.getVendedoresBloqueados();
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/admin/vendedores/:vendedorId/modulos/:moduloId/reset-intentos
+   */
+  async resetIntentosModulo(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const vendedorId = req.params.vendedorId as string;
+      const moduloId = req.params.moduloId as string;
+      const result = await adminService.resetIntentosModulo(vendedorId, moduloId, {
         id: req.user!.id,
         rol: req.user!.rol,
       });
