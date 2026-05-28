@@ -6,6 +6,7 @@ import { apiClient, ApiError } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { Badge } from '@/components/ui/badge';
+import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 
 export interface InformeVisita {
   id: string;
@@ -40,13 +41,6 @@ export interface InformeVisita {
     clientes: { nombre: string; apellido: string; dni: string | null; email: string | null; telefono: string | null } | null;
   } | null;
 }
-
-const ORDEN_BADGE: Record<string, { label: string; variant: 'default' | 'warning' | 'success' | 'muted' | 'danger' }> = {
-  pendiente_gomero: { label: 'Pendiente gomero', variant: 'warning' },
-  pendiente_mecanico: { label: 'Pendiente mecánico', variant: 'warning' },
-  finalizado: { label: 'Finalizado', variant: 'success' },
-  incompleto: { label: 'Incompleto', variant: 'muted' },
-};
 
 function fmt(ts: string | null | undefined) {
   if (!ts) return '—';
@@ -152,7 +146,6 @@ export function InformeVisitaTaller({
 
   const v = visita.vehiculos;
   const c = v?.clientes;
-  const ordenCfg = visita.orden_estado ? ORDEN_BADGE[visita.orden_estado] : null;
   const fotos = Array.isArray(visita.fotos_neumatico_urls) ? visita.fotos_neumatico_urls : [];
   const tieneParteGomero =
     visita.neumaticos_cambiados != null ||
@@ -167,8 +160,8 @@ export function InformeVisitaTaller({
     <div className="px-4 py-5 pb-24 flex flex-col gap-5 max-w-lg mx-auto lg:max-w-3xl">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Informe de orden</span>
-        {ordenCfg ? (
-          <Badge variant={ordenCfg.variant}>{ordenCfg.label}</Badge>
+        {visita.orden_estado ? (
+          <BadgeOrdenEstado ordenEstado={visita.orden_estado} />
         ) : (
           <Badge variant="muted">Sin estado de orden</Badge>
         )}

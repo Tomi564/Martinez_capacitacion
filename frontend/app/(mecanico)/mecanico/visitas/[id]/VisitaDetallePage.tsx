@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
+import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 
 interface Visita {
   id: string;
@@ -236,7 +237,9 @@ export default function VisitaDetallePage() {
         )}
         {visita.motivo && <p className="text-sm text-gray-500 mt-2 italic">"{visita.motivo}"</p>}
         {visita.orden_estado && (
-          <p className="text-xs font-semibold text-[#C8102E] mt-2">Estado orden: {visita.orden_estado}</p>
+          <div className="mt-2">
+            <BadgeOrdenEstado ordenEstado={visita.orden_estado} />
+          </div>
         )}
         <div className="mt-3 flex items-center justify-between">
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${entregado ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700'}`}>

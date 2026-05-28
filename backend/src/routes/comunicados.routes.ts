@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { supabase } from '../config/database';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { limiteVigenciaComunicadoIso } from '../utils/comunicado-vigencia';
 
 const router = Router();
 router.use(authMiddleware);
@@ -18,6 +19,7 @@ router.get('/', async (_req, res, next) => {
       .from('comunicados')
       .select('id, titulo, contenido, created_at')
       .eq('activo', true)
+      .gte('created_at', limiteVigenciaComunicadoIso())
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

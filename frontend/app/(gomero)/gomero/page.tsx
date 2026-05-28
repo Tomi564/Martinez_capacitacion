@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 
 interface OrdenRow {
   id: string;
@@ -12,13 +13,6 @@ interface OrdenRow {
   created_at: string;
   vehiculos: { patente: string; marca: string; modelo: string } | null;
 }
-
-const ESTADO_LABEL: Record<string, string> = {
-  pendiente_gomero: 'Pendiente (gomería)',
-  pendiente_mecanico: 'En taller',
-  finalizado: 'Finalizada',
-  incompleto: 'Incompleta',
-};
 
 export default function GomeroHomePage() {
   const router = useRouter();
@@ -75,10 +69,12 @@ export default function GomeroHomePage() {
           >
             <p className="text-2xl font-black tracking-widest text-gray-900">{o.vehiculos?.patente}</p>
             <p className="text-gray-600 font-medium">{o.vehiculos?.marca} {o.vehiculos?.modelo}</p>
-            <p className="text-xs text-gray-400 mt-2">
-              {ESTADO_LABEL[o.orden_estado || ''] || o.orden_estado || '—'} ·{' '}
-              {new Date(o.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <BadgeOrdenEstado ordenEstado={o.orden_estado} />
+              <span className="text-xs text-gray-400">
+                {new Date(o.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+              </span>
+            </div>
           </button>
         ))}
       </div>

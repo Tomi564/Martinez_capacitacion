@@ -6,9 +6,10 @@ import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { TabVentasClientes } from '@/components/clientes/TabVentasClientes';
+import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 
 interface Visita {
-  id: string; estado: string; motivo: string | null; observaciones: string | null;
+  id: string; estado: string; orden_estado?: string | null; motivo: string | null; observaciones: string | null;
   km: number | null; diagnostico_enviado: boolean; created_at: string;
 }
 interface Vehiculo {
@@ -177,9 +178,13 @@ export default function ClientesAdminPage() {
                             const est = ESTADO_LABEL[visita.estado];
                             return (
                               <div key={visita.id} className="border border-gray-100 rounded-xl p-3 flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                   <span className="text-xs text-gray-500">{new Date(visita.created_at).toLocaleDateString('es-AR')}</span>
-                                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${est?.bg || 'bg-gray-100'} ${est?.color || 'text-gray-600'}`}>{est?.label || visita.estado}</span>
+                                  {visita.orden_estado ? (
+                                    <BadgeOrdenEstado ordenEstado={visita.orden_estado} />
+                                  ) : (
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${est?.bg || 'bg-gray-100'} ${est?.color || 'text-gray-600'}`}>{est?.label || visita.estado}</span>
+                                  )}
                                 </div>
                                 {visita.motivo && <p className="text-xs text-gray-600">Motivo: {visita.motivo}</p>}
                                 {visita.km && <p className="text-xs text-gray-400">{visita.km.toLocaleString()} km</p>}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient, ApiError } from '@/lib/api';
+import { esComunicadoVigente } from '@/lib/comunicadoVigencia';
 
 interface Comunicado {
   id: string;
@@ -223,8 +224,8 @@ export default function ComunicadosPage() {
         </div>
       )}
 
-      {/* Activo destacado */}
-      {comunicados.filter(c => c.activo).map(c => (
+      {/* Activo destacado (vigente: publicado hace menos de 30 días) */}
+      {comunicados.filter(c => c.activo && esComunicadoVigente(c.created_at)).map(c => (
         <div key={c.id} className="bg-[#C8102E] text-white rounded-2xl p-5 flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -266,12 +267,12 @@ export default function ComunicadosPage() {
         </div>
       ))}
 
-      {/* Historial */}
-      {comunicados.filter(c => !c.activo).length > 0 && (
+      {/* Historial (inactivos o activos con más de 30 días) */}
+      {comunicados.filter(c => !c.activo || !esComunicadoVigente(c.created_at)).length > 0 && (
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Historial</p>
           <div className="flex flex-col gap-2">
-            {comunicados.filter(c => !c.activo).map(c => (
+            {comunicados.filter(c => !c.activo || !esComunicadoVigente(c.created_at)).map(c => (
               <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{c.titulo}</p>
@@ -307,7 +308,7 @@ export default function ComunicadosPage() {
                     onClick={() => handleToggle(c.id, c.activo)}
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors font-medium"
                   >
-                    Reactivar
+                    {c.activo ? 'Desactivar' : 'Reactivar'}
                   </button>
                 </div>
               </div>

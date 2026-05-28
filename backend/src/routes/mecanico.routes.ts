@@ -50,7 +50,7 @@ router.get('/clientes', requireRole('admin', 'vendedor'), async (req, res: Respo
     const { data, error, count } = await supabase
       .from('vehiculos')
       .select(
-        `id, patente, marca, modelo, anio, medida_rueda, created_at, clientes(id, nombre, apellido, dni, telefono, email), visitas_taller(id, estado, motivo, observaciones, km, diagnostico_enviado, created_at)`,
+        `id, patente, marca, modelo, anio, medida_rueda, created_at, clientes(id, nombre, apellido, dni, telefono, email), visitas_taller(id, estado, orden_estado, motivo, observaciones, km, diagnostico_enviado, created_at)`,
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
@@ -350,7 +350,7 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
   } catch (e) { next(e); }
 });
 
-// GET /api/mecanico/visitas/:id — detalle de visita con checklist (vendedor: solo lectura en el front)
+// GET /api/mecanico/visitas/:id — detalle de visita (vendedor: lectura si el vehículo tiene cliente registrado)
 router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const rawId = req.params.id;
@@ -372,18 +372,11 @@ router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (
         throw new AppError('No autorizado', 403);
       }
     } else if (rol === 'vendedor') {
-      const veh = visita.vehiculos as { cliente_id?: string | null } | null;
-      const clienteId = veh?.cliente_id;
-      if (!clienteId) {
-        throw new AppError('No autorizado', 403);
-      }
-      const { count, error: atErr } = await supabase
-        .from('atenciones')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', req.user!.id)
-        .eq('cliente_id', clienteId);
-      if (atErr) throw new AppError('Error al verificar acceso', 500);
-      if (!count || count < 1) {
+      const veh = visita.vehiculos as {
+        cliente_id?: string | null;
+        clientes?: { id?: string } | null;
+      } | null;
+      if (!veh?.cliente_id || !veh.clientes) {
         throw new AppError('No autorizado', 403);
       }
     }

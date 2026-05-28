@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Car, ChevronDown, Package, PlusCircle, Trash2, Wrench } from 'lucide-react';
@@ -174,9 +175,13 @@ export default function MecanicoHome() {
             </span>
           )}
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${cfg.bg} ${cfg.color}`}>
-              {cfg.label}
-            </span>
+            {v.orden_estado ? (
+              <BadgeOrdenEstado ordenEstado={v.orden_estado} />
+            ) : (
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${cfg.bg} ${cfg.color}`}>
+                {cfg.label}
+              </span>
+            )}
             <button
               onClick={() => setVisitaAEliminar(v)}
               disabled={deletingId === v.id}
