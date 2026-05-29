@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 
@@ -64,13 +64,56 @@ interface VendedorBloqueado {
   estado: string;
 }
 
-type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados';
+interface VelocidadCapacitacion {
+  userId: string;
+  vendedor: string;
+  promedioExamenMinutos: number | null;
+  tiempoTotalProgramaDias: number | null;
+  moduloMasRapido: string | null;
+  moduloMasLento: string | null;
+}
+
+type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados' | 'velocidad';
+
+type VelocidadSortKey =
+  | 'vendedor'
+  | 'promedioExamenMinutos'
+  | 'moduloMasRapido'
+  | 'moduloMasLento'
+  | 'tiempoTotalProgramaDias';
 
 const TAB_LABELS: Record<TabAnaliticas, string> = {
   progreso: 'Capacitación',
   calificaciones: 'Calificaciones QR',
   bloqueados: 'Bloqueados',
+  velocidad: 'Velocidad',
 };
+
+function compareVelocidad(
+  a: VelocidadCapacitacion,
+  b: VelocidadCapacitacion,
+  key: VelocidadSortKey,
+  dir: 'asc' | 'desc'
+): number {
+  const mul = dir === 'asc' ? 1 : -1;
+  if (key === 'vendedor') {
+    return mul * a.vendedor.localeCompare(b.vendedor, 'es');
+  }
+  if (key === 'moduloMasRapido' || key === 'moduloMasLento') {
+    const av = a[key] ?? '';
+    const bv = b[key] ?? '';
+    if (!av && !bv) return 0;
+    if (!av) return 1;
+    if (!bv) return -1;
+    return mul * av.localeCompare(bv, 'es');
+  }
+  const av = a[key];
+  const bv = b[key];
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  return mul * (av - bv);
+}
 
 export default function ReportesPage() {
   const [data, setData] = useState<ReportesData | null>(null);
@@ -81,6 +124,11 @@ export default function ReportesPage() {
   const [csvExportError, setCsvExportError] = useState<string | null>(null);
   const [tabActiva, setTabActiva] = useState<TabAnaliticas>('progreso');
   const [resetKey, setResetKey] = useState<string | null>(null);
+  const [velocidad, setVelocidad] = useState<VelocidadCapacitacion[]>([]);
+  const [isLoadingVelocidad, setIsLoadingVelocidad] = useState(false);
+  const [errorVelocidad, setErrorVelocidad] = useState<string | null>(null);
+  const [velocidadSortKey, setVelocidadSortKey] = useState<VelocidadSortKey>('vendedor');
+  const [velocidadSortDir, setVelocidadSortDir] = useState<'asc' | 'desc'>('asc');
 
   const loadBloqueados = useCallback(async () => {
     const res = await apiClient.get<{ vendedoresBloqueados: VendedorBloqueado[] }>(
@@ -88,6 +136,53 @@ export default function ReportesPage() {
     );
     setVendedoresBloqueados(res.vendedoresBloqueados);
   }, []);
+
+  const loadVelocidad = useCallback(async () => {
+    setIsLoadingVelocidad(true);
+    setErrorVelocidad(null);
+    try {
+      const res = await apiClient.get<{ velocidad: VelocidadCapacitacion[] }>(
+        '/admin/reportes/velocidad'
+      );
+      setVelocidad(res.velocidad || []);
+    } catch (err) {
+      console.error('[ReportesPage] Error cargando velocidad', err);
+      setErrorVelocidad(
+        'No se pudo cargar la velocidad de capacitación. Verificá que la función admin_velocidad_capacitacion esté aplicada en Supabase.'
+      );
+      setVelocidad([]);
+    } finally {
+      setIsLoadingVelocidad(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tabActiva === 'velocidad') {
+      void loadVelocidad();
+    }
+  }, [tabActiva, loadVelocidad]);
+
+  const velocidadOrdenada = useMemo(
+    () =>
+      [...velocidad].sort((a, b) =>
+        compareVelocidad(a, b, velocidadSortKey, velocidadSortDir)
+      ),
+    [velocidad, velocidadSortKey, velocidadSortDir]
+  );
+
+  const toggleVelocidadSort = (key: VelocidadSortKey) => {
+    if (velocidadSortKey === key) {
+      setVelocidadSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setVelocidadSortKey(key);
+      setVelocidadSortDir(key === 'vendedor' ? 'asc' : 'desc');
+    }
+  };
+
+  const sortIndicator = (key: VelocidadSortKey) => {
+    if (velocidadSortKey !== key) return ' ↕';
+    return velocidadSortDir === 'asc' ? ' ↑' : ' ↓';
+  };
 
   useEffect(() => {
     const fetchReportes = async () => {
@@ -202,7 +297,7 @@ export default function ReportesPage() {
             Intentos, promedios y calificaciones del equipo
           </p>
         </div>
-        {tabActiva !== 'bloqueados' && (
+        {tabActiva !== 'bloqueados' && tabActiva !== 'velocidad' && (
         <button
           onClick={() => exportarCSV(tabActiva)}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
@@ -219,7 +314,7 @@ export default function ReportesPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
-        {(['progreso', 'calificaciones', 'bloqueados'] as const).map((tab) => (
+        {(['progreso', 'calificaciones', 'bloqueados', 'velocidad'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setTabActiva(tab)}
@@ -314,6 +409,148 @@ export default function ReportesPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Velocidad de capacitación */}
+      {tabActiva === 'velocidad' && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          {errorVelocidad && (
+            <div className="p-4 bg-amber-50 border-b border-amber-100 text-sm text-amber-900" role="alert">
+              {errorVelocidad}
+            </div>
+          )}
+          <p className="px-4 pt-4 text-xs text-gray-500">
+            Tiempo de examen: promedio de intentos aprobados. Módulos rápido/lento: desde la primera apertura
+            hasta la aprobación (requiere <code className="text-gray-600">iniciado_at</code>). Programa completo:
+            todos los módulos activos aprobados.
+          </p>
+          {isLoadingVelocidad ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="lg:hidden divide-y divide-gray-100 mt-2">
+                {velocidadOrdenada.map((row) => (
+                  <div key={row.userId} className="px-4 py-3 flex flex-col gap-1.5">
+                    <Link
+                      href={`/admin/vendedores/${row.userId}`}
+                      className="font-semibold text-gray-900 text-sm hover:underline"
+                    >
+                      {row.vendedor}
+                    </Link>
+                    <p className="text-xs text-gray-500">
+                      Examen (prom.):{' '}
+                      <strong className="text-gray-800">
+                        {row.promedioExamenMinutos != null ? `${row.promedioExamenMinutos} min` : '—'}
+                      </strong>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Programa:{' '}
+                      <strong className="text-gray-800">
+                        {row.tiempoTotalProgramaDias != null
+                          ? `${row.tiempoTotalProgramaDias} días`
+                          : '—'}
+                      </strong>
+                    </p>
+                    {row.moduloMasRapido && (
+                      <p className="text-xs text-green-700">↑ {row.moduloMasRapido}</p>
+                    )}
+                    {row.moduloMasLento && (
+                      <p className="text-xs text-amber-800">↓ {row.moduloMasLento}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="hidden lg:block overflow-x-auto mt-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleVelocidadSort('vendedor')}
+                          className="text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800"
+                        >
+                          Vendedor{sortIndicator('vendedor')}
+                        </button>
+                      </th>
+                      <th className="text-center px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleVelocidadSort('promedioExamenMinutos')}
+                          className="text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800"
+                        >
+                          Examen (prom.){sortIndicator('promedioExamenMinutos')}
+                        </button>
+                      </th>
+                      <th className="text-left px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleVelocidadSort('moduloMasRapido')}
+                          className="text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800"
+                        >
+                          Más rápido{sortIndicator('moduloMasRapido')}
+                        </button>
+                      </th>
+                      <th className="text-left px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleVelocidadSort('moduloMasLento')}
+                          className="text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800"
+                        >
+                          Más lento{sortIndicator('moduloMasLento')}
+                        </button>
+                      </th>
+                      <th className="text-center px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleVelocidadSort('tiempoTotalProgramaDias')}
+                          className="text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800"
+                        >
+                          Programa completo{sortIndicator('tiempoTotalProgramaDias')}
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {velocidadOrdenada.map((row, index) => (
+                      <tr
+                        key={row.userId}
+                        className={index !== 0 ? 'border-t border-gray-100' : ''}
+                      >
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/admin/vendedores/${row.userId}`}
+                            className="font-semibold text-gray-900 hover:underline"
+                          >
+                            {row.vendedor}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-700">
+                          {row.promedioExamenMinutos != null
+                            ? `${row.promedioExamenMinutos} min`
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px]">
+                          {row.moduloMasRapido ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px]">
+                          {row.moduloMasLento ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-700">
+                          {row.tiempoTotalProgramaDias != null
+                            ? `${row.tiempoTotalProgramaDias} días`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

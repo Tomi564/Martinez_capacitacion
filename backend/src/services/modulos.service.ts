@@ -179,7 +179,23 @@ export class ModulosService {
       .single();
 
     let progresoFinal = progreso;
-    if (progreso && progreso.estado !== 'aprobado') {
+
+    if (
+      progreso &&
+      (progreso.estado === 'disponible' || progreso.estado === 'en_curso') &&
+      !progreso.iniciado_at
+    ) {
+      const iniciadoAt = new Date().toISOString();
+      await supabase
+        .from('progreso')
+        .update({ iniciado_at: iniciadoAt })
+        .eq('user_id', userId)
+        .eq('modulo_id', moduloId)
+        .is('iniciado_at', null);
+      progresoFinal = { ...progreso, iniciado_at: iniciadoAt };
+    }
+
+    if (progresoFinal && progresoFinal.estado !== 'aprobado') {
       const { data: intentoAprobado } = await supabase
         .from('intentos_examen')
         .select('nota')
@@ -192,11 +208,11 @@ export class ModulosService {
       if (intentoAprobado) {
         const patch = {
           estado: 'aprobado',
-          completado_at: progreso.completado_at || new Date().toISOString(),
-          mejor_nota: Math.max(Number(progreso.mejor_nota || 0), Number(intentoAprobado.nota || 0)),
+          completado_at: progresoFinal.completado_at || new Date().toISOString(),
+          mejor_nota: Math.max(Number(progresoFinal.mejor_nota || 0), Number(intentoAprobado.nota || 0)),
         };
         await supabase.from('progreso').update(patch).eq('user_id', userId).eq('modulo_id', moduloId);
-        progresoFinal = { ...progreso, ...patch };
+        progresoFinal = { ...progresoFinal, ...patch };
       }
     }
 

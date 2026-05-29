@@ -111,6 +111,12 @@ router.get(
   adminController.getReportesCsv.bind(adminController)
 );
 
+// GET /api/admin/reportes/velocidad
+router.get(
+  '/reportes/velocidad',
+  adminController.getVelocidadCapacitacion.bind(adminController)
+);
+
 // GET /api/admin/reportes
 router.get(
   '/reportes',

@@ -120,6 +120,26 @@ export interface ReporteProgresoItem {
   fechaUltimaActividad: string | null;
 }
 
+/** Fila RPC `admin_velocidad_capacitacion`. */
+interface AdminVelocidadCapacitacionRow {
+  user_id: string;
+  nombre?: string | null;
+  apellido?: string | null;
+  promedio_duracion_examen_seg?: number | null;
+  tiempo_total_programa_dias?: number | null;
+  modulo_mas_rapido?: string | null;
+  modulo_mas_lento?: string | null;
+}
+
+export interface VelocidadCapacitacionItem {
+  userId: string;
+  vendedor: string;
+  promedioExamenMinutos: number | null;
+  tiempoTotalProgramaDias: number | null;
+  moduloMasRapido: string | null;
+  moduloMasLento: string | null;
+}
+
 export interface ReporteCalificacionesItem {
   vendedor: string;
   email: string;
@@ -638,6 +658,34 @@ export class AdminService {
       progreso: reporteProgreso,
       calificaciones: reporteCalificaciones,
     };
+  }
+
+  /**
+   * Velocidad de capacitación por vendedor (RPC admin_velocidad_capacitacion).
+   */
+  async getVelocidadCapacitacion(): Promise<{ velocidad: VelocidadCapacitacionItem[] }> {
+    const { data, error } = await supabase.rpc('admin_velocidad_capacitacion');
+
+    if (error) throw new AppError('Error al obtener velocidad de capacitación', 500);
+
+    const velocidad: VelocidadCapacitacionItem[] = (data || []).map(
+      (row: AdminVelocidadCapacitacionRow) => ({
+        userId: row.user_id,
+        vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
+        promedioExamenMinutos:
+          row.promedio_duracion_examen_seg != null
+            ? Math.round((Number(row.promedio_duracion_examen_seg) / 60) * 10) / 10
+            : null,
+        tiempoTotalProgramaDias:
+          row.tiempo_total_programa_dias != null
+            ? Number(row.tiempo_total_programa_dias)
+            : null,
+        moduloMasRapido: row.modulo_mas_rapido || null,
+        moduloMasLento: row.modulo_mas_lento || null,
+      })
+    );
+
+    return { velocidad };
   }
 
   /**

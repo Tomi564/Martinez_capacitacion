@@ -227,6 +227,18 @@ export class AdminController {
   }
 
   /**
+   * GET /api/admin/reportes/velocidad
+   */
+  async getVelocidadCapacitacion(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await adminService.getVelocidadCapacitacion();
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/admin/reportes/csv?tipo=progreso|calificaciones
    * Exporta CSV listo para descargar.
    */
