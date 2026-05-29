@@ -82,7 +82,6 @@ export function PreguntasDiariasDashboard() {
       <Card className="rounded-2xl border-green-200 bg-green-50/90">
         <CardContent className="p-5">
           <p className="text-sm font-semibold text-green-900 leading-snug">{data.mensaje}</p>
-          <p className="text-xs text-green-700 mt-2">Zona horaria: Argentina (Buenos Aires)</p>
         </CardContent>
       </Card>
     );

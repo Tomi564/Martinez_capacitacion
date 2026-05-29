@@ -128,7 +128,7 @@ export class ClientesService {
       if (error) throw new AppError('Error al validar el cliente', 500);
       if (!data) throw new AppError('El cliente seleccionado no existe', 400);
 
-      await supabase
+      const { error: updErr } = await supabase
         .from('clientes')
         .update({
           nombre: datos.nombre,
@@ -137,6 +137,7 @@ export class ClientesService {
           email: datos.email,
         })
         .eq('id', data.id);
+      if (updErr) throw new AppError('Error al actualizar datos del cliente', 500);
 
       return data.id;
     }

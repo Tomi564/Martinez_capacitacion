@@ -6,6 +6,7 @@ import { normalizePatenteAr } from '../utils/patente';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { Resend } from 'resend';
 import { sendPushToUserIds } from '../services/push-send.service';
+import { presionPsiFromBody } from '../utils/presion-neumaticos';
 
 const router = Router();
 router.use(authMiddleware);
@@ -323,13 +324,7 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
         observaciones: observaciones || null,
         estado_neumaticos: estado_neumaticos || null,
         estado_frenos: estado_frenos || null,
-        presion_psi:
-          presion_psi != null && presion_psi !== ''
-            ? (() => {
-                const n = Number(String(presion_psi).replace(',', '.'));
-                return Number.isFinite(n) ? n : null;
-              })()
-            : null,
+        presion_psi: presionPsiFromBody(presion_psi),
         recomendacion: recomendacion || null,
         tren_delantero: tren_delantero || null,
         tren_alineado: tren_alineado ?? false,
@@ -399,6 +394,10 @@ router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (
 // PATCH /api/mecanico/visitas/:id — actualizar estado/observaciones
 router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const rawId = req.params.id;
+    const visitaId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    if (!visitaId) throw new AppError('ID de visita inválido', 400);
+
     const {
       estado,
       observaciones,
@@ -422,7 +421,7 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
       .select(
         'id, orden_estado, mecanico_tomo_at, mecanico_id, vehiculos(patente)'
       )
-      .eq('id', req.params.id)
+      .eq('id', visitaId)
       .single();
     if (prevErr || !prev) throw new AppError('Visita no encontrada', 404);
 
@@ -437,12 +436,7 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
     if (estado_neumaticos !== undefined) updates.estado_neumaticos = estado_neumaticos || null;
     if (estado_frenos !== undefined) updates.estado_frenos = estado_frenos || null;
     if (presion_psi !== undefined) {
-      if (presion_psi == null || presion_psi === '') {
-        updates.presion_psi = null;
-      } else {
-        const n = Number(String(presion_psi).replace(',', '.'));
-        updates.presion_psi = Number.isFinite(n) ? n : null;
-      }
+      updates.presion_psi = presionPsiFromBody(presion_psi);
     }
     if (recomendacion !== undefined) updates.recomendacion = recomendacion || null;
     if (estado_visita !== undefined) updates.estado_visita = estado_visita;
@@ -473,10 +467,17 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
       updates.mecanico_tomo_at = new Date().toISOString();
     }
 
-    const { error } = await supabase.from('visitas_taller').update(updates).eq('id', req.params.id);
+    const { error } = await supabase.from('visitas_taller').update(updates).eq('id', visitaId);
     if (error) {
-      console.error('[mecanico] PATCH visitas_taller', req.params.id, error);
-      throw new AppError('Error al actualizar visita', 500);
+      console.error('[mecanico] PATCH visitas_taller', visitaId, error);
+      const msg = (error.message || '').toLowerCase();
+      if (error.code === '22003' || msg.includes('numeric')) {
+        throw new AppError(
+          'La presión ingresada es demasiado alta. Usá un valor entre 0,5 y 10 BAR.',
+          400
+        );
+      }
+      throw new AppError(error.message || 'Error al actualizar visita', 500);
     }
 
     const nuevoOrdenEstado = updates.orden_estado as string | undefined;

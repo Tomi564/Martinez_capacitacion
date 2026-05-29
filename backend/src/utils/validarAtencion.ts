@@ -22,8 +22,9 @@ export function validarProductoMontoPorResultado(
     return { producto: productoStr, monto: montoRaw };
   }
 
+  // Sin venta / pendiente: sin monto; producto opcional (interés del cliente)
   return {
     producto: productoStr || null,
-    monto: montoRaw !== null && !Number.isNaN(montoRaw) && montoRaw > 0 ? montoRaw : null,
+    monto: null,
   };
 }

@@ -74,6 +74,7 @@ export function FormAtencion({
   submitLabel = 'Guardar',
 }: FormAtencionProps) {
   const esVentaCerrada = form.resultado === 'venta_cerrada';
+  const labelProducto = esVentaCerrada ? 'Producto vendido' : 'Producto de interés';
   const puedeGuardar = puedeGuardarAtencion(form);
 
   return (
@@ -101,7 +102,13 @@ export function FormAtencion({
             {RESULTADOS.map((resultado) => (
               <button
                 key={resultado.id}
-                onClick={() => setForm((prev) => ({ ...prev, resultado: resultado.id }))}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    resultado: resultado.id,
+                    monto: resultado.id === 'venta_cerrada' ? prev.monto : '',
+                  }))
+                }
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-medium ${
                   form.resultado === resultado.id
                     ? 'border-gray-900 bg-[#C8102E] text-white'
@@ -203,7 +210,7 @@ export function FormAtencion({
         {form.resultado && (
           <div className="flex flex-col gap-1.5 relative">
             <label className="text-sm font-semibold text-gray-900">
-              Producto vendido
+              {labelProducto}
               {esVentaCerrada ? (
                 <span className="text-[#C8102E] font-normal ml-1">*</span>
               ) : (
@@ -217,7 +224,11 @@ export function FormAtencion({
                 value={form.producto}
                 onChange={(e) => onBuscarProductos(e.target.value)}
                 onBlur={() => setTimeout(onLimpiarSugerencias, 150)}
-                placeholder={esVentaCerrada ? 'Qué se vendió…' : 'Buscar por marca o medida… (opcional)'}
+                placeholder={
+                  esVentaCerrada
+                    ? 'Qué se vendió…'
+                    : 'Marca, medida o producto consultado… (opcional)'
+                }
                 className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
               />
               {buscandoProducto && (

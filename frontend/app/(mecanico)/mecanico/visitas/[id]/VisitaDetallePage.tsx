@@ -100,12 +100,28 @@ export default function VisitaDetallePage() {
     setIsSaving(true);
     setMsg(null);
     try {
+      const fotosPayload = fotos.length ? fotos : null;
+      if (fotosPayload && fotosPayload.join('').length > 450_000) {
+        setMsg({
+          tipo: 'error',
+          texto: 'Las fotos son demasiado pesadas. Usá menos imágenes o fotos más chicas.',
+        });
+        return false;
+      }
+
       const presionRaw = presionBar.replace(',', '.').trim();
-      const presionNum = presionRaw ? Number(presionRaw) : null;
-      const presionPsiBody =
-        presionNum != null && Number.isFinite(presionNum)
-          ? Number(barToPsi(presionNum).toFixed(1))
-          : null;
+      let presionPsiBody: number | null = null;
+      if (presionRaw) {
+        const presionNum = Number(presionRaw);
+        if (!Number.isFinite(presionNum) || presionNum < 0.5 || presionNum > 10) {
+          setMsg({
+            tipo: 'error',
+            texto: 'La presión debe estar entre 0,5 y 10 BAR.',
+          });
+          return false;
+        }
+        presionPsiBody = Number(barToPsi(presionNum).toFixed(1));
+      }
 
       await apiClient.patch(`/mecanico/visitas/${id}`, {
         observaciones: observaciones.trim() || null,
@@ -116,7 +132,7 @@ export default function VisitaDetallePage() {
         amortiguadores_revisados: amortiguadores,
         auxilio_revisado: auxilio,
         presupuesto: presupuesto.trim() || null,
-        fotos_neumatico_urls: fotos.length ? fotos : null,
+        fotos_neumatico_urls: fotosPayload,
       });
       setMsg({ tipo: 'ok', texto: 'Guardado correctamente' });
       return true;
@@ -379,9 +395,10 @@ export default function VisitaDetallePage() {
         <label className="text-sm text-gray-500">Presión (BAR)</label>
         <input
           type="number"
-          min={1.5}
-          max={3.5}
+          min={0.5}
+          max={10}
           step={0.1}
+          inputMode="decimal"
           disabled={entregado}
           value={presionBar}
           onChange={(e) => setPresionBar(e.target.value)}

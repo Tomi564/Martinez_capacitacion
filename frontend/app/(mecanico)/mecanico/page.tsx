@@ -148,33 +148,35 @@ export default function MecanicoHome() {
     const cliente = v.vehiculos?.clientes;
     return (
       <div
-        className={`w-full rounded-xl p-4 flex items-center gap-4 ${
+        className={`w-full rounded-xl p-4 flex gap-3 ${
           destacada
             ? 'bg-white border-2 border-[#C8102E]/35 shadow-[0_2px_12px_rgba(200,16,46,0.08)]'
             : 'bg-white border border-gray-200'
         }`}
       >
         <button
+          type="button"
           onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
           className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 active:scale-[0.99] transition-transform"
         >
           <Car className="w-5 h-5 text-gray-500" />
         </button>
         <button
+          type="button"
           onClick={() => router.push(`/mecanico/visitas/${v.id}`)}
           className="flex-1 min-w-0 text-left active:scale-[0.99] transition-transform"
         >
-          <p className="font-bold text-gray-900 text-base">{v.vehiculos?.patente}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-bold text-gray-900 text-base">{v.vehiculos?.patente}</p>
+            {destacada && (
+              <span className="text-[10px] font-black uppercase tracking-wide text-[#C8102E] bg-[#C8102E]/10 px-2 py-0.5 rounded-full">
+                Gomero
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 truncate">{v.vehiculos?.marca} {v.vehiculos?.modelo}</p>
-          {cliente && <p className="text-xs text-gray-400">{cliente.nombre} {cliente.apellido}</p>}
-        </button>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          {destacada && (
-            <span className="text-[10px] font-black uppercase tracking-wide text-[#C8102E] bg-[#C8102E]/10 px-2 py-0.5 rounded-full">
-              Gomero
-            </span>
-          )}
-          <div className="flex items-center gap-2">
+          {cliente && <p className="text-xs text-gray-400 mt-0.5">{cliente.nombre} {cliente.apellido}</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {v.orden_estado ? (
               <BadgeOrdenEstado ordenEstado={v.orden_estado} />
             ) : (
@@ -182,17 +184,18 @@ export default function MecanicoHome() {
                 {cfg.label}
               </span>
             )}
-            <button
-              onClick={() => setVisitaAEliminar(v)}
-              disabled={deletingId === v.id}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40"
-              aria-label="Eliminar revisión"
-              title="Eliminar revisión"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
           </div>
-        </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setVisitaAEliminar(v)}
+          disabled={deletingId === v.id}
+          className="h-8 w-8 self-start inline-flex items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 shrink-0"
+          aria-label="Eliminar revisión"
+          title="Eliminar revisión"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
     );
   }

@@ -343,14 +343,20 @@ export function useAtenciones() {
     setSugerencias([]);
   };
 
-  const buildPayload = () => ({
-    canal: form.canal,
-    resultado: form.resultado,
-    producto: form.producto || null,
-    monto: form.monto ? Number(form.monto) : null,
-    observaciones: form.observaciones || null,
-    ...clientePayloadFromForm(form),
-  });
+  const buildPayload = () => {
+    const esVentaCerrada = form.resultado === 'venta_cerrada';
+    return {
+      canal: form.canal,
+      resultado: form.resultado,
+      producto: form.producto.trim() || null,
+      monto:
+        esVentaCerrada && form.monto.trim()
+          ? Number(form.monto)
+          : null,
+      observaciones: form.observaciones.trim() || null,
+      ...clientePayloadFromForm(form),
+    };
+  };
 
   const cerrarForm = () => {
     setShowForm(false);

@@ -60,6 +60,16 @@ async function notificarAdmins(titulo: string, cuerpo: string) {
 
 function mapErrorSupabaseAtencion(error: { code?: string; message?: string }): AppError {
   if (error.code === '23514') {
+    const msg = (error.message || '').toLowerCase();
+    if (msg.includes('canal')) {
+      return new AppError(
+        'Canal no válido. Si usás Teléfono u otros canales nuevos, aplicá la migración 026 en Supabase.',
+        400
+      );
+    }
+    if (msg.includes('resultado')) {
+      return new AppError('Resultado de atención no válido.', 400);
+    }
     return new AppError(
       'Datos inválidos para la atención. Verificá el canal y el resultado seleccionados.',
       400

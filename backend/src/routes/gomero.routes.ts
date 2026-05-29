@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { normalizePatenteAr } from '../utils/patente';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { sendPushToUserIds } from '../services/push-send.service';
+import { presionPsiFromBody } from '../utils/presion-neumaticos';
 
 const router = Router();
 router.use(authMiddleware);
@@ -291,12 +292,7 @@ router.patch('/ordenes/:id', requireRole('gomero', 'admin'), async (req: AuthReq
     if (observaciones_gomero !== undefined) updates.observaciones_gomero = observaciones_gomero || null;
 
     if (presion_psi !== undefined) {
-      if (presion_psi == null || presion_psi === '') {
-        updates.presion_psi = null;
-      } else {
-        const n = Number(String(presion_psi).replace(',', '.'));
-        updates.presion_psi = Number.isFinite(n) ? n : null;
-      }
+      updates.presion_psi = presionPsiFromBody(presion_psi);
     }
 
     const { error } = await supabase.from('visitas_taller').update(updates).eq('id', id);
