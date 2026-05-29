@@ -108,13 +108,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // ─────────────────────────────────────────────────────
-// Rate limiting global — 100 requests por IP cada 15 minutos
+// Rate limiting global — 500 req/IP cada 15 min (prod); excluye polling frecuente
 // ─────────────────────────────────────────────────────
+const RATE_LIMIT_SKIP_PATHS: RegExp[] = [
+  /^\/api\/admin\/dashboard\/?$/,
+  /^\/api\/admin\/notificaciones(\/|$)/,
+  /^\/api\/ranking\//,
+];
+
+function skipRateLimitFrequentRoutes(req: express.Request): boolean {
+  const path = req.originalUrl.split('?')[0];
+  return RATE_LIMIT_SKIP_PATHS.some((re) => re.test(path));
+}
+
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 100 : 500,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipRateLimitFrequentRoutes,
   message: { error: 'Demasiadas peticiones. Intentá de nuevo en 15 minutos.' },
 });
 app.use('/api', globalLimiter);

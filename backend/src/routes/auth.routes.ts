@@ -19,13 +19,12 @@ const router = Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
 // ─────────────────────────────────────────────────────
-// Rate limiter específico para login
-// Más estricto que el global: 10 intentos cada 15 minutos
-// Protege contra ataques de fuerza bruta sobre contraseñas
+// Rate limiter específico para login — 50 intentos fallidos por ventana
+// Protege contra fuerza bruta; los logins exitosos no cuentan (skipSuccessfulRequests)
 // ─────────────────────────────────────────────────────
 const loginLimiter = rateLimit({
   windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000, // prod: 15m | dev: 1m
-  max: isProduction ? 5 : 50,
+  max: 50,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
