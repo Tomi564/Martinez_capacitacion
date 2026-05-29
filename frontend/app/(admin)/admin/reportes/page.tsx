@@ -11,7 +11,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { apiClient } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
+import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
+
+interface CalificacionQrDetalle {
+  id: string;
+  estrellas_vendedor: number;
+  estrellas_empresa: number;
+  comentario: string | null;
+  created_at: string;
+  users: { nombre: string; apellido: string; email: string } | null;
+}
 
 interface ReporteProgreso {
   vendedor: string;
@@ -129,6 +139,11 @@ export default function ReportesPage() {
   const [errorVelocidad, setErrorVelocidad] = useState<string | null>(null);
   const [velocidadSortKey, setVelocidadSortKey] = useState<VelocidadSortKey>('vendedor');
   const [velocidadSortDir, setVelocidadSortDir] = useState<'asc' | 'desc'>('asc');
+  const [calificacionesDetalle, setCalificacionesDetalle] = useState<CalificacionQrDetalle[]>([]);
+  const [isLoadingCalificacionesDetalle, setIsLoadingCalificacionesDetalle] = useState(false);
+  const [calificacionAEliminar, setCalificacionAEliminar] = useState<CalificacionQrDetalle | null>(null);
+  const [eliminandoCalificacion, setEliminandoCalificacion] = useState(false);
+  const [msgEliminar, setMsgEliminar] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
   const loadBloqueados = useCallback(async () => {
     const res = await apiClient.get<{ vendedoresBloqueados: VendedorBloqueado[] }>(
@@ -156,11 +171,58 @@ export default function ReportesPage() {
     }
   }, []);
 
+  const loadCalificacionesDetalle = useCallback(async () => {
+    setIsLoadingCalificacionesDetalle(true);
+    try {
+      const res = await apiClient.get<{ calificaciones: CalificacionQrDetalle[] }>(
+        '/admin/calificaciones-qr?limit=100'
+      );
+      setCalificacionesDetalle(res.calificaciones || []);
+    } catch (err) {
+      console.error('[ReportesPage] Error cargando calificaciones QR', err);
+      setCalificacionesDetalle([]);
+    } finally {
+      setIsLoadingCalificacionesDetalle(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tabActiva === 'velocidad') {
       void loadVelocidad();
     }
-  }, [tabActiva, loadVelocidad]);
+    if (tabActiva === 'calificaciones') {
+      void loadCalificacionesDetalle();
+    }
+  }, [tabActiva, loadVelocidad, loadCalificacionesDetalle]);
+
+  const fetchReportesRefresh = useCallback(async () => {
+    try {
+      const reportesRes = await apiClient.get<ReportesData>('/admin/reportes');
+      setData(reportesRes);
+    } catch {
+      /* el resumen agregado puede quedar desactualizado hasta recargar */
+    }
+  }, []);
+
+  const confirmarEliminarCalificacion = async () => {
+    const c = calificacionAEliminar;
+    if (!c) return;
+    setEliminandoCalificacion(true);
+    setMsgEliminar(null);
+    try {
+      await apiClient.delete(`/admin/calificaciones-qr/${c.id}`);
+      setCalificacionAEliminar(null);
+      setMsgEliminar({ tipo: 'ok', texto: 'Calificación eliminada' });
+      await Promise.all([loadCalificacionesDetalle(), fetchReportesRefresh()]);
+      setTimeout(() => setMsgEliminar(null), 4000);
+    } catch (err) {
+      const texto =
+        err instanceof ApiError ? err.message : 'No se pudo eliminar la calificación';
+      setMsgEliminar({ tipo: 'error', texto });
+    } finally {
+      setEliminandoCalificacion(false);
+    }
+  };
 
   const velocidadOrdenada = useMemo(
     () =>
@@ -286,6 +348,18 @@ export default function ReportesPage() {
       {csvExportError && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" role="alert">
           {csvExportError}
+        </div>
+      )}
+
+      {msgEliminar && (
+        <div
+          className={`p-3 rounded-xl text-sm ${
+            msgEliminar.tipo === 'ok'
+              ? 'bg-green-50 border border-green-200 text-green-700'
+              : 'bg-red-50 border border-red-200 text-red-600'
+          }`}
+        >
+          {msgEliminar.texto}
         </div>
       )}
 
@@ -687,6 +761,85 @@ export default function ReportesPage() {
           </div>
         </div>
       )}
+
+      {tabActiva === 'calificaciones' && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="text-sm font-bold text-gray-900">Valoraciones individuales</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Podés eliminar calificaciones de prueba. Los promedios de arriba se actualizan al borrar.
+            </p>
+          </div>
+          {isLoadingCalificacionesDetalle ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-7 h-7 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : calificacionesDetalle.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No hay calificaciones registradas.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {calificacionesDetalle.map((c) => {
+                const vendedor = c.users
+                  ? `${c.users.nombre} ${c.users.apellido}`
+                  : 'Vendedor desconocido';
+                return (
+                  <div
+                    key={c.id}
+                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{vendedor}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Vendedor {c.estrellas_vendedor}★ · Empresa {c.estrellas_empresa}★ ·{' '}
+                        {new Date(c.created_at).toLocaleDateString('es-AR', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                      {c.comentario && (
+                        <p className="text-xs text-gray-600 mt-1 italic line-clamp-2">{c.comentario}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCalificacionAEliminar(c)}
+                      className="text-xs px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-medium shrink-0 self-start sm:self-center"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <ConfirmarEliminacionModal
+        open={!!calificacionAEliminar}
+        titulo="¿Eliminar esta calificación QR?"
+        descripcion={
+          calificacionAEliminar ? (
+            <>
+              Se borrará la valoración de{' '}
+              <span className="font-semibold text-gray-900">
+                {calificacionAEliminar.users
+                  ? `${calificacionAEliminar.users.nombre} ${calificacionAEliminar.users.apellido}`
+                  : 'vendedor'}
+              </span>{' '}
+              ({calificacionAEliminar.estrellas_vendedor}★ vendedor,{' '}
+              {calificacionAEliminar.estrellas_empresa}★ empresa).
+            </>
+          ) : null
+        }
+        eliminando={eliminandoCalificacion}
+        onCancelar={() => setCalificacionAEliminar(null)}
+        onConfirmar={confirmarEliminarCalificacion}
+        idTitulo="eliminar-calificacion-titulo"
+      />
 
     </div>
   );

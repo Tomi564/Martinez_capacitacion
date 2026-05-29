@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { apiClient, ApiError } from '@/lib/api';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { PageState } from '@/components/ui/PageState';
+import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
 
 interface AtencionVenta {
   id: string;
@@ -45,15 +46,19 @@ const RESULTADO_LABEL: Record<string, string> = {
 interface TabVentasClientesProps {
   busqueda: string;
   showVendedor?: boolean;
+  onMensaje?: (msg: { tipo: 'ok' | 'error'; texto: string }) => void;
 }
 
-export function TabVentasClientes({ busqueda, showVendedor = false }: TabVentasClientesProps) {
+export function TabVentasClientes({ busqueda, showVendedor = false, onMensaje }: TabVentasClientesProps) {
   const [clientes, setClientes] = useState<ClienteVenta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [clienteAEliminar, setClienteAEliminar] = useState<ClienteVenta | null>(null);
+  const [advertencia, setAdvertencia] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
@@ -65,11 +70,55 @@ export function TabVentasClientes({ busqueda, showVendedor = false }: TabVentasC
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    cargar();
-  }, []);
+    void cargar();
+  }, [cargar]);
+
+  const abrirEliminar = async (c: ClienteVenta) => {
+    setAdvertencia(null);
+    setClienteAEliminar(c);
+    try {
+      const res = await apiClient.get<{ vehiculos: number; atenciones: number; visitas: number }>(
+        `/admin/clientes/${c.id}/dependencias`
+      );
+      const partes: string[] = [];
+      if (res.vehiculos > 0) partes.push(`${res.vehiculos} vehículo${res.vehiculos === 1 ? '' : 's'}`);
+      if (res.atenciones > 0) partes.push(`${res.atenciones} atención${res.atenciones === 1 ? '' : 'es'}`);
+      if (res.visitas > 0) partes.push(`${res.visitas} visita${res.visitas === 1 ? '' : 's'} en taller`);
+      if (partes.length > 0) {
+        setAdvertencia(
+          `Este cliente tiene datos asociados: ${partes.join(', ')}. Al eliminarlo, los vehículos quedarán sin titular y las atenciones sin vínculo al cliente.`
+        );
+      }
+    } catch {
+      if (c.total_atenciones > 0) {
+        setAdvertencia(
+          `Este cliente tiene ${c.total_atenciones} atención${c.total_atenciones === 1 ? '' : 'es'} registrada${c.total_atenciones === 1 ? '' : 's'}.`
+        );
+      }
+    }
+  };
+
+  const confirmarEliminar = async () => {
+    const c = clienteAEliminar;
+    if (!c) return;
+    setEliminando(true);
+    try {
+      await apiClient.delete(`/admin/clientes/${c.id}`);
+      setClienteAEliminar(null);
+      setAdvertencia(null);
+      onMensaje?.({ tipo: 'ok', texto: 'Cliente eliminado' });
+      await cargar();
+    } catch (err) {
+      const texto =
+        err instanceof ApiError ? err.message : 'No se pudo eliminar el cliente';
+      onMensaje?.({ tipo: 'error', texto });
+    } finally {
+      setEliminando(false);
+    }
+  };
 
   const filtrados = clientes.filter((c) => {
     const q = busqueda.toLowerCase();
@@ -97,12 +146,12 @@ export function TabVentasClientes({ busqueda, showVendedor = false }: TabVentasC
             const abierto = expandido === c.id;
             return (
               <div key={c.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setExpandido(abierto ? null : c.id)}
-                  className="w-full p-4 text-left flex items-start justify-between gap-3"
-                >
-                  <div className="flex-1 min-w-0">
+                <div className="w-full p-4 flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setExpandido(abierto ? null : c.id)}
+                    className="flex-1 min-w-0 text-left"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-gray-900">
                         {c.nombre} {c.apellido}
@@ -117,18 +166,15 @@ export function TabVentasClientes({ busqueda, showVendedor = false }: TabVentasC
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mt-1 inline-block">
                       {c.total_atenciones} {c.total_atenciones === 1 ? 'atención' : 'atenciones'}
                     </span>
-                  </div>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={`w-4 h-4 text-gray-400 shrink-0 mt-1 transition-transform ${abierto ? 'rotate-180' : ''}`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void abrirEliminar(c)}
+                    className="text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium shrink-0"
                   >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
+                    Eliminar
+                  </button>
+                </div>
                 {abierto && (
                   <div className="border-t border-gray-100 px-4 pb-4 pt-3 flex flex-col gap-2">
                     {c.atenciones.map((a) => (
@@ -158,6 +204,30 @@ export function TabVentasClientes({ busqueda, showVendedor = false }: TabVentasC
           })}
         </div>
       </PageState>
+
+      <ConfirmarEliminacionModal
+        open={!!clienteAEliminar}
+        titulo="¿Eliminar este cliente?"
+        descripcion={
+          clienteAEliminar ? (
+            <>
+              Se borrará a{' '}
+              <span className="font-semibold text-gray-900">
+                {clienteAEliminar.nombre} {clienteAEliminar.apellido}
+              </span>
+              {clienteAEliminar.dni ? ` (DNI ${clienteAEliminar.dni})` : ''}.
+            </>
+          ) : null
+        }
+        advertencia={advertencia}
+        eliminando={eliminando}
+        onCancelar={() => {
+          setClienteAEliminar(null);
+          setAdvertencia(null);
+        }}
+        onConfirmar={confirmarEliminar}
+        idTitulo="eliminar-cliente-ventas-titulo"
+      />
     </PageState>
   );
 }

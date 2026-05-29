@@ -908,7 +908,9 @@ export class AdminService {
   }
 
   /**
-   * Elimina definitivamente un usuario del equipo.
+   * Elimina definitivamente un usuario del equipo (vendedor, gomero o mecánico).
+   * Los datos con ON DELETE CASCADE se borran solos; visitas_taller.mecanico_id
+   * usa RESTRICT en el esquema base — se anula antes del DELETE (ver migración 034).
    */
   async eliminarVendedor(vendedorId: string, actor?: ActorAuditoria) {
     const { data: antes } = await supabase
@@ -922,17 +924,13 @@ export class AdminService {
       throw new AppError('Usuario no encontrado', 404);
     }
 
-    // Si es mecánico, se libera de visitas históricas para evitar
-    // restricciones de FK al borrar el usuario.
-    if (antes.rol === 'mecanico') {
-      const { error: liberarVisitasError } = await supabase
-        .from('visitas_taller')
-        .update({ mecanico_id: null })
-        .eq('mecanico_id', vendedorId);
-
-      if (liberarVisitasError) {
-        throw new AppError('No se pudieron liberar las visitas del mecánico', 500);
-      }
+    // visitas_taller.mecanico_id → ON DELETE RESTRICT (sin migración 034 aplicada).
+    const { error: liberarMecanicoErr } = await supabase
+      .from('visitas_taller')
+      .update({ mecanico_id: null })
+      .eq('mecanico_id', vendedorId);
+    if (liberarMecanicoErr) {
+      throw new AppError('No se pudieron liberar las visitas asignadas al usuario', 500);
     }
 
     const { error } = await supabase

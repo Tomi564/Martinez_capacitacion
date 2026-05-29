@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { TabVentasClientes } from '@/components/clientes/TabVentasClientes';
 import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
+import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
 
 interface Visita {
   id: string; estado: string; orden_estado?: string | null; motivo: string | null; observaciones: string | null;
@@ -39,8 +40,18 @@ export default function ClientesAdminPage() {
   const [expandido, setExpandido] = useState<string | null>(null);
   const [tab, setTab] = useState<'taller' | 'qr' | 'ventas'>('taller');
   const [hasError, setHasError] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [advertenciaModal, setAdvertenciaModal] = useState<string | null>(null);
 
-  const cargarClientes = async () => {
+  type ModalEliminar =
+    | { tipo: 'vehiculo'; vehiculo: Vehiculo }
+    | { tipo: 'visita'; visita: Visita; patente: string }
+    | { tipo: 'cliente'; cliente: NonNullable<Vehiculo['clientes']> }
+    | { tipo: 'participante'; participante: Participante };
+  const [modalEliminar, setModalEliminar] = useState<ModalEliminar | null>(null);
+
+  const cargarClientes = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
@@ -56,11 +67,166 @@ export default function ClientesAdminPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    cargarClientes();
-  }, []);
+    void cargarClientes();
+  }, [cargarClientes]);
+
+  const abrirEliminarVehiculo = async (v: Vehiculo) => {
+    setAdvertenciaModal(null);
+    setModalEliminar({ tipo: 'vehiculo', vehiculo: v });
+    const n = v.visitas_taller?.length || 0;
+    if (n > 0) {
+      setAdvertenciaModal(
+        `Este vehículo tiene ${n} ${n === 1 ? 'visita asociada' : 'visitas asociadas'} que también se eliminarán.`
+      );
+      return;
+    }
+    try {
+      const res = await apiClient.get<{ visitas: number }>(`/admin/vehiculos/${v.id}/dependencias`);
+      if (res.visitas > 0) {
+        setAdvertenciaModal(
+          `Este vehículo tiene ${res.visitas} ${res.visitas === 1 ? 'visita asociada' : 'visitas asociadas'} que también se eliminarán.`
+        );
+      }
+    } catch {
+      /* sin advertencia extra */
+    }
+  };
+
+  const abrirEliminarCliente = async (c: NonNullable<Vehiculo['clientes']>) => {
+    setAdvertenciaModal(null);
+    setModalEliminar({ tipo: 'cliente', cliente: c });
+    try {
+      const res = await apiClient.get<{ vehiculos: number; atenciones: number; visitas: number }>(
+        `/admin/clientes/${c.id}/dependencias`
+      );
+      const partes: string[] = [];
+      if (res.vehiculos > 0) partes.push(`${res.vehiculos} vehículo${res.vehiculos === 1 ? '' : 's'}`);
+      if (res.atenciones > 0) partes.push(`${res.atenciones} atención${res.atenciones === 1 ? '' : 'es'}`);
+      if (res.visitas > 0) partes.push(`${res.visitas} visita${res.visitas === 1 ? '' : 's'} en taller`);
+      if (partes.length > 0) {
+        setAdvertenciaModal(
+          `Este cliente tiene datos asociados: ${partes.join(', ')}. Al eliminarlo, los vehículos quedarán sin titular y las atenciones sin vínculo al cliente.`
+        );
+      }
+    } catch {
+      /* sin advertencia extra */
+    }
+  };
+
+  const abrirEliminarParticipante = async (p: Participante) => {
+    setAdvertenciaModal(null);
+    setModalEliminar({ tipo: 'participante', participante: p });
+    try {
+      const res = await apiClient.get<{ vehiculos: number; atenciones: number }>(
+        `/admin/participantes/${p.id}/dependencias`
+      );
+      const partes: string[] = [];
+      if (res.vehiculos > 0) partes.push(`${res.vehiculos} vehículo${res.vehiculos === 1 ? '' : 's'} con el mismo DNI`);
+      if (res.atenciones > 0) partes.push(`${res.atenciones} atención${res.atenciones === 1 ? '' : 'es'}`);
+      if (partes.length > 0) {
+        setAdvertenciaModal(`Este participante tiene datos vinculados por DNI: ${partes.join(' y ')}.`);
+      }
+    } catch {
+      /* sin advertencia extra */
+    }
+  };
+
+  const confirmarEliminar = async () => {
+    if (!modalEliminar) return;
+    setEliminando(true);
+    setMsg(null);
+    try {
+      if (modalEliminar.tipo === 'vehiculo') {
+        await apiClient.delete(`/admin/vehiculos/${modalEliminar.vehiculo.id}`);
+        setMsg({ tipo: 'ok', texto: 'Vehículo eliminado' });
+      } else if (modalEliminar.tipo === 'visita') {
+        await apiClient.delete(`/admin/visitas/${modalEliminar.visita.id}`);
+        setMsg({ tipo: 'ok', texto: 'Visita eliminada' });
+      } else if (modalEliminar.tipo === 'cliente') {
+        await apiClient.delete(`/admin/clientes/${modalEliminar.cliente.id}`);
+        setMsg({ tipo: 'ok', texto: 'Cliente eliminado' });
+      } else {
+        await apiClient.delete(`/admin/participantes/${modalEliminar.participante.id}`);
+        setMsg({ tipo: 'ok', texto: 'Participante eliminado' });
+      }
+      setModalEliminar(null);
+      setAdvertenciaModal(null);
+      await cargarClientes();
+      setTimeout(() => setMsg(null), 4000);
+    } catch (err) {
+      const texto =
+        err instanceof ApiError ? err.message : 'No se pudo completar la eliminación';
+      setMsg({ tipo: 'error', texto });
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const tituloModal = () => {
+    if (!modalEliminar) return '';
+    switch (modalEliminar.tipo) {
+      case 'vehiculo':
+        return '¿Eliminar este vehículo?';
+      case 'visita':
+        return '¿Eliminar esta visita?';
+      case 'cliente':
+        return '¿Eliminar este cliente?';
+      case 'participante':
+        return '¿Eliminar este participante?';
+    }
+  };
+
+  const descripcionModal = () => {
+    if (!modalEliminar) return null;
+    switch (modalEliminar.tipo) {
+      case 'vehiculo': {
+        const v = modalEliminar.vehiculo;
+        return (
+          <>
+            Se borrará el vehículo{' '}
+            <span className="font-semibold text-gray-900">{v.patente}</span> ({v.marca} {v.modelo}).
+          </>
+        );
+      }
+      case 'visita': {
+        const { visita, patente } = modalEliminar;
+        return (
+          <>
+            Se borrará la visita del{' '}
+            <span className="font-semibold text-gray-900">{patente}</span> del{' '}
+            {new Date(visita.created_at).toLocaleDateString('es-AR')}.
+          </>
+        );
+      }
+      case 'cliente': {
+        const c = modalEliminar.cliente;
+        return (
+          <>
+            Se borrará a{' '}
+            <span className="font-semibold text-gray-900">
+              {c.nombre} {c.apellido}
+            </span>
+            {c.dni ? ` (DNI ${c.dni})` : ''}.
+          </>
+        );
+      }
+      case 'participante': {
+        const p = modalEliminar.participante;
+        return (
+          <>
+            Se borrará a{' '}
+            <span className="font-semibold text-gray-900">
+              {p.nombre} {p.apellido}
+            </span>{' '}
+            (DNI {p.dni}) del registro QR.
+          </>
+        );
+      }
+    }
+  };
 
   const vehiculosConVisitas = vehiculos.filter(v => (v.visitas_taller?.length || 0) > 0);
 
@@ -103,6 +269,18 @@ export default function ClientesAdminPage() {
         </div>
       </div>
 
+      {msg && (
+        <div
+          className={`p-3 rounded-xl text-sm ${
+            msg.tipo === 'ok'
+              ? 'bg-green-50 border border-green-200 text-green-700'
+              : 'bg-red-50 border border-red-200 text-red-600'
+          }`}
+        >
+          {msg.texto}
+        </div>
+      )}
+
       {/* Buscador */}
       <input
         type="text" value={busqueda} onChange={e => { setBusqueda(e.target.value); setExpandido(null); }}
@@ -137,7 +315,8 @@ export default function ClientesAdminPage() {
               const visitasOrdenadas = [...v.visitas_taller].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
               return (
                 <div key={v.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                  <button onClick={() => setExpandido(abierto ? null : v.id)} className="w-full p-4 text-left flex items-start justify-between gap-3">
+                  <div className="w-full p-4 flex items-start justify-between gap-3">
+                  <button type="button" onClick={() => setExpandido(abierto ? null : v.id)} className="flex-1 min-w-0 text-left">
                     <div className="flex-1 min-w-0">
                       <p className="font-black text-gray-900 tracking-wider text-lg">{v.patente}</p>
                       <p className="text-sm text-gray-600">{v.marca} {v.modelo}{v.anio && ` · ${v.anio}`}</p>
@@ -154,8 +333,18 @@ export default function ClientesAdminPage() {
                       )}
                       <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mt-1 inline-block">{v.visitas_taller.length} {v.visitas_taller.length === 1 ? 'visita' : 'visitas'}</span>
                     </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 text-gray-400 shrink-0 mt-1 transition-transform ${abierto ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
                   </button>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 text-gray-400 mt-1 transition-transform ${abierto ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    <button
+                      type="button"
+                      onClick={() => void abrirEliminarVehiculo(v)}
+                      className="text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                    >
+                      Eliminar vehículo
+                    </button>
+                  </div>
+                  </div>
                   {abierto && (
                     <div className="border-t border-gray-100 px-4 pb-4 pt-3 flex flex-col gap-3">
                       {c && (
@@ -168,6 +357,13 @@ export default function ClientesAdminPage() {
                           {c.dni && <p className="text-xs text-gray-500">DNI: {c.dni}</p>}
                           {c.telefono && <p className="text-xs text-gray-500">{c.telefono}</p>}
                           {c.email && <p className="text-xs text-gray-400">{c.email}</p>}
+                          <button
+                            type="button"
+                            onClick={() => void abrirEliminarCliente(c)}
+                            className="mt-2 text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium self-start"
+                          >
+                            Eliminar cliente
+                          </button>
                         </div>
                       )}
                       {v.medida_rueda && <p className="text-xs text-gray-400">Rueda: {v.medida_rueda}</p>}
@@ -189,9 +385,21 @@ export default function ClientesAdminPage() {
                                 {visita.motivo && <p className="text-xs text-gray-600">Motivo: {visita.motivo}</p>}
                                 {visita.km && <p className="text-xs text-gray-400">{visita.km.toLocaleString()} km</p>}
                                 {visita.observaciones && <p className="text-xs text-gray-500 italic border-t border-gray-100 pt-1.5">{visita.observaciones}</p>}
-                                <div className="flex items-center justify-between mt-0.5">
+                                <div className="flex items-center justify-between gap-2 mt-0.5 flex-wrap">
                                   {visita.diagnostico_enviado && <span className="text-xs text-blue-600 font-medium">✓ Diagnóstico enviado</span>}
-                                  <button onClick={() => router.push(`/admin/clientes/visita/${visita.id}`)} className="text-xs text-[#C8102E] font-bold ml-auto">Ver checklist →</button>
+                                  <div className="flex items-center gap-2 ml-auto">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAdvertenciaModal(null);
+                                        setModalEliminar({ tipo: 'visita', visita, patente: v.patente });
+                                      }}
+                                      className="text-xs px-2 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                                    >
+                                      Eliminar
+                                    </button>
+                                    <button type="button" onClick={() => router.push(`/admin/clientes/visita/${visita.id}`)} className="text-xs text-[#C8102E] font-bold">Ver checklist →</button>
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -226,9 +434,18 @@ export default function ClientesAdminPage() {
                   </div>
                   <p className="text-xs text-gray-400 shrink-0">{new Date(p.created_at).toLocaleDateString('es-AR')}</p>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-gray-600">{p.contacto}</p>
-                  {p.vendedor && <p className="text-xs text-gray-400">vía {p.vendedor.nombre} {p.vendedor.apellido}</p>}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {p.vendedor && <p className="text-xs text-gray-400">vía {p.vendedor.nombre} {p.vendedor.apellido}</p>}
+                    <button
+                      type="button"
+                      onClick={() => void abrirEliminarParticipante(p)}
+                      className="text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -236,8 +453,28 @@ export default function ClientesAdminPage() {
         </PageState>
       )}
 
-      {tab === 'ventas' && <TabVentasClientes busqueda={busqueda} showVendedor />}
+      {tab === 'ventas' && (
+        <TabVentasClientes
+          busqueda={busqueda}
+          showVendedor
+          onMensaje={(m) => setMsg(m)}
+        />
+      )}
       </PageState>
+
+      <ConfirmarEliminacionModal
+        open={!!modalEliminar}
+        titulo={tituloModal()}
+        descripcion={descripcionModal()}
+        advertencia={advertenciaModal}
+        eliminando={eliminando}
+        onCancelar={() => {
+          setModalEliminar(null);
+          setAdvertenciaModal(null);
+        }}
+        onConfirmar={confirmarEliminar}
+        idTitulo="eliminar-clientes-titulo"
+      />
     </div>
   );
 }

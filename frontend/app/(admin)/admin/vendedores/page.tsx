@@ -10,7 +10,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 
 interface Vendedor {
   id: string;
@@ -38,6 +38,10 @@ const ROL_LABEL: Record<string, string> = {
   mecanico: 'Mecánico',
 };
 
+function nombreCompletoUsuario(v: Pick<Vendedor, 'nombre' | 'apellido'>) {
+  return `${v.nombre} ${v.apellido}`.replace(/\s+/g, ' ').trim();
+}
+
 export default function VendedoresPage() {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,6 +68,10 @@ export default function VendedoresPage() {
     password: '',
     rol: 'vendedor',
   });
+  const [usuarioAEliminar, setUsuarioAEliminar] = useState<Vendedor | null>(null);
+  const [confirmacionNombre, setConfirmacionNombre] = useState('');
+  const [eliminandoCuenta, setEliminandoCuenta] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   const fetchVendedores = async () => {
     try {
@@ -146,6 +154,41 @@ export default function VendedoresPage() {
     });
     setEditError(null);
     setShowEditModal(true);
+  };
+
+  const cerrarModalEliminar = () => {
+    setUsuarioAEliminar(null);
+    setConfirmacionNombre('');
+    setErrorEliminar(null);
+  };
+
+  const nombreEsperadoEliminar = usuarioAEliminar
+    ? nombreCompletoUsuario(usuarioAEliminar)
+    : '';
+
+  const confirmacionNombreValida =
+    !!usuarioAEliminar &&
+    confirmacionNombre.trim().replace(/\s+/g, ' ') === nombreEsperadoEliminar;
+
+  const handleEliminarCuenta = async () => {
+    if (!usuarioAEliminar || !confirmacionNombreValida) return;
+    setEliminandoCuenta(true);
+    setErrorEliminar(null);
+    try {
+      await apiClient.delete(`/admin/vendedores/${usuarioAEliminar.id}`);
+      cerrarModalEliminar();
+      setToastOk(`Eliminamos la cuenta de ${nombreEsperadoEliminar}.`);
+      window.setTimeout(() => setToastOk(null), 4500);
+      await fetchVendedores();
+    } catch (err) {
+      const texto =
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo eliminar la cuenta. Reintentá.';
+      setErrorEliminar(texto);
+    } finally {
+      setEliminandoCuenta(false);
+    }
   };
 
   const handleGuardarEdicion = async () => {
@@ -347,15 +390,17 @@ export default function VendedoresPage() {
                 </span>
               </div>
 
-              {/* Acciones — mismo ancho/alineación que en módulos */}
-              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-1.5 shrink-0 w-[7.85rem]">
+              {/* Acciones */}
+              <div className="flex flex-col items-stretch gap-1.5 shrink-0 w-[8.5rem]">
               <button
+                type="button"
                 onClick={() => openEditModal(vendedor)}
                 className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors text-center"
               >
                 Editar
               </button>
               <button
+                type="button"
                 onClick={() => void handleToggleActivo(vendedor)}
                 className={`w-full text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors text-center ${
                   vendedor.activo
@@ -364,6 +409,17 @@ export default function VendedoresPage() {
                 }`}
               >
                 {vendedor.activo ? 'Desactivar' : 'Activar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setUsuarioAEliminar(vendedor);
+                  setConfirmacionNombre('');
+                  setErrorEliminar(null);
+                }}
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors text-center"
+              >
+                Eliminar cuenta
               </button>
               </div>
             </div>
@@ -508,6 +564,75 @@ export default function VendedoresPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal eliminar cuenta permanentemente */}
+      {usuarioAEliminar && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end lg:items-center justify-center p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="eliminar-cuenta-titulo"
+            className="bg-white rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto"
+          >
+            <h2 id="eliminar-cuenta-titulo" className="text-lg font-bold text-gray-900">
+              ¿Eliminar cuenta permanentemente?
+            </h2>
+
+            <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-sm">
+              <p className="font-semibold text-gray-900">{nombreEsperadoEliminar}</p>
+              <p className="text-gray-600 mt-0.5">{usuarioAEliminar.email}</p>
+              <p className="text-xs font-medium text-[#C8102E] mt-1">
+                Rol: {ROL_LABEL[usuarioAEliminar.rol] || usuarioAEliminar.rol}
+              </p>
+            </div>
+
+            <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              Esta acción eliminará permanentemente la cuenta y todos sus datos asociados
+              (progreso, intentos de examen, atenciones, calificaciones QR, etc.). No se puede deshacer.
+            </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="confirmar-nombre-eliminar" className="text-sm font-medium text-gray-700">
+                Escribí <span className="font-semibold text-gray-900">{nombreEsperadoEliminar}</span> para confirmar
+              </label>
+              <input
+                id="confirmar-nombre-eliminar"
+                type="text"
+                value={confirmacionNombre}
+                onChange={(e) => setConfirmacionNombre(e.target.value)}
+                autoComplete="off"
+                placeholder={nombreEsperadoEliminar}
+                className="h-11 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+
+            {errorEliminar && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+                {errorEliminar}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={cerrarModalEliminar}
+                disabled={eliminandoCuenta}
+                className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleEliminarCuenta()}
+                disabled={eliminandoCuenta || !confirmacionNombreValida}
+                className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+              >
+                {eliminandoCuenta ? 'Eliminando...' : 'Eliminar permanentemente'}
+              </button>
+            </div>
           </div>
         </div>
       )}

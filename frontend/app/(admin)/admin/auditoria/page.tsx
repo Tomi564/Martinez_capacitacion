@@ -38,6 +38,11 @@ const ACCIONES = [
   'editar_comunicado',
   'eliminar_comunicado',
   'editar_modulo',
+  'eliminar_atencion',
+  'eliminar_calificacion_qr',
+  'eliminar_cliente',
+  'eliminar_participante_qr',
+  'eliminar_vehiculo',
 ];
 
 const ROLES = ['', 'admin', 'vendedor', 'mecanico', 'gomero'];
@@ -65,6 +70,11 @@ function labelAccion(accion: string) {
     editar_comunicado: 'Modificó un comunicado',
     eliminar_comunicado: 'Eliminó un comunicado',
     editar_modulo: 'Editó un módulo de capacitación',
+    eliminar_atencion: 'Eliminó una atención de venta',
+    eliminar_calificacion_qr: 'Eliminó una calificación QR',
+    eliminar_cliente: 'Eliminó un cliente registrado',
+    eliminar_participante_qr: 'Eliminó un participante del QR',
+    eliminar_vehiculo: 'Eliminó un vehículo del taller',
   };
   return map[accion] || accion.replace(/_/g, ' ');
 }
@@ -79,6 +89,11 @@ function labelEntidad(entidad: string) {
     modulos: 'Módulo de capacitación',
     usuario: 'Usuario',
     users: 'Usuario',
+    atenciones: 'Atención de venta',
+    calificaciones_qr: 'Calificación QR',
+    clientes: 'Cliente',
+    participantes_sorteo: 'Participante QR',
+    vehiculos: 'Vehículo del taller',
   };
   return map[entidad] || entidad;
 }

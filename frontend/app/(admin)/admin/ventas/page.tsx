@@ -6,8 +6,9 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { apiClient, ApiError } from '@/lib/api';
+import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
 
 interface Atencion {
   id: string;
@@ -45,30 +46,44 @@ const CANAL_LABEL: Record<string, string> = {
   otro:      'Otro',
 };
 
+function BotonEliminar({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium shrink-0"
+    >
+      Eliminar
+    </button>
+  );
+}
+
 export default function VentasAdminPage() {
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtroVendedor, setFiltroVendedor] = useState('todos');
   const [filtroResultado, setFiltroResultado] = useState('todos');
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [atencionAEliminar, setAtencionAEliminar] = useState<Atencion | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await apiClient.get<{ atenciones: Atencion[] }>(
-          '/atenciones/todas'
-        );
-        setAtenciones(res.atenciones);
-      } catch {
-        setError('Error al cargar las atenciones');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetch();
+  const cargarAtenciones = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ atenciones: Atencion[] }>('/atenciones/todas');
+      setAtenciones(res.atenciones);
+      setError(null);
+    } catch {
+      setError('Error al cargar las atenciones');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // Lista de vendedores únicos para el filtro
+  useEffect(() => {
+    void cargarAtenciones();
+  }, [cargarAtenciones]);
+
   const vendedores = Array.from(
     new Map(
       atenciones
@@ -89,6 +104,44 @@ export default function VentasAdminPage() {
   const totalMonto = filtradas
     .filter(a => a.monto)
     .reduce((acc, a) => acc + (a.monto || 0), 0);
+
+  const confirmarEliminar = async () => {
+    const a = atencionAEliminar;
+    if (!a) return;
+    setEliminando(true);
+    setMsg(null);
+    try {
+      await apiClient.delete(`/admin/atenciones/${a.id}`);
+      setAtencionAEliminar(null);
+      setMsg({ tipo: 'ok', texto: 'Atención eliminada' });
+      await cargarAtenciones();
+      setTimeout(() => setMsg(null), 4000);
+    } catch (err) {
+      const texto =
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo eliminar la atención';
+      setMsg({ tipo: 'error', texto });
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const descripcionAtencion = (a: Atencion) => {
+    const vendedor = a.users ? `${a.users.nombre} ${a.users.apellido}` : 'sin vendedor';
+    const fecha = new Date(a.created_at).toLocaleDateString('es-AR', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    });
+    return (
+      <>
+        Se borrará la atención del <span className="font-semibold text-gray-900">{vendedor}</span>
+        {' '}({CANAL_LABEL[a.canal] || a.canal}, {RESULTADO_LABEL[a.resultado] || a.resultado}, {fecha}).
+        {a.producto && (
+          <span className="block mt-1 text-gray-500">Producto: {a.producto}</span>
+        )}
+      </>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -111,7 +164,6 @@ export default function VentasAdminPage() {
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-6 max-w-5xl mx-auto">
 
-      {/* Encabezado */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Ventas</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -119,7 +171,16 @@ export default function VentasAdminPage() {
         </p>
       </div>
 
-      {/* Métricas rápidas */}
+      {msg && (
+        <div className={`p-3 rounded-xl text-sm ${
+          msg.tipo === 'ok'
+            ? 'bg-green-50 border border-green-200 text-green-700'
+            : 'bg-red-50 border border-red-200 text-red-600'
+        }`}>
+          {msg.texto}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {([
           { label: 'Total registradas', value: filtradas.length, accent: 'bg-gray-900', color: 'text-gray-900' },
@@ -153,9 +214,7 @@ export default function VentasAdminPage() {
         ))}
       </div>
 
-      {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
-        {/* Filtro vendedor */}
         <select
           value={filtroVendedor}
           onChange={e => setFiltroVendedor(e.target.value)}
@@ -167,7 +226,6 @@ export default function VentasAdminPage() {
           ))}
         </select>
 
-        {/* Filtro resultado */}
         <select
           value={filtroResultado}
           onChange={e => setFiltroResultado(e.target.value)}
@@ -180,14 +238,12 @@ export default function VentasAdminPage() {
         </select>
       </div>
 
-      {/* Lista — cards mobile, tabla desktop */}
       {filtradas.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
           <p className="text-gray-400 text-sm">No hay atenciones con los filtros seleccionados</p>
         </div>
       ) : (
         <>
-          {/* Cards — mobile */}
           <div className="flex flex-col gap-3 lg:hidden">
             {filtradas.map(a => (
               <div key={a.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm ring-1 ring-gray-900/5">
@@ -195,9 +251,12 @@ export default function VentasAdminPage() {
                   <p className="text-sm font-semibold text-gray-900">
                     {a.users ? `${a.users.nombre} ${a.users.apellido}` : '—'}
                   </p>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${RESULTADO_STYLE[a.resultado] || 'bg-gray-100 text-gray-500'}`}>
-                    {RESULTADO_LABEL[a.resultado] || a.resultado}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${RESULTADO_STYLE[a.resultado] || 'bg-gray-100 text-gray-500'}`}>
+                      {RESULTADO_LABEL[a.resultado] || a.resultado}
+                    </span>
+                    <BotonEliminar onClick={() => setAtencionAEliminar(a)} />
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
                   <span>{CANAL_LABEL[a.canal] || a.canal}</span>
@@ -217,7 +276,6 @@ export default function VentasAdminPage() {
             ))}
           </div>
 
-          {/* Tabla — desktop */}
           <div className="hidden lg:block bg-white border border-gray-200 rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
@@ -228,6 +286,7 @@ export default function VentasAdminPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Resultado</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Monto</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" />
                 </tr>
               </thead>
               <tbody>
@@ -251,6 +310,9 @@ export default function VentasAdminPage() {
                         day: 'numeric', month: 'short', year: 'numeric',
                       })}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <BotonEliminar onClick={() => setAtencionAEliminar(a)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -258,6 +320,16 @@ export default function VentasAdminPage() {
           </div>
         </>
       )}
+
+      <ConfirmarEliminacionModal
+        open={!!atencionAEliminar}
+        titulo="¿Eliminar esta atención?"
+        descripcion={atencionAEliminar ? descripcionAtencion(atencionAEliminar) : null}
+        eliminando={eliminando}
+        onCancelar={() => setAtencionAEliminar(null)}
+        onConfirmar={confirmarEliminar}
+        idTitulo="eliminar-atencion-titulo"
+      />
     </div>
   );
 }

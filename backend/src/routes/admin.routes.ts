@@ -837,6 +837,324 @@ router.patch('/visitas/:id', async (req, res, next) => {
   }
 });
 
+// DELETE /api/admin/visitas/:id — eliminar visita (admin, sin restricción de mecánico)
+router.delete('/visitas/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('visitas_taller')
+      .select('id, estado, estado_visita, motivo, vehiculo_id, mecanico_id, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Visita no encontrada' });
+    }
+
+    const { error } = await supabase.from('visitas_taller').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar visita');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_visita',
+      entidad: 'visitas_taller',
+      entidadId: id,
+      datosAnteriores: anterior,
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({ mensaje: 'Visita eliminada' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/calificaciones-qr — listado individual para gestión
+router.get('/calificaciones-qr', async (req, res, next) => {
+  try {
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const { data, error, count } = await supabase
+      .from('calificaciones_qr')
+      .select(
+        `
+        id, estrellas_vendedor, estrellas_empresa, comentario, created_at,
+        users!calificaciones_qr_vendedor_id_fkey(id, nombre, apellido, email)
+      `,
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw new Error('Error al obtener calificaciones QR');
+    return res.status(200).json({
+      calificaciones: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/calificaciones-qr/:id
+router.delete('/calificaciones-qr/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('calificaciones_qr')
+      .select('id, vendedor_id, estrellas_vendedor, estrellas_empresa, comentario, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Calificación no encontrada' });
+    }
+
+    const { error } = await supabase.from('calificaciones_qr').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar calificación');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_calificacion_qr',
+      entidad: 'calificaciones_qr',
+      entidadId: id,
+      datosAnteriores: anterior,
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({ mensaje: 'Calificación eliminada' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/atenciones/:id
+router.delete('/atenciones/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('atenciones')
+      .select('id, user_id, canal, resultado, producto, monto, cliente_id, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Atención no encontrada' });
+    }
+
+    const { error } = await supabase.from('atenciones').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar atención');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_atencion',
+      entidad: 'atenciones',
+      entidadId: id,
+      datosAnteriores: anterior,
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({ mensaje: 'Atención eliminada' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/clientes/:id/dependencias
+router.get('/clientes/:id/dependencias', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: cliente } = await supabase
+      .from('clientes')
+      .select('id, nombre, apellido, dni')
+      .eq('id', id)
+      .maybeSingle();
+    if (!cliente) {
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
+
+    const [{ count: vehiculos }, { count: atenciones }, vehiculosIdsRes] = await Promise.all([
+      supabase.from('vehiculos').select('id', { count: 'exact', head: true }).eq('cliente_id', id),
+      supabase.from('atenciones').select('id', { count: 'exact', head: true }).eq('cliente_id', id),
+      supabase.from('vehiculos').select('id').eq('cliente_id', id),
+    ]);
+
+    let visitas = 0;
+    const vehiculoIds = (vehiculosIdsRes.data || []).map((v) => v.id);
+    if (vehiculoIds.length > 0) {
+      const { count } = await supabase
+        .from('visitas_taller')
+        .select('id', { count: 'exact', head: true })
+        .in('vehiculo_id', vehiculoIds);
+      visitas = count || 0;
+    }
+
+    return res.status(200).json({
+      vehiculos: vehiculos || 0,
+      atenciones: atenciones || 0,
+      visitas,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/clientes/:id
+router.delete('/clientes/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('clientes')
+      .select('id, nombre, apellido, dni, telefono, email')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
+
+    const { error } = await supabase.from('clientes').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar cliente');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_cliente',
+      entidad: 'clientes',
+      entidadId: id,
+      datosAnteriores: anterior,
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({ mensaje: 'Cliente eliminado' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/participantes/:id/dependencias
+router.get('/participantes/:id/dependencias', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: participante } = await supabase
+      .from('participantes_sorteo')
+      .select('id, nombre, apellido, dni')
+      .eq('id', id)
+      .maybeSingle();
+    if (!participante) {
+      return res.status(404).json({ error: 'Participante no encontrado' });
+    }
+
+    let vehiculos = 0;
+    let atenciones = 0;
+    if (participante.dni) {
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('dni', participante.dni)
+        .maybeSingle();
+      if (cliente) {
+        const [{ count: vCount }, { count: aCount }] = await Promise.all([
+          supabase.from('vehiculos').select('id', { count: 'exact', head: true }).eq('cliente_id', cliente.id),
+          supabase.from('atenciones').select('id', { count: 'exact', head: true }).eq('cliente_id', cliente.id),
+        ]);
+        vehiculos = vCount || 0;
+        atenciones = aCount || 0;
+      }
+    }
+
+    return res.status(200).json({ vehiculos, atenciones });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/participantes/:id
+router.delete('/participantes/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('participantes_sorteo')
+      .select('id, nombre, apellido, dni, contacto, vendedor_id, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Participante no encontrado' });
+    }
+
+    const { error } = await supabase.from('participantes_sorteo').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar participante');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_participante_qr',
+      entidad: 'participantes_sorteo',
+      entidadId: id,
+      datosAnteriores: anterior,
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({ mensaje: 'Participante eliminado' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/vehiculos/:id/dependencias
+router.get('/vehiculos/:id/dependencias', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: vehiculo } = await supabase
+      .from('vehiculos')
+      .select('id, patente')
+      .eq('id', id)
+      .maybeSingle();
+    if (!vehiculo) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const { count: visitas } = await supabase
+      .from('visitas_taller')
+      .select('id', { count: 'exact', head: true })
+      .eq('vehiculo_id', id);
+
+    return res.status(200).json({ visitas: visitas || 0 });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/vehiculos/:id
+router.delete('/vehiculos/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { data: anterior } = await supabase
+      .from('vehiculos')
+      .select('id, patente, marca, modelo, cliente_id, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (!anterior) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const { count: visitas } = await supabase
+      .from('visitas_taller')
+      .select('id', { count: 'exact', head: true })
+      .eq('vehiculo_id', id);
+
+    const { error } = await supabase.from('vehiculos').delete().eq('id', id);
+    if (error) throw new Error('Error al eliminar vehículo');
+
+    await registrarAuditoria(req, {
+      accion: 'eliminar_vehiculo',
+      entidad: 'vehiculos',
+      entidadId: id,
+      datosAnteriores: { ...anterior, visitas_eliminadas: visitas || 0 },
+      datosNuevos: null,
+    });
+
+    return res.status(200).json({
+      mensaje: 'Vehículo eliminado',
+      visitasEliminadas: visitas || 0,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/admin/vendedores/:id/objetivo
 router.post('/vendedores/:id/objetivo', async (req, res, next) => {
   try {
