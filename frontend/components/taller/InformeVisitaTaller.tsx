@@ -1,12 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { apiClient, ApiError } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { Badge } from '@/components/ui/badge';
 import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
+import {
+  agruparLineasInforme,
+  formatPesosAr,
+  lineasMarcadasParaApi,
+  subtotalLineaInforme,
+  tieneItemsMarcadosInforme,
+  tienePresupuestoNuevoInforme,
+  type PresupuestoLineaInforme,
+} from '@/lib/presupuesto-checklist';
+import { PresupuestoVendedorEditor } from '@/components/taller/PresupuestoVendedorEditor';
 
 export interface InformeVisita {
   id: string;
@@ -15,6 +25,7 @@ export interface InformeVisita {
   orden_estado?: string | null;
   motivo: string | null;
   observaciones: string | null;
+  operario_responsable?: string | null;
   km: number | null;
   presion_psi?: number | null;
   neumaticos_cambiados?: boolean | null;
@@ -81,14 +92,119 @@ function nombrePresupuestoPdf(patente: string, createdAt: string): string {
   return `presupuesto-${pat}-${f}.pdf`;
 }
 
+function mapLineasApi(raw: PresupuestoLineaInforme[] | undefined): PresupuestoLineaInforme[] {
+  return (raw || []).map((l) => ({
+    item_catalogo_id: l.item_catalogo_id,
+    grupo: l.grupo,
+    etiqueta: l.etiqueta,
+    orden: l.orden ?? 0,
+    marcado: !!l.marcado,
+    cantidad: Number(l.cantidad ?? 1),
+    precio: l.precio != null ? Number(l.precio) : null,
+  }));
+}
+
+function PresupuestoChecklistInforme({ lineas }: { lineas: PresupuestoLineaInforme[] }) {
+  const secciones = useMemo(() => agruparLineasInforme(lineas), [lineas]);
+  const total = useMemo(
+    () => lineas.filter((l) => l.marcado).reduce((s, l) => s + subtotalLineaInforme(l), 0),
+    [lineas],
+  );
+
+  if (!secciones.length) {
+    return <p className="text-sm text-gray-500">Sin ítems presupuestados.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {secciones.map((sec) => (
+        <div key={sec.grupo} className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-[#1F1F1F] text-white px-3 py-2 flex justify-between items-center">
+            <span className="text-xs font-black uppercase tracking-wide">{sec.titulo}</span>
+            <span className="text-xs font-bold">{formatPesosAr(sec.subtotal)}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                  <th className="px-3 py-2 font-bold">Ítem</th>
+                  <th className="px-2 py-2 font-bold text-center w-14">Cant.</th>
+                  <th className="px-2 py-2 font-bold text-right w-24">P. unit.</th>
+                  <th className="px-3 py-2 font-bold text-right w-24">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sec.items.map((l) => (
+                  <tr key={l.item_catalogo_id} className="border-t border-gray-100">
+                    <td className="px-3 py-2 text-gray-900">{l.etiqueta}</td>
+                    <td className="px-2 py-2 text-center text-gray-700">{l.cantidad}</td>
+                    <td className="px-2 py-2 text-right text-gray-700">
+                      {formatPesosAr(l.precio || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                      {formatPesosAr(subtotalLineaInforme(l))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-3 py-2 bg-gray-50 flex justify-between text-xs">
+            <span className="font-bold text-gray-500 uppercase">Subtotal sección</span>
+            <span className="font-black text-gray-900">{formatPesosAr(sec.subtotal)}</span>
+          </div>
+        </div>
+      ))}
+
+      <div className="rounded-xl bg-[#C8102E] text-white px-4 py-3 flex justify-between items-center">
+        <span className="font-black uppercase text-sm">Total general</span>
+        <span className="text-lg font-black">{formatPesosAr(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+function MecanicoLegacyInforme({ visita }: { visita: InformeVisita }) {
+  return (
+    <ul className="text-sm text-gray-800 space-y-2">
+      <li>
+        <span className="text-gray-500">Tren delantero:</span> {trenTxt(visita.tren_delantero)}
+      </li>
+      <li>
+        <span className="text-gray-500">Alineado:</span> {boolTxt(visita.tren_alineado)}
+      </li>
+      <li>
+        <span className="text-gray-500">Balanceo:</span> {boolTxt(visita.tren_balanceo)}
+      </li>
+      <li>
+        <span className="text-gray-500">Amortiguadores:</span> {boolTxt(visita.amortiguadores_revisados)}
+      </li>
+      <li>
+        <span className="text-gray-500">Auxilio:</span> {boolTxt(visita.auxilio_revisado)}
+      </li>
+      {visita.presupuesto?.trim() && (
+        <li className="pt-2 border-t border-gray-100">
+          <span className="text-gray-500 block mb-1">Presupuesto (texto)</span>
+          <span className="whitespace-pre-wrap">{visita.presupuesto}</span>
+        </li>
+      )}
+    </ul>
+  );
+}
+
 export function InformeVisitaTaller({
   visitaId,
   presupuestoApiBase,
+  habilitarArmarPresupuesto = false,
 }: {
   visitaId: string;
   presupuestoApiBase: PresupuestoPdfApiBase;
+  habilitarArmarPresupuesto?: boolean;
 }) {
   const [visita, setVisita] = useState<InformeVisita | null>(null);
+  const [presupuestoLineas, setPresupuestoLineas] = useState<PresupuestoLineaInforme[]>([]);
+  const [preciosVendedor, setPreciosVendedor] = useState<Record<string, string>>({});
+  const [modo, setModo] = useState<'informe' | 'presupuesto'>('informe');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [descargandoPdf, setDescargandoPdf] = useState(false);
@@ -98,10 +214,20 @@ export function InformeVisitaTaller({
     setLoading(true);
     setError(false);
     try {
-      const r = await apiClient.get<{ visita: InformeVisita }>(
-        `/mecanico/visitas/${visitaId}`
-      );
+      const r = await apiClient.get<{
+        visita: InformeVisita;
+        presupuesto_lineas?: PresupuestoLineaInforme[];
+      }>(`/mecanico/visitas/${visitaId}`);
       setVisita(r.visita);
+      const lineas = mapLineasApi(r.presupuesto_lineas);
+      setPresupuestoLineas(lineas);
+      const preciosIniciales: Record<string, string> = {};
+      for (const l of lineas) {
+        if (l.marcado && l.precio != null) {
+          preciosIniciales[l.item_catalogo_id] = String(Math.round(l.precio));
+        }
+      }
+      setPreciosVendedor(preciosIniciales);
     } catch {
       setError(true);
     } finally {
@@ -122,10 +248,37 @@ export function InformeVisitaTaller({
       const fallback = nombrePresupuestoPdf(patente, visita.created_at);
       await apiClient.downloadFile(
         `${presupuestoApiBase}/${visitaId}/presupuesto.pdf`,
-        fallback
+        fallback,
       );
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : 'No se pudo descargar el presupuesto.';
+      setErrorPdf(msg);
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
+
+  const generarPresupuestoVendedor = async () => {
+    if (!visita || presupuestoApiBase !== '/vendedor/visitas') return;
+    setDescargandoPdf(true);
+    setErrorPdf(null);
+    try {
+      const payload = lineasMarcadasParaApi(presupuestoLineas, preciosVendedor);
+      const res = await apiClient.patch<{ presupuesto_lineas: PresupuestoLineaInforme[] }>(
+        `/vendedor/visitas/${visitaId}/presupuesto`,
+        { presupuesto_lineas: payload },
+      );
+      const lineas = mapLineasApi(res.presupuesto_lineas);
+      setPresupuestoLineas(lineas);
+
+      const patente = visita.vehiculos?.patente || 'sin-patente';
+      const fallback = nombrePresupuestoPdf(patente, visita.created_at);
+      await apiClient.downloadFile(
+        `${presupuestoApiBase}/${visitaId}/presupuesto.pdf`,
+        fallback,
+      );
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'No se pudo generar el presupuesto.';
       setErrorPdf(msg);
     } finally {
       setDescargandoPdf(false);
@@ -155,6 +308,9 @@ export function InformeVisitaTaller({
     visita.presion_psi != null ||
     !!visita.observaciones_gomero;
   const ordenCerrada = visita.orden_estado === 'finalizado' || visita.orden_estado === 'incompleto';
+  const usaPresupuestoNuevo = tienePresupuestoNuevoInforme(presupuestoLineas);
+  const itemsMarcados = tieneItemsMarcadosInforme(presupuestoLineas);
+  const mostrarModoPresupuesto = habilitarArmarPresupuesto && itemsMarcados;
 
   return (
     <div className="px-4 py-5 pb-24 flex flex-col gap-5 max-w-lg mx-auto lg:max-w-3xl">
@@ -172,17 +328,64 @@ export function InformeVisitaTaller({
         )}
       </div>
 
+      {mostrarModoPresupuesto && (
+        <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => setModo('informe')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${
+              modo === 'informe' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            Informe completo
+          </button>
+          <button
+            type="button"
+            onClick={() => setModo('presupuesto')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${
+              modo === 'presupuesto' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            Armar presupuesto
+          </button>
+        </div>
+      )}
+
+      {modo === 'presupuesto' && mostrarModoPresupuesto ? (
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+            Presupuesto para el cliente
+          </p>
+          <PresupuestoVendedorEditor
+            lineas={presupuestoLineas}
+            precios={preciosVendedor}
+            onPrecioChange={(itemId, valor) =>
+              setPreciosVendedor((prev) => ({ ...prev, [itemId]: valor }))
+            }
+            operario={visita.operario_responsable}
+            observaciones={visita.observaciones}
+            onGenerarPdf={generarPresupuestoVendedor}
+            generando={descargandoPdf}
+            errorPdf={errorPdf}
+          />
+        </section>
+      ) : (
+        <>
       <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={descargarPresupuesto}
-          disabled={descargandoPdf}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#a50d26] disabled:opacity-60"
-        >
-          <Download className="w-4 h-4" />
-          {descargandoPdf ? 'Generando PDF…' : 'Descargar presupuesto'}
-        </button>
-        {errorPdf && <p className="text-sm text-red-600">{errorPdf}</p>}
+        {usaPresupuestoNuevo && (
+          <>
+            <button
+              type="button"
+              onClick={descargarPresupuesto}
+              disabled={descargandoPdf}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#a50d26] disabled:opacity-60"
+            >
+              <Download className="w-4 h-4" />
+              {descargandoPdf ? 'Generando PDF…' : 'Descargar presupuesto'}
+            </button>
+            {errorPdf && <p className="text-sm text-red-600">{errorPdf}</p>}
+          </>
+        )}
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -228,7 +431,9 @@ export function InformeVisitaTaller({
             </li>
             <li>
               <span className="text-gray-500">Presión:</span>{' '}
-              {visita.presion_psi != null ? `${psiToBar(visita.presion_psi).toLocaleString('es-AR', { maximumFractionDigits: 1 })} BAR` : '—'}
+              {visita.presion_psi != null
+                ? `${psiToBar(visita.presion_psi).toLocaleString('es-AR', { maximumFractionDigits: 1 })} BAR`
+                : '—'}
             </li>
             {visita.observaciones_gomero && (
               <li className="pt-2 border-t border-amber-200/80">
@@ -242,42 +447,33 @@ export function InformeVisitaTaller({
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Parte del mecánico</p>
-        <ul className="text-sm text-gray-800 space-y-2">
-          <li>
-            <span className="text-gray-500">Tren delantero:</span> {trenTxt(visita.tren_delantero)}
-          </li>
-          <li>
-            <span className="text-gray-500">Alineado:</span> {boolTxt(visita.tren_alineado)}
-          </li>
-          <li>
-            <span className="text-gray-500">Balanceo:</span> {boolTxt(visita.tren_balanceo)}
-          </li>
-          <li>
-            <span className="text-gray-500">Amortiguadores:</span> {boolTxt(visita.amortiguadores_revisados)}
-          </li>
-          <li>
-            <span className="text-gray-500">Auxilio:</span> {boolTxt(visita.auxilio_revisado)}
-          </li>
-          <li>
-            <span className="text-gray-500">Presupuesto:</span>{' '}
-            {visita.presupuesto?.trim() ? (
-              <span className="whitespace-pre-wrap">{visita.presupuesto}</span>
-            ) : (
-              '—'
+        {usaPresupuestoNuevo ? (
+          <PresupuestoChecklistInforme lineas={presupuestoLineas} />
+        ) : (
+          <MecanicoLegacyInforme visita={visita} />
+        )}
+
+        {(visita.operario_responsable || visita.observaciones || visita.motivo) && (
+          <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+            {visita.operario_responsable && (
+              <p className="text-sm">
+                <span className="text-gray-500 font-medium">Operario responsable:</span>{' '}
+                <span className="text-gray-900 font-semibold">{visita.operario_responsable}</span>
+              </p>
             )}
-          </li>
-          {visita.observaciones && (
-            <li className="pt-2 border-t border-gray-100">
-              <span className="text-gray-500 block mb-1">Observaciones generales</span>
-              <span className="whitespace-pre-wrap">{visita.observaciones}</span>
-            </li>
-          )}
-          {visita.motivo && (
-            <li>
-              <span className="text-gray-500">Motivo visita:</span> {visita.motivo}
-            </li>
-          )}
-        </ul>
+            {visita.observaciones && (
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase mb-1">Observaciones generales</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{visita.observaciones}</p>
+              </div>
+            )}
+            {visita.motivo && (
+              <p className="text-sm text-gray-600">
+                <span className="text-gray-500">Motivo visita:</span> {visita.motivo}
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -287,7 +483,13 @@ export function InformeVisitaTaller({
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {fotos.map((src, i) => (
-              <a key={i} href={src} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+              <a
+                key={i}
+                href={src}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50"
+              >
                 <img src={src} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
               </a>
             ))}
@@ -316,6 +518,8 @@ export function InformeVisitaTaller({
           </li>
         </ul>
       </section>
+        </>
+      )}
     </div>
   );
 }

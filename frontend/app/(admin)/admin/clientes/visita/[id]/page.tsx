@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
-import { FileText } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 
 interface Visita {
   id: string; estado: string; motivo: string | null; observaciones: string | null;
@@ -19,6 +19,7 @@ interface Visita {
 
 export default function VisitaAdminDetalle() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [visita, setVisita] = useState<Visita | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -43,7 +44,18 @@ export default function VisitaAdminDetalle() {
 
   if (isLoading || hasError || !visita) {
     return (
-      <div className="px-4 lg:px-8 py-6 max-w-2xl mx-auto">
+      <div className="px-4 lg:px-8 py-6 max-w-2xl mx-auto flex flex-col gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+            else router.push('/admin/clientes');
+          }}
+          className="self-start inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Volver
+        </button>
         <PageState
           state={isLoading ? 'loading' : hasError ? 'error' : 'empty'}
           onRetry={cargarVisita}
@@ -58,6 +70,18 @@ export default function VisitaAdminDetalle() {
 
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-5 max-w-2xl mx-auto pb-10">
+
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+          else router.push('/admin/clientes');
+        }}
+        className="self-start inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Volver
+      </button>
 
       <Link
         href={`/admin/clientes/informe/${id}`}

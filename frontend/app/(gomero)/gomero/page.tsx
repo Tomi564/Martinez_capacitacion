@@ -11,7 +11,16 @@ interface OrdenRow {
   id: string;
   orden_estado: string | null;
   created_at: string;
-  vehiculos: { patente: string; marca: string; modelo: string } | null;
+  patente_pendiente?: string | null;
+  vehiculos: {
+    patente: string;
+    marca: string;
+    modelo: string;
+    clientes: { nombre: string; apellido: string; telefono?: string | null } | null;
+  } | null;
+  atenciones?: {
+    clientes: { nombre: string; apellido: string; telefono?: string | null } | null;
+  } | null;
 }
 
 export default function GomeroHomePage() {
@@ -56,27 +65,57 @@ export default function GomeroHomePage() {
       )}
 
       {!loading && ordenes.length === 0 && !error && (
-        <p className="text-gray-500 text-center py-10">Todavía no cargaste ninguna orden.</p>
+        <p className="text-gray-500 text-center py-10">Todavía no hay órdenes pendientes.</p>
       )}
 
       <div className="flex flex-col gap-3">
-        {ordenes.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => router.push(`/gomero/orden/${o.id}`)}
-            className="w-full text-left bg-white rounded-2xl border border-gray-200 p-4 active:scale-[0.99] transition-transform"
-          >
-            <p className="text-2xl font-black tracking-widest text-gray-900">{o.vehiculos?.patente}</p>
-            <p className="text-gray-600 font-medium">{o.vehiculos?.marca} {o.vehiculos?.modelo}</p>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <BadgeOrdenEstado ordenEstado={o.orden_estado} />
-              <span className="text-xs text-gray-400">
-                {new Date(o.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-              </span>
-            </div>
-          </button>
-        ))}
+        {ordenes.map((o) => {
+          const patente = o.vehiculos?.patente || o.patente_pendiente || '—';
+          const cliente =
+            o.vehiculos?.clientes || o.atenciones?.clientes || null;
+          const esDesdeVendedor = !!o.atenciones && !o.vehiculos;
+
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => router.push(`/gomero/orden/${o.id}`)}
+              className="w-full text-left bg-white rounded-2xl border border-gray-200 p-4 active:scale-[0.99] transition-transform"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-2xl font-black tracking-widest text-gray-900">{patente}</p>
+                {esDesdeVendedor && (
+                  <span className="text-[10px] font-bold uppercase bg-blue-50 text-blue-800 px-2 py-1 rounded-full shrink-0">
+                    Vendedor
+                  </span>
+                )}
+              </div>
+              {o.vehiculos && (
+                <p className="text-gray-600 font-medium">
+                  {o.vehiculos.marca} {o.vehiculos.modelo}
+                </p>
+              )}
+              {cliente && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {cliente.nombre} {cliente.apellido}
+                  {cliente.telefono ? ` · ${cliente.telefono}` : ''}
+                </p>
+              )}
+              {!o.vehiculos && o.patente_pendiente && (
+                <p className="text-xs text-amber-800 mt-1">Completar datos del vehículo</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <BadgeOrdenEstado ordenEstado={o.orden_estado} />
+                <span className="text-xs text-gray-400">
+                  {new Date(o.created_at).toLocaleString('es-AR', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

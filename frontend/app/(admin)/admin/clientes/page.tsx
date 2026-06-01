@@ -46,7 +46,7 @@ export default function ClientesAdminPage() {
 
   type ModalEliminar =
     | { tipo: 'vehiculo'; vehiculo: Vehiculo }
-    | { tipo: 'visita'; visita: Visita; patente: string }
+    | { tipo: 'visita'; visita: Visita; patente: string; clienteNombre?: string }
     | { tipo: 'cliente'; cliente: NonNullable<Vehiculo['clientes']> }
     | { tipo: 'participante'; participante: Participante };
   const [modalEliminar, setModalEliminar] = useState<ModalEliminar | null>(null);
@@ -171,7 +171,7 @@ export default function ClientesAdminPage() {
       case 'vehiculo':
         return '¿Eliminar este vehículo?';
       case 'visita':
-        return '¿Eliminar esta visita?';
+        return '¿Eliminar esta orden de taller?';
       case 'cliente':
         return '¿Eliminar este cliente?';
       case 'participante':
@@ -192,12 +192,23 @@ export default function ClientesAdminPage() {
         );
       }
       case 'visita': {
-        const { visita, patente } = modalEliminar;
+        const { visita, patente, clienteNombre } = modalEliminar;
         return (
           <>
-            Se borrará la visita del{' '}
-            <span className="font-semibold text-gray-900">{patente}</span> del{' '}
-            {new Date(visita.created_at).toLocaleDateString('es-AR')}.
+            Se borrará la orden del vehículo{' '}
+            <span className="font-semibold text-gray-900">{patente}</span>
+            {clienteNombre ? (
+              <>
+                {' '}
+                (cliente: <span className="font-semibold text-gray-900">{clienteNombre}</span>)
+              </>
+            ) : null}{' '}
+            del {new Date(visita.created_at).toLocaleDateString('es-AR', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+            .
           </>
         );
       }
@@ -225,6 +236,27 @@ export default function ClientesAdminPage() {
           </>
         );
       }
+    }
+  };
+
+  const abrirEliminarVisita = async (visita: Visita, vehiculo: Vehiculo) => {
+    setAdvertenciaModal(null);
+    const c = vehiculo.clientes;
+    setModalEliminar({
+      tipo: 'visita',
+      visita,
+      patente: vehiculo.patente,
+      clienteNombre: c ? `${c.nombre} ${c.apellido}`.trim() : undefined,
+    });
+    try {
+      const res = await apiClient.get<{ tiene_diagnostico_cargado?: boolean }>(
+        `/admin/visitas/${visita.id}`,
+      );
+      if (res.tiene_diagnostico_cargado) {
+        setAdvertenciaModal('Esta orden tiene diagnóstico cargado que también se eliminará.');
+      }
+    } catch {
+      /* sin advertencia extra */
     }
   };
 
@@ -386,19 +418,24 @@ export default function ClientesAdminPage() {
                                 {visita.km && <p className="text-xs text-gray-400">{visita.km.toLocaleString()} km</p>}
                                 {visita.observaciones && <p className="text-xs text-gray-500 italic border-t border-gray-100 pt-1.5">{visita.observaciones}</p>}
                                 <div className="flex items-center justify-between gap-2 mt-0.5 flex-wrap">
-                                  {visita.diagnostico_enviado && <span className="text-xs text-blue-600 font-medium">✓ Diagnóstico enviado</span>}
+                                  {visita.diagnostico_enviado && (
+                                    <span className="text-xs text-blue-600 font-medium">✓ Diagnóstico enviado</span>
+                                  )}
                                   <div className="flex items-center gap-2 ml-auto">
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        setAdvertenciaModal(null);
-                                        setModalEliminar({ tipo: 'visita', visita, patente: v.patente });
-                                      }}
+                                      onClick={() => void abrirEliminarVisita(visita, v)}
                                       className="text-xs px-2 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium"
                                     >
                                       Eliminar
                                     </button>
-                                    <button type="button" onClick={() => router.push(`/admin/clientes/visita/${visita.id}`)} className="text-xs text-[#C8102E] font-bold">Ver checklist →</button>
+                                    <button
+                                      type="button"
+                                      onClick={() => router.push(`/admin/clientes/visita/${visita.id}`)}
+                                      className="text-xs text-[#C8102E] font-bold"
+                                    >
+                                      Ver checklist →
+                                    </button>
                                   </div>
                                 </div>
                               </div>

@@ -5,6 +5,12 @@ import { AppError } from '../middleware/errorHandler';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
 import { presupuestoVisitaController } from '../controllers/presupuesto-visita.controller';
+import { presupuestoVisitaService } from '../services/presupuesto-visita.service';
+import type { PresupuestoLineaInput } from '../services/presupuesto-lineas.service';
+import {
+  vehiculosBuscarPatenteHandler,
+  vehiculosSugerenciasHandler,
+} from '../handlers/vehiculos-patente.handler';
 
 const router = Router();
 router.use(authMiddleware);
@@ -96,6 +102,33 @@ router.get(
   (req, res, next) => presupuestoVisitaController.descargar(req, res, next)
 );
 
+// PATCH /api/vendedor/visitas/:id/presupuesto — precios finales del vendedor
+router.patch(
+  '/visitas/:id/presupuesto',
+  requireRole('vendedor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const rawId = req.params.id;
+      const visitaId = typeof rawId === 'string' ? rawId : rawId?.[0];
+      if (!visitaId) throw new AppError('ID de visita inválido', 400);
+
+      const { presupuesto_lineas } = req.body as { presupuesto_lineas?: PresupuestoLineaInput[] };
+      if (!Array.isArray(presupuesto_lineas)) {
+        throw new AppError('presupuesto_lineas es requerido', 400);
+      }
+
+      const lineas = await presupuestoVisitaService.guardarPresupuestoVendedor(
+        visitaId,
+        presupuesto_lineas,
+      );
+
+      return res.json({ presupuesto_lineas: lineas });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
 // DELETE /api/vendedor/sugerencias/:id — eliminar propia
 router.delete('/sugerencias/:id', requireRole('vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -115,6 +148,12 @@ router.delete('/sugerencias/:id', requireRole('vendedor'), async (req: AuthReque
     next(e);
   }
 });
+
+// GET /api/vendedor/vehiculos/sugerencias?q= — autocompletado patente (atenciones)
+router.get('/vehiculos/sugerencias', requireRole('vendedor'), vehiculosSugerenciasHandler);
+
+// GET /api/vendedor/vehiculos/buscar/:patente
+router.get('/vehiculos/buscar/:patente', requireRole('vendedor'), vehiculosBuscarPatenteHandler);
 
 export default router;
 

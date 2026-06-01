@@ -18,6 +18,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ApiError, apiClient, bindAuthTokenSource } from '@/lib/api';
+import { resetPwaInstallSession } from '@/lib/pwa-install-session';
 import type { User, LoginResponse } from '@/types';
 
 interface AuthState {
@@ -28,12 +29,15 @@ interface AuthState {
   error: string | null;
   /** True cuando /auth/me devolvió 401 — el layout vendedor muestra aviso y redirige al login */
   sessionExpiredBanner: boolean;
+  /** True tras login exitoso — InstallPWA muestra el modal una vez por sesión */
+  pendingPwaPrompt: boolean;
 
   // Acciones
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
   clearSessionExpiredBanner: () => void;
+  clearPendingPwaPrompt: () => void;
   refreshUser: () => Promise<void>;
 
   // Guards
@@ -56,6 +60,7 @@ export const useAuth = create<AuthState>()(
       isLoading: false,
       error: null,
       sessionExpiredBanner: false,
+      pendingPwaPrompt: false,
 
       // ─────────────────────────────────────────────────────
       // Login: llama al backend y guarda token + user
@@ -84,12 +89,14 @@ export const useAuth = create<AuthState>()(
             );
           }
 
+          resetPwaInstallSession();
           set({
             token: response.token,
             user: response.user as User,
             isLoading: false,
             error: null,
             sessionExpiredBanner: false,
+            pendingPwaPrompt: true,
           });
         } catch (error) {
           set({
@@ -122,6 +129,7 @@ export const useAuth = create<AuthState>()(
           token: null,
           error: null,
           sessionExpiredBanner: false,
+          pendingPwaPrompt: false,
         });
 
         // Redirigir al login
@@ -161,6 +169,8 @@ export const useAuth = create<AuthState>()(
       clearError: () => set({ error: null }),
 
       clearSessionExpiredBanner: () => set({ sessionExpiredBanner: false }),
+
+      clearPendingPwaPrompt: () => set({ pendingPwaPrompt: false }),
 
       // ─────────────────────────────────────────────────────
       // Guards de rol

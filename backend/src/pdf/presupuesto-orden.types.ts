@@ -1,13 +1,11 @@
 /**
  * Datos para el PDF de presupuesto / orden de reparación (formato físico Martínez).
- * El endpoint final mapeará visitas_taller + clientes + vehículos a esta estructura.
  */
 
 export interface EmpresaPresupuesto {
   nombre: string;
   direccion: string;
   telefono: string;
-  /** Ruta opcional a logo PNG/JPG (pdfkit no embebe SVG directamente). */
   logoPath?: string;
 }
 
@@ -19,7 +17,6 @@ export interface OrdenPresupuestoMeta {
 export interface ClientePresupuesto {
   nombre: string;
   apellido: string;
-  domicilio: string;
   telefono: string;
 }
 
@@ -29,31 +26,35 @@ export interface VehiculoPresupuesto {
   modelo: string;
 }
 
-/** Ítem del tren delantero con precio solo si aplica al presupuesto. */
-export interface ItemTrenPresupuesto {
-  etiqueta: string;
-  /** Si el servicio/revisión aplica en esta orden. */
-  aplica: boolean;
-  /** Precio en pesos; omitir o null si no se cotiza. */
-  precio?: number | null;
-}
-
-export interface TrenDelanteroPresupuesto {
-  /** x2 | x4 | no — alcance del tren según mecánico. */
-  alcance: 'x2' | 'x4' | 'no' | null;
-  alineado: ItemTrenPresupuesto;
-  balanceo: ItemTrenPresupuesto;
-  amortiguadores: ItemTrenPresupuesto;
-  auxilio: ItemTrenPresupuesto;
-}
-
-export interface CubiertasPresupuesto {
+export interface GomeroPresupuesto {
   marca: string;
   medida: string;
-  /** Presión en BAR (el gomero registra PSI en DB; convertir al mapear). */
   presionBar: string;
   kilometraje: string;
   neumaticosCambiados: boolean | null;
+}
+
+export interface PresupuestoLineaPdf {
+  etiqueta: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+export interface PresupuestoSeccionPdf {
+  titulo: string;
+  lineas: PresupuestoLineaPdf[];
+  subtotal: number;
+}
+
+/** Campos del mecánico en visitas anteriores al checklist por ítems. */
+export interface PresupuestoLegacyMecanico {
+  trenDelantero: string;
+  alineado: boolean | null;
+  balanceo: boolean | null;
+  amortiguadores: boolean | null;
+  auxilio: boolean | null;
+  presupuestoTexto: string | null;
 }
 
 export interface PresupuestoOrdenData {
@@ -61,10 +62,13 @@ export interface PresupuestoOrdenData {
   orden: OrdenPresupuestoMeta;
   cliente: ClientePresupuesto;
   vehiculo: VehiculoPresupuesto;
-  trenDelantero: TrenDelanteroPresupuesto;
-  cubiertas: CubiertasPresupuesto;
-  /** Total destacado del mecánico (texto libre hoy → número al parsear o ingresar). */
+  gomero: GomeroPresupuesto;
+  /** true si hay ítems marcados en visita_presupuesto_lineas */
+  usaChecklistNuevo: boolean;
+  secciones: PresupuestoSeccionPdf[];
+  legacy?: PresupuestoLegacyMecanico;
   totalGeneral: number;
+  operarioResponsable: string;
   observaciones: string;
   firmaMecanico?: string;
 }

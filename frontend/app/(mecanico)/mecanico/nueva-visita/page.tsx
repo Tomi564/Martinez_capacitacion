@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { formatPatenteArDisplay, normalizePatenteAr } from '@/lib/patente';
+import { normalizePatenteAr, formatPatenteArDisplay } from '@/lib/patente';
 import { usePatenteSugerencias } from '@/hooks/usePatenteSugerencias';
+import { Button } from '@/components/ui/button';
 
 interface Vehiculo {
   id: string;
@@ -16,579 +17,231 @@ interface Vehiculo {
   clientes: { id: string; nombre: string; apellido: string; telefono: string | null; email: string | null } | null;
 }
 
-type WizardStep = 1 | 2;
-
-interface WizardForm {
-  patente: string;
-  marca: string;
-  modelo: string;
-  anio: string;
-  medida_rueda: string;
-  nombre: string;
-  apellido: string;
-  telefono: string;
-  email: string;
-  motivo: string;
-}
-
-const DRAFT_KEY = 'mecanico_nueva_visita_wizard_draft_v2';
-
-const FORM_INICIAL: WizardForm = {
-  patente: '',
-  marca: '',
-  modelo: '',
-  anio: '',
-  medida_rueda: '',
-  nombre: '',
-  apellido: '',
-  telefono: '',
-  email: '',
-  motivo: '',
-};
+const DRAFT_KEY = 'mecanico_nueva_visita_draft_v3';
 
 export default function NuevaVisita() {
   const router = useRouter();
-  const [step, setStep] = useState<WizardStep>(1);
-  const [form, setForm] = useState<WizardForm>(FORM_INICIAL);
-  const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState<Vehiculo | null>(null);
-  const { sugerencias, setSugerencias, isBuscandoSugerencias } = usePatenteSugerencias(form.patente);
-  const [isBuscandoExacto, setIsBuscandoExacto] = useState(false);
-  const [isGuardando, setIsGuardando] = useState(false);
-  const [error, setError] = useState('');
+  const [patente, setPatente] = useState('');
+  const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
+  const [marca, setMarca] = useState('');
+  const [modelo, setModelo] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  const [trenDelantero, setTrenDelantero] = useState<'x2' | 'x4' | 'no' | null>(null);
-  const [trenAlineado, setTrenAlineado] = useState(false);
-  const [trenBalanceo, setTrenBalanceo] = useState(false);
-  const [amortiguadores, setAmortiguadores] = useState<boolean | null>(null);
-  const [auxilio, setAuxilio] = useState<boolean | null>(null);
-  const [presupuesto, setPresupuesto] = useState('');
-  const [fotos, setFotos] = useState<string[]>([]);
-
-  const setField =
-    (key: keyof WizardForm) =>
-    (value: string) =>
-      setForm((prev) => ({ ...prev, [key]: value }));
+  const { sugerencias, setSugerencias, isBuscandoSugerencias } = usePatenteSugerencias(patente);
+  const patenteCanon = useMemo(() => normalizePatenteAr(patente), [patente]);
 
   const aplicarVehiculo = (v: Vehiculo) => {
-    setVehiculoSeleccionado(v);
-    const patenteCanon = normalizePatenteAr(v.patente || '');
-    setForm((prev) => ({
-      ...prev,
-      patente: patenteCanon ? formatPatenteArDisplay(patenteCanon) : '',
-      marca: v.marca || '',
-      modelo: v.modelo || '',
-      anio: v.anio ? String(v.anio) : '',
-      medida_rueda: v.medida_rueda || '',
-      nombre: v.clientes?.nombre || '',
-      apellido: v.clientes?.apellido || '',
-      telefono: v.clientes?.telefono || '',
-      email: v.clientes?.email || '',
-    }));
+    setVehiculo(v);
+    setMarca(v.marca);
+    setModelo(v.modelo);
+    setNombre(v.clientes?.nombre || '');
+    setApellido(v.clientes?.apellido || '');
+    setTelefono(v.clientes?.telefono || '');
+    setPatente(formatPatenteArDisplay(v.patente));
+    setSugerencias([]);
   };
 
-  const limpiarVehiculoSeleccionadoSiCorresponde = (nextPatente?: string) => {
-    if (!vehiculoSeleccionado) return;
-    const siguiente = normalizePatenteAr(nextPatente ?? form.patente);
-    const actual = normalizePatenteAr(vehiculoSeleccionado.patente || '');
-    if (siguiente !== actual) {
-      setVehiculoSeleccionado(null);
+  const buscarExacto = async () => {
+    if (patenteCanon.length < 6) {
+      setMsg('Ingresá al menos 6 caracteres de patente.');
+      return;
     }
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as {
-        form?: WizardForm;
-        step?: WizardStep;
-        vehiculoSeleccionado?: Vehiculo | null;
-        trenDelantero?: 'x2' | 'x4' | 'no' | null;
-        trenAlineado?: boolean;
-        trenBalanceo?: boolean;
-        amortiguadores?: boolean | null;
-        auxilio?: boolean | null;
-        presupuesto?: string;
-        fotos?: string[];
-      };
-      if (draft.form) setForm((prev) => ({ ...prev, ...draft.form }));
-      if (draft.step && [1, 2].includes(draft.step)) setStep(draft.step);
-      if (draft.vehiculoSeleccionado?.id) setVehiculoSeleccionado(draft.vehiculoSeleccionado);
-      if (draft.trenDelantero) setTrenDelantero(draft.trenDelantero);
-      if (typeof draft.trenAlineado === 'boolean') setTrenAlineado(draft.trenAlineado);
-      if (typeof draft.trenBalanceo === 'boolean') setTrenBalanceo(draft.trenBalanceo);
-      if (draft.amortiguadores != null) setAmortiguadores(draft.amortiguadores);
-      if (draft.auxilio != null) setAuxilio(draft.auxilio);
-      if (typeof draft.presupuesto === 'string') setPresupuesto(draft.presupuesto);
-      if (Array.isArray(draft.fotos)) setFotos(draft.fotos.filter((x) => typeof x === 'string'));
-    } catch (draftError) {
-      console.error('[NuevaVisitaWizard] Error leyendo borrador local', draftError);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          form,
-          step,
-          vehiculoSeleccionado,
-          trenDelantero,
-          trenAlineado,
-          trenBalanceo,
-          amortiguadores,
-          auxilio,
-          presupuesto,
-          fotos,
-        })
-      );
-    } catch (draftError) {
-      console.error('[NuevaVisitaWizard] Error guardando borrador local', draftError);
-    }
-  }, [form, step, vehiculoSeleccionado, trenDelantero, trenAlineado, trenBalanceo, amortiguadores, auxilio, presupuesto, fotos]);
-
-  const buscarPorPatenteExacta = async () => {
-    const patenteCanon = normalizePatenteAr(form.patente);
-    if (!patenteCanon) return;
-    setError('');
-    setIsBuscandoExacto(true);
+    setMsg(null);
+    setBuscando(true);
     try {
       const res = await apiClient.get<{ vehiculo: Vehiculo | null }>(
         `/mecanico/vehiculos/buscar/${encodeURIComponent(patenteCanon)}`,
       );
-      if (!res.vehiculo) {
-        setVehiculoSeleccionado(null);
-        setError('No encontramos esa patente. Podés completar los datos y crearla como vehículo nuevo.');
-        return;
+      if (res.vehiculo) aplicarVehiculo(res.vehiculo);
+      else {
+        setVehiculo(null);
+        setMarca('');
+        setModelo('');
+        setNombre('');
+        setApellido('');
+        setTelefono('');
+        setMsg('No encontramos la patente. Completá marca y modelo abajo.');
       }
-      aplicarVehiculo(res.vehiculo);
-      setSugerencias([]);
-    } catch (searchError) {
-      console.error('[NuevaVisitaWizard] Error en búsqueda exacta de patente', searchError);
-      setError('Error al buscar la patente. Intentá de nuevo.');
+    } catch {
+      setMsg('Error al buscar la patente.');
     } finally {
-      setIsBuscandoExacto(false);
+      setBuscando(false);
     }
   };
 
-  const validarPaso1 = () => {
-    if (!normalizePatenteAr(form.patente)) {
-      setError('Ingresá la patente para continuar.');
-      return false;
+  const crearVisita = async () => {
+    setMsg(null);
+    if (!patenteCanon || !marca.trim() || !modelo.trim()) {
+      setMsg('Patente, marca y modelo son obligatorios.');
+      return;
     }
-    if (!vehiculoSeleccionado && (!form.marca.trim() || !form.modelo.trim())) {
-      setError('Si el vehículo no está vinculado, completá marca y modelo.');
-      return false;
-    }
-    if (!form.nombre.trim() || !form.apellido.trim()) {
-      setError('Completá nombre y apellido del titular del vehículo.');
-      return false;
-    }
-    if (!form.telefono.trim()) {
-      setError('Ingresá un teléfono de contacto del cliente.');
-      return false;
-    }
-    return true;
-  };
-
-  const irSiguiente = () => {
-    setError('');
-    if (step === 1) {
-      if (!validarPaso1()) return;
-      setStep(2);
-    }
-  };
-
-  const irAnterior = () => {
-    setError('');
-    if (step === 1) return;
-    setStep((prev) => (prev - 1) as WizardStep);
-  };
-
-  const agregarFotos = (files: FileList | null) => {
-    if (!files?.length) return;
-    const toma = Array.from(files).filter((f) => f.type.startsWith('image/'));
-    toma.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const r = String(reader.result || '');
-        if (!r) return;
-        setFotos((prev) => (prev.length >= 4 ? prev : [...prev, r]));
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const confirmarYGuardar = async () => {
-    if (!validarPaso1()) {
-      setStep(1);
+    if (!nombre.trim() || !apellido.trim()) {
+      setMsg('Nombre y apellido del cliente son obligatorios.');
       return;
     }
 
-    setError('');
-    setIsGuardando(true);
+    setCreando(true);
     try {
-      let vehiculoId = vehiculoSeleccionado?.id;
-
-      if (vehiculoSeleccionado?.id && !vehiculoSeleccionado.clientes) {
-        await apiClient.patch(`/mecanico/vehiculos/${vehiculoSeleccionado.id}`, {
-          cliente: {
-            nombre: form.nombre.trim(),
-            apellido: form.apellido.trim(),
-            telefono: form.telefono.trim() || null,
-            email: form.email.trim() || null,
-          },
-        });
-      }
-
-      if (!vehiculoId) {
+      let vid = vehiculo?.id;
+      if (!vid) {
         const vRes = await apiClient.post<{ vehiculo: { id: string } }>('/mecanico/vehiculos', {
-          patente: normalizePatenteAr(form.patente),
-          marca: form.marca.trim(),
-          modelo: form.modelo.trim(),
-          anio: form.anio ? Number(form.anio) : null,
-          medida_rueda: form.medida_rueda.trim() || null,
+          patente: patenteCanon,
+          marca: marca.trim(),
+          modelo: modelo.trim(),
           cliente: {
-            nombre: form.nombre.trim(),
-            apellido: form.apellido.trim(),
-            telefono: form.telefono.trim() || null,
-            email: form.email.trim() || null,
+            nombre: nombre.trim(),
+            apellido: apellido.trim(),
+            telefono: telefono.trim() || null,
           },
         });
-        vehiculoId = vRes.vehiculo.id;
+        vid = vRes.vehiculo.id;
+      } else if (vehiculo) {
+        const c = vehiculo.clientes;
+        const cambioCliente =
+          nombre.trim() !== (c?.nombre || '') ||
+          apellido.trim() !== (c?.apellido || '') ||
+          telefono.trim() !== (c?.telefono || '');
+        if (c && cambioCliente) {
+          await apiClient.patch(`/mecanico/vehiculos/${vid}`, {
+            cliente: {
+              nombre: nombre.trim(),
+              apellido: apellido.trim(),
+              telefono: telefono.trim() || null,
+            },
+          });
+        }
       }
 
       const visRes = await apiClient.post<{ visita: { id: string } }>('/mecanico/visitas', {
-        vehiculo_id: vehiculoId,
-        motivo: form.motivo.trim() || null,
-        observaciones: null,
-        presion_psi: null,
-        recomendacion: null,
-        tren_delantero: trenDelantero,
-        tren_alineado: trenAlineado,
-        tren_balanceo: trenBalanceo,
-        amortiguadores_revisados: amortiguadores,
-        auxilio_revisado: auxilio,
-        presupuesto: presupuesto.trim() || null,
-        fotos_neumatico_urls: fotos.length ? fotos : null,
+        vehiculo_id: vid,
+        motivo: motivo.trim() || null,
       });
 
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(DRAFT_KEY);
       }
       router.replace(`/mecanico/visitas/${visRes.visita.id}`);
-    } catch (saveError) {
-      console.error('[NuevaVisitaWizard] Error al confirmar y guardar visita', saveError);
-      setError('No pudimos guardar la visita. Revisá los datos e intentá de nuevo.');
-      setIsGuardando(false);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'No se pudo crear la visita.');
+    } finally {
+      setCreando(false);
     }
   };
 
-  const progreso = useMemo(() => (step / 2) * 100, [step]);
-
   return (
-    <div className="px-4 py-5 pb-40 max-w-lg mx-auto flex flex-col gap-4 overflow-x-hidden">
-      <header className="bg-white border border-gray-200 rounded-2xl p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nueva visita</p>
-          <p className="text-sm font-semibold text-gray-800">Paso {step} de 2</p>
-        </div>
-        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
-          <div className="h-full bg-[#C8102E] rounded-full transition-all duration-300" style={{ width: `${progreso}%` }} />
-        </div>
-      </header>
+    <div className="px-4 py-5 max-w-lg mx-auto flex flex-col gap-5 pb-28">
+      <h1 className="text-xl font-black text-gray-900">Nueva visita</h1>
+      <p className="text-sm text-gray-500">
+        Identificá el vehículo por patente. Después completás el presupuesto en el detalle.
+      </p>
 
-      {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
-
-      {step === 1 && (
-        <div className="flex flex-col gap-4">
-          <Section title="Identificación del vehículo">
-            <div className="px-4 py-3">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Patente</label>
-              <div className="relative mt-2">
-                <div className="flex gap-2">
-                  <input
-                    value={form.patente}
-                    onChange={(e) => {
-                      const nextPatente = e.target.value.toUpperCase();
-                      setField('patente')(nextPatente);
-                      limpiarVehiculoSeleccionadoSiCorresponde(nextPatente);
-                      setError('');
-                    }}
-                    onBlur={() => {
-                      const canon = normalizePatenteAr(form.patente);
-                      if (canon) setField('patente')(formatPatenteArDisplay(canon));
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && buscarPorPatenteExacta()}
-                    placeholder="Ej: AC 797 HP"
-                    maxLength={12}
-                    className="flex-1 min-w-0 h-14 px-4 bg-white border-2 border-gray-200 rounded-2xl text-2xl font-black tracking-wider text-gray-900 placeholder-gray-300 focus:outline-none focus:border-[#C8102E] uppercase"
-                  />
-                  <button
-                    onClick={buscarPorPatenteExacta}
-                    disabled={isBuscandoExacto || !form.patente.trim()}
-                    className="h-14 px-4 shrink-0 bg-[#1F1F1F] text-white rounded-2xl disabled:opacity-40 active:scale-95 transition-transform text-sm font-semibold"
-                  >
-                    {isBuscandoExacto ? 'Buscando...' : 'Buscar'}
-                  </button>
-                </div>
-
-                {(isBuscandoSugerencias || sugerencias.length > 0) && (
-                  <div className="absolute z-20 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                    {isBuscandoSugerencias && (
-                      <p className="px-3 py-2 text-xs text-gray-500">Buscando sugerencias...</p>
-                    )}
-                    {!isBuscandoSugerencias &&
-                      sugerencias.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => {
-                            aplicarVehiculo(s);
-                            setSugerencias([]);
-                            setError('');
-                          }}
-                          className="w-full text-left px-3 py-2 border-t border-gray-100 first:border-t-0 hover:bg-gray-50"
-                        >
-                          <p className="text-sm font-semibold text-gray-900">
-                            {s.patente} · {s.marca} {s.modelo} {s.anio ? `(${s.anio})` : ''}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {s.clientes ? `${s.clientes.nombre} ${s.clientes.apellido}` : 'Sin cliente vinculado'}
-                          </p>
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {vehiculoSeleccionado && (
-                <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3">
-                  <p className="text-xs font-bold text-green-700 uppercase tracking-wide">Vehículo vinculado</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-1">
-                    {vehiculoSeleccionado.marca} {vehiculoSeleccionado.modelo}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {vehiculoSeleccionado.clientes
-                      ? `${vehiculoSeleccionado.clientes.nombre} ${vehiculoSeleccionado.clientes.apellido}`
-                      : 'Sin cliente vinculado'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </Section>
-
-          <Section title="Datos del vehículo">
-            <Row label="Marca *">
-              <Input placeholder="Toyota" value={form.marca} onChange={(e) => setField('marca')(e.target.value)} />
-            </Row>
-            <Row label="Modelo *">
-              <Input placeholder="Corolla" value={form.modelo} onChange={(e) => setField('modelo')(e.target.value)} />
-            </Row>
-            <Row label="Año">
-              <Input placeholder="2020" type="number" value={form.anio} onChange={(e) => setField('anio')(e.target.value)} />
-            </Row>
-            <Row label="Medida rueda">
-              <Input
-                placeholder="195/65 R15"
-                value={form.medida_rueda}
-                onChange={(e) => setField('medida_rueda')(e.target.value)}
-              />
-            </Row>
-          </Section>
-
-          <Section title="Titular del vehículo">
-            <Row label="Nombre *">
-              <Input placeholder="Juan" value={form.nombre} onChange={(e) => setField('nombre')(e.target.value)} />
-            </Row>
-            <Row label="Apellido *">
-              <Input placeholder="García" value={form.apellido} onChange={(e) => setField('apellido')(e.target.value)} />
-            </Row>
-            <Row label="Teléfono *">
-              <Input placeholder="3874000000" type="tel" value={form.telefono} onChange={(e) => setField('telefono')(e.target.value)} />
-            </Row>
-            <Row label="Email">
-              <Input placeholder="juan@email.com" type="email" value={form.email} onChange={(e) => setField('email')(e.target.value)} />
-            </Row>
-          </Section>
-
-          <Section title="Motivo de la visita">
-            <div className="px-4 py-3">
-              <Input
-                placeholder="Ej: control general, cambio de neumáticos..."
-                value={form.motivo}
-                onChange={(e) => setField('motivo')(e.target.value)}
-              />
-            </div>
-          </Section>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="flex flex-col gap-4">
-          <Section title="Diagnóstico (nuevo flujo)">
-            <div className="px-4 py-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tren delantero</p>
-              <div className="grid grid-cols-3 gap-2">
-                {(['x2', 'x4', 'no'] as const).map((op) => (
-                  <button
-                    key={op}
-                    type="button"
-                    onClick={() => setTrenDelantero(op)}
-                    className={`py-4 rounded-2xl font-black text-sm border-2 ${
-                      trenDelantero === op ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white border-gray-200 text-gray-800'
-                    }`}
-                  >
-                    {op === 'no' ? 'No' : op.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-
-              {(trenDelantero === 'x2' || trenDelantero === 'x4') && (
-                <div className="mt-4 flex gap-4">
-                  <label className="flex items-center gap-2 text-base font-bold">
-                    <input type="checkbox" checked={trenAlineado} onChange={(e) => setTrenAlineado(e.target.checked)} className="w-6 h-6 rounded" />
-                    Alineado
-                  </label>
-                  <label className="flex items-center gap-2 text-base font-bold">
-                    <input type="checkbox" checked={trenBalanceo} onChange={(e) => setTrenBalanceo(e.target.checked)} className="w-6 h-6 rounded" />
-                    Balanceo
-                  </label>
-                </div>
-              )}
-
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-6 mb-3">Amortiguadores revisados</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAmortiguadores(true)}
-                  className={`h-14 rounded-2xl font-black ${amortiguadores === true ? 'bg-green-600 text-white' : 'bg-white border-2 border-gray-200'}`}
-                >
-                  Sí
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAmortiguadores(false)}
-                  className={`h-14 rounded-2xl font-black ${amortiguadores === false ? 'bg-gray-800 text-white' : 'bg-white border-2 border-gray-200'}`}
-                >
-                  No
-                </button>
-              </div>
-
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-6 mb-3">Auxilio revisado</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAuxilio(true)}
-                  className={`h-14 rounded-2xl font-black ${auxilio === true ? 'bg-green-600 text-white' : 'bg-white border-2 border-gray-200'}`}
-                >
-                  Sí
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAuxilio(false)}
-                  className={`h-14 rounded-2xl font-black ${auxilio === false ? 'bg-gray-800 text-white' : 'bg-white border-2 border-gray-200'}`}
-                >
-                  No
-                </button>
-              </div>
-
-              <div className="mt-6">
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Fotos del neumático (máx. 4)</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  multiple
-                  className="w-full text-sm"
-                  onChange={(e) => agregarFotos(e.target.files)}
-                />
-                <p className="text-xs text-gray-400 mt-1">{fotos.length}/4 guardadas (en este dispositivo)</p>
-              </div>
-
-              <div className="mt-6">
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Presupuesto</p>
-                <textarea
-                  value={presupuesto}
-                  onChange={(e) => setPresupuesto(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 text-base"
-                  placeholder="Texto libre…"
-                />
-              </div>
-            </div>
-          </Section>
-        </div>
-      )}
-
-      <footer className="fixed left-0 right-0 bottom-16 z-30 bg-white border-t border-gray-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
-          {step > 1 && (
-            <button
-              onClick={irAnterior}
-              className="h-12 px-5 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-base active:scale-95 transition-transform"
-            >
-              Anterior
-            </button>
-          )}
-
-          {step < 2 && (
-            <button
-              onClick={irSiguiente}
-              className="flex-1 h-12 rounded-xl bg-[#C8102E] text-white font-bold text-base active:scale-95 transition-transform"
-            >
-              Siguiente
-            </button>
-          )}
-
-          {step === 2 && (
-            <button
-              onClick={confirmarYGuardar}
-              disabled={isGuardando}
-              className="flex-1 h-12 rounded-xl bg-[#C8102E] text-white font-bold text-base active:scale-95 transition-transform disabled:opacity-50"
-            >
-              {isGuardando ? 'Guardando...' : 'Guardar visita'}
-            </button>
-          )}
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{title}</p>
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-        {children}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+        <label className="text-xs font-bold text-gray-500 uppercase">Patente</label>
+        <input
+          value={patente}
+          onChange={(e) => {
+            setPatente(e.target.value.toUpperCase());
+            setMsg(null);
+          }}
+          onBlur={() => {
+            if (patenteCanon) setPatente(formatPatenteArDisplay(patenteCanon));
+          }}
+          placeholder="AA123BB"
+          className="w-full h-14 px-4 text-xl font-bold tracking-widest rounded-xl border border-gray-200 uppercase"
+          autoCapitalize="characters"
+        />
+        {sugerencias.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {sugerencias.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className="text-left py-3 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm active:bg-gray-200"
+                onClick={() => aplicarVehiculo(s)}
+              >
+                <span className="font-bold">{formatPatenteArDisplay(s.patente)}</span>{' '}
+                <span className="text-gray-600">
+                  {s.marca} {s.modelo}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {(isBuscandoSugerencias || buscando) && <p className="text-xs text-gray-400">Buscando…</p>}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-12 rounded-xl font-bold"
+          onClick={buscarExacto}
+        >
+          Buscar patente
+        </Button>
       </div>
-    </div>
-  );
-}
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center px-4 py-3 gap-3">
-      <span className="text-sm text-gray-500 w-32 shrink-0">{label}</span>
-      {children}
-    </div>
-  );
-}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+        <p className="text-xs font-bold text-gray-500 uppercase">Datos del vehículo</p>
+        <input
+          placeholder="Marca"
+          value={marca}
+          onChange={(e) => setMarca(e.target.value)}
+          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
+        />
+        <input
+          placeholder="Modelo"
+          value={modelo}
+          onChange={(e) => setModelo(e.target.value)}
+          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
+        />
+      </div>
 
-function Input({ placeholder, type = 'text', value, onChange }: {
-  placeholder: string; type?: string;
-  value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      className="flex-1 min-w-0 h-10 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/35 focus:border-[#C8102E]"
-    />
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+        <p className="text-xs font-bold text-gray-500 uppercase">Cliente</p>
+        <input
+          placeholder="Nombre"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
+        />
+        <input
+          placeholder="Apellido"
+          value={apellido}
+          onChange={(e) => setApellido(e.target.value)}
+          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
+        />
+        <input
+          placeholder="Teléfono (opcional)"
+          type="tel"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
+        />
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+        <p className="text-xs font-bold text-gray-500 uppercase">Motivo (opcional)</p>
+        <input
+          placeholder="Ej: control general, ruido en tren delantero…"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
+        />
+      </div>
+
+      {msg && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{msg}</p>}
+
+      <Button
+        className="w-full h-14 rounded-2xl text-lg font-black"
+        disabled={creando}
+        onClick={crearVisita}
+      >
+        {creando ? 'Creando…' : 'Continuar al presupuesto'}
+      </Button>
+    </div>
   );
 }

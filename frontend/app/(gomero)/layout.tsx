@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { suscribirPush } from '@/hooks/usePushNotifications';
+import { InstallPWA } from '@/components/ui/InstallPWA';
 
 const NAV_PRIMARY = [
   {
@@ -76,6 +77,8 @@ export default function GomeroLayout({ children }: { children: React.ReactNode }
       </main>
 
       <BottomNav pathname={pathname} primaryItems={[NAV_PRIMARY[0], NAV_PRIMARY[1]]} />
+
+      <InstallPWA />
     </div>
   );
 }

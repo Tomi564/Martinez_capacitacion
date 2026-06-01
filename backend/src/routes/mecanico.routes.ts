@@ -7,6 +7,14 @@ import type { AuthRequest } from '../middleware/auth.middleware';
 import { Resend } from 'resend';
 import { sendPushToUserIds } from '../services/push-send.service';
 import { presionPsiFromBody } from '../utils/presion-neumaticos';
+import {
+  guardarLineasVisita,
+  listarCatalogoPresupuesto,
+  listarLineasVisita,
+  prepararLineasParaGuardar,
+  textoResumenPresupuesto,
+  type PresupuestoLineaInput,
+} from '../services/presupuesto-lineas.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -387,7 +395,26 @@ router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (
       .select('*')
       .eq('visita_id', visitaId);
 
-    return res.json({ visita, items: items || [], respuestas: respuestas || [] });
+    let presupuesto_catalogo: Awaited<ReturnType<typeof listarCatalogoPresupuesto>> = [];
+    let presupuesto_lineas: Awaited<ReturnType<typeof listarLineasVisita>> = [];
+    let presupuesto_ok = true;
+    try {
+      presupuesto_catalogo = await listarCatalogoPresupuesto();
+      presupuesto_lineas = await listarLineasVisita(visitaId);
+      if (!presupuesto_catalogo.length) presupuesto_ok = false;
+    } catch (presErr) {
+      presupuesto_ok = false;
+      console.warn('[mecanico] Presupuesto checklist no disponible (¿migración 034?)', presErr);
+    }
+
+    return res.json({
+      visita,
+      items: items || [],
+      respuestas: respuestas || [],
+      presupuesto_catalogo,
+      presupuesto_lineas,
+      presupuesto_ok,
+    });
   } catch (e) { next(e); }
 });
 
@@ -414,12 +441,14 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
       auxilio_revisado,
       presupuesto,
       fotos_neumatico_urls,
+      operario_responsable,
+      presupuesto_lineas,
     } = req.body;
 
     const { data: prev, error: prevErr } = await supabase
       .from('visitas_taller')
       .select(
-        'id, orden_estado, mecanico_tomo_at, mecanico_id, vehiculos(patente)'
+        'id, orden_estado, mecanico_tomo_at, mecanico_id, operario_responsable, vehiculos(patente)'
       )
       .eq('id', visitaId)
       .single();
@@ -449,8 +478,26 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
     if (amortiguadores_revisados !== undefined) updates.amortiguadores_revisados = amortiguadores_revisados;
     if (auxilio_revisado !== undefined) updates.auxilio_revisado = auxilio_revisado;
     if (presupuesto !== undefined) updates.presupuesto = presupuesto || null;
+    if (operario_responsable !== undefined) {
+      updates.operario_responsable =
+        operario_responsable && String(operario_responsable).trim()
+          ? String(operario_responsable).trim()
+          : null;
+    }
     if (fotos_neumatico_urls !== undefined) {
       updates.fotos_neumatico_urls = Array.isArray(fotos_neumatico_urls) ? fotos_neumatico_urls : null;
+    }
+
+    if (Array.isArray(presupuesto_lineas)) {
+      const lineasInput = presupuesto_lineas as PresupuestoLineaInput[];
+      const resueltas = await prepararLineasParaGuardar(lineasInput);
+      await guardarLineasVisita(visitaId, resueltas);
+      const guardadas = await listarLineasVisita(visitaId);
+      const operarioTxt =
+        operario_responsable !== undefined
+          ? String(operario_responsable || '').trim() || null
+          : ((prev as { operario_responsable?: string | null }).operario_responsable ?? null);
+      updates.presupuesto = textoResumenPresupuesto(guardadas, operarioTxt);
     }
 
     if (orden_estado !== undefined) {

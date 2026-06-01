@@ -10,6 +10,7 @@ import { NumberWheelPicker } from '@/components/ui/NumberWheelPicker';
 interface Orden {
   id: string;
   orden_estado: string | null;
+  patente_pendiente?: string | null;
   km: number | null;
   presion_psi: number | null;
   neumaticos_cambiados: boolean | null;
@@ -21,7 +22,10 @@ interface Orden {
     marca: string;
     modelo: string;
     medida_rueda: string | null;
-    clientes: { nombre: string; apellido: string } | null;
+    clientes: { nombre: string; apellido: string; telefono?: string | null } | null;
+  } | null;
+  atenciones?: {
+    clientes: { nombre: string; apellido: string; telefono?: string | null; email?: string | null } | null;
   } | null;
 }
 
@@ -76,6 +80,9 @@ export default function OrdenGomeroDetallePage() {
   const [guardando, setGuardando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [marcaVehiculo, setMarcaVehiculo] = useState('');
+  const [modeloVehiculo, setModeloVehiculo] = useState('');
+  const [anioVehiculo, setAnioVehiculo] = useState('');
 
   const cargar = async () => {
     setLoading(true);
@@ -103,7 +110,37 @@ export default function OrdenGomeroDetallePage() {
     cargar();
   }, [id]);
 
+  const necesitaCompletarVehiculo = !!orden?.patente_pendiente && !orden?.vehiculos;
+
+  const guardarVehiculoPendiente = async (): Promise<boolean> => {
+    if (!marcaVehiculo.trim() || !modeloVehiculo.trim()) {
+      setMsg('Completá marca y modelo del vehículo.');
+      return false;
+    }
+    setGuardando(true);
+    setMsg(null);
+    try {
+      await apiClient.patch(`/gomero/ordenes/${id}`, {
+        vehiculo_marca: marcaVehiculo.trim(),
+        vehiculo_modelo: modeloVehiculo.trim(),
+        vehiculo_anio: anioVehiculo.trim() ? Number(anioVehiculo) : null,
+      });
+      await cargar();
+      setMsg('Vehículo registrado.');
+      return true;
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Error al guardar el vehículo');
+      return false;
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const guardar = async (): Promise<boolean> => {
+    if (necesitaCompletarVehiculo) {
+      setMsg('Primero completá los datos del vehículo.');
+      return false;
+    }
     if (neumaticosCambiados == null) {
       setMsg('Indicá si se cambiaron los neumáticos.');
       return false;
@@ -175,17 +212,58 @@ export default function OrdenGomeroDetallePage() {
   }
 
   const v = orden.vehiculos;
+  const cliente = v?.clientes || orden.atenciones?.clientes || null;
+  const patenteDisplay = v?.patente || orden.patente_pendiente || '—';
 
   return (
     <div className="px-4 py-5 max-w-lg mx-auto flex flex-col gap-5 pb-32">
       <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <p className="text-3xl font-black tracking-widest">{v?.patente}</p>
-        <p className="text-gray-600 font-medium mt-1">{v?.marca} {v?.modelo}</p>
-        {v?.clientes && (
-          <p className="text-sm text-gray-500 mt-2">{v.clientes.nombre} {v.clientes.apellido}</p>
+        <p className="text-3xl font-black tracking-widest">{patenteDisplay}</p>
+        {v && <p className="text-gray-600 font-medium mt-1">{v.marca} {v.modelo}</p>}
+        {cliente && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs font-bold text-gray-500 uppercase">Cliente</p>
+            <p className="text-sm font-semibold text-gray-900 mt-1">
+              {cliente.nombre} {cliente.apellido}
+            </p>
+            {cliente.telefono && <p className="text-sm text-gray-600">{cliente.telefono}</p>}
+          </div>
         )}
       </div>
 
+      {necesitaCompletarVehiculo && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
+          <p className="text-xs font-bold text-amber-900 uppercase">Completar vehículo</p>
+          <p className="text-sm text-amber-950">
+            Esta orden viene del vendedor. Cargá marca y modelo para continuar.
+          </p>
+          <input
+            placeholder="Marca"
+            value={marcaVehiculo}
+            onChange={(e) => setMarcaVehiculo(e.target.value)}
+            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white"
+          />
+          <input
+            placeholder="Modelo"
+            value={modeloVehiculo}
+            onChange={(e) => setModeloVehiculo(e.target.value)}
+            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white"
+          />
+          <input
+            placeholder="Año (opcional)"
+            type="number"
+            value={anioVehiculo}
+            onChange={(e) => setAnioVehiculo(e.target.value)}
+            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white"
+          />
+          <Button className="w-full h-12 rounded-xl font-bold" disabled={guardando} onClick={guardarVehiculoPendiente}>
+            {guardando ? 'Guardando…' : 'Guardar vehículo'}
+          </Button>
+        </div>
+      )}
+
+      {!necesitaCompletarVehiculo && (
+      <>
       <div>
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">¿Se cambiaron los neumáticos?</p>
         <div className="grid grid-cols-2 gap-3">
@@ -276,12 +354,6 @@ export default function OrdenGomeroDetallePage() {
         </>
       )}
 
-      {msg && (
-        <p className={`text-sm rounded-xl px-4 py-3 ${msg === 'Guardado.' || msg.includes('Enviado') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
-          {msg}
-        </p>
-      )}
-
       <div className="flex flex-col gap-3">
         <Button
           className="h-14 rounded-2xl text-base font-black"
@@ -299,6 +371,15 @@ export default function OrdenGomeroDetallePage() {
           {enviando ? 'Enviando…' : 'Enviar al mecánico'}
         </Button>
       </div>
+      </>
+      )}
+
+      {msg && (
+        <p className={`text-sm rounded-xl px-4 py-3 ${msg === 'Guardado.' || msg.includes('Enviado') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
+          {msg}
+        </p>
+      )}
+
     </div>
   );
 }

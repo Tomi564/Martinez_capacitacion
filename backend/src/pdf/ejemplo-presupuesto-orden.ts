@@ -14,7 +14,6 @@ import type { PresupuestoOrdenData } from './presupuesto-orden.types';
 
 export { generarPresupuestoOrdenPdf } from './presupuesto-orden.pdf';
 
-/** Datos de muestra para previsualizar el layout sin tocar la base. */
 export function datosEjemploPresupuestoOrden(): PresupuestoOrdenData {
   return {
     empresa: {
@@ -30,7 +29,6 @@ export function datosEjemploPresupuestoOrden(): PresupuestoOrdenData {
     cliente: {
       nombre: 'Juan',
       apellido: 'Pérez',
-      domicilio: 'Calle Falsa 123, San Miguel',
       telefono: '11 5555-1234',
     },
     vehiculo: {
@@ -38,24 +36,36 @@ export function datosEjemploPresupuestoOrden(): PresupuestoOrdenData {
       marca: 'Toyota',
       modelo: 'Corolla',
     },
-    trenDelantero: {
-      alcance: 'x4',
-      alineado: { etiqueta: 'Alineación', aplica: true, precio: 18500 },
-      balanceo: { etiqueta: 'Balanceo', aplica: true, precio: 12000 },
-      amortiguadores: { etiqueta: 'Amortiguadores revisados', aplica: true, precio: null },
-      auxilio: { etiqueta: 'Auxilio revisado', aplica: true, precio: null },
-    },
-    cubiertas: {
+    gomero: {
       marca: 'Pirelli',
       medida: '195/55 R16',
       presionBar: '2,2 BAR',
       kilometraje: '48.500 km',
       neumaticosCambiados: true,
     },
+    usaChecklistNuevo: true,
+    secciones: [
+      {
+        titulo: 'TREN DELANTERO',
+        subtotal: 45000,
+        lineas: [
+          { etiqueta: 'Rótulas', cantidad: 2, precioUnitario: 15000, subtotal: 30000 },
+          { etiqueta: 'Extremos de Dirección', cantidad: 2, precioUnitario: 7500, subtotal: 15000 },
+        ],
+      },
+      {
+        titulo: 'CUBIERTAS',
+        subtotal: 240000,
+        lineas: [
+          { etiqueta: 'Continental', cantidad: 4, precioUnitario: 55000, subtotal: 220000 },
+          { etiqueta: 'Balanceos Autos', cantidad: 1, precioUnitario: 20000, subtotal: 20000 },
+        ],
+      },
+    ],
     totalGeneral: 285000,
-    observaciones:
-      'Cliente solicita presupuesto por 4 cubiertas + alineación y balanceo. Auxilio con desgaste lateral — recomendar cambio en próxima visita.',
-    firmaMecanico: 'Taller Martínez — Mecánico',
+    operarioResponsable: 'Carlos Gómez',
+    observaciones: 'Cliente solicita presupuesto por cubiertas + tren delantero.',
+    firmaMecanico: 'Carlos Gómez',
   };
 }
 

@@ -13,6 +13,7 @@ import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
 import { enviarPushComunicado } from '../services/comunicados-scheduler.service';
 import { preguntasDiariasService } from '../services/preguntas-diarias.service';
 import { presupuestoVisitaController } from '../controllers/presupuesto-visita.controller';
+import { visitaTieneDiagnosticoCargado } from '../utils/visita-diagnostico';
 
 const router = Router();
 
@@ -756,6 +757,7 @@ router.get('/visitas/:id', async (req, res, next) => {
       .from('visitas_taller')
       .select(`
         id, created_at, estado_visita, motivo, observaciones, presion_psi, updated_by_admin_at,
+        patente_pendiente,
         tren_delantero, tren_alineado, tren_balanceo, amortiguadores_revisados, auxilio_revisado, presupuesto, fotos_neumatico_urls,
         vehiculos(patente, marca, modelo, clientes(nombre, apellido, dni))
       `)
@@ -763,7 +765,8 @@ router.get('/visitas/:id', async (req, res, next) => {
       .single();
 
     if (error) throw new Error('Error al obtener visita');
-    return res.status(200).json({ visita: data });
+    const tiene_diagnostico_cargado = await visitaTieneDiagnosticoCargado(id);
+    return res.status(200).json({ visita: data, tiene_diagnostico_cargado });
   } catch (error) {
     next(error);
   }
@@ -837,31 +840,52 @@ router.patch('/visitas/:id', async (req, res, next) => {
   }
 });
 
-// DELETE /api/admin/visitas/:id — eliminar visita (admin, sin restricción de mecánico)
+// DELETE /api/admin/visitas/:id — eliminar orden de taller (solo admin)
 router.delete('/visitas/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { data: anterior } = await supabase
+
+    const { data: visita, error: readErr } = await supabase
       .from('visitas_taller')
-      .select('id, estado, estado_visita, motivo, vehiculo_id, mecanico_id, created_at')
+      .select(`
+        id, created_at, estado, estado_visita, orden_estado, motivo, km, mecanico_id, patente_pendiente,
+        vehiculos(patente, marca, modelo, clientes(id, nombre, apellido))
+      `)
       .eq('id', id)
       .maybeSingle();
-    if (!anterior) {
-      return res.status(404).json({ error: 'Visita no encontrada' });
+
+    if (readErr) throw new Error('Error al buscar la orden');
+    if (!visita) {
+      return res.status(404).json({ error: 'Orden no encontrada' });
     }
 
-    const { error } = await supabase.from('visitas_taller').delete().eq('id', id);
-    if (error) throw new Error('Error al eliminar visita');
+    const vehiculo = visita.vehiculos as {
+      patente?: string;
+      marca?: string;
+      modelo?: string;
+      clientes?: { id?: string; nombre?: string; apellido?: string } | null;
+    } | null;
+
+    const datosAnteriores = {
+      ...visita,
+      patente: vehiculo?.patente || visita.patente_pendiente || null,
+      cliente: vehiculo?.clientes
+        ? `${vehiculo.clientes.nombre || ''} ${vehiculo.clientes.apellido || ''}`.trim()
+        : null,
+    };
+
+    const { error: delErr } = await supabase.from('visitas_taller').delete().eq('id', id);
+    if (delErr) throw new Error('Error al eliminar la orden');
 
     await registrarAuditoria(req, {
       accion: 'eliminar_visita',
       entidad: 'visitas_taller',
       entidadId: id,
-      datosAnteriores: anterior,
+      datosAnteriores,
       datosNuevos: null,
     });
 
-    return res.status(200).json({ mensaje: 'Visita eliminada' });
+    return res.status(200).json({ ok: true, mensaje: 'Orden eliminada' });
   } catch (error) {
     next(error);
   }

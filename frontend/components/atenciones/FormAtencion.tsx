@@ -2,10 +2,12 @@
 
 import {
   puedeGuardarAtencion,
+  resultadoConPatente,
   type ClienteSugerencia,
   type FormAtencionState,
   type ProductoSugerencia,
 } from '@/hooks/useAtenciones';
+import type { VehiculoSugerido } from '@/hooks/usePatenteSugerencias';
 
 const CANALES = [
   { id: 'whatsapp', label: 'WhatsApp', icono: '💬' },
@@ -44,6 +46,12 @@ interface FormAtencionProps {
   onGuardar: () => void;
   onLimpiarSugerencias: () => void;
   onLimpiarSugerenciasCliente: () => void;
+  sugerenciasPatente?: VehiculoSugerido[];
+  buscandoPatente?: boolean;
+  onPatenteChange?: (texto: string) => void;
+  onBuscarPatenteExacta?: () => void;
+  onSeleccionarVehiculoPatente?: (v: VehiculoSugerido) => void;
+  onLimpiarSugerenciasPatente?: () => void;
   title?: string;
   submitLabel?: string;
 }
@@ -70,10 +78,17 @@ export function FormAtencion({
   onGuardar,
   onLimpiarSugerencias,
   onLimpiarSugerenciasCliente,
+  sugerenciasPatente = [],
+  buscandoPatente = false,
+  onPatenteChange,
+  onBuscarPatenteExacta,
+  onSeleccionarVehiculoPatente,
+  onLimpiarSugerenciasPatente,
   title = 'Registrar atención',
   submitLabel = 'Guardar',
 }: FormAtencionProps) {
   const esVentaCerrada = form.resultado === 'venta_cerrada';
+  const mostrarPatente = resultadoConPatente(form.resultado);
   const labelProducto = esVentaCerrada ? 'Producto vendido' : 'Producto de interés';
   const puedeGuardar = puedeGuardarAtencion(form);
 
@@ -107,6 +122,15 @@ export function FormAtencion({
                     ...prev,
                     resultado: resultado.id,
                     monto: resultado.id === 'venta_cerrada' ? prev.monto : '',
+                    ...(resultadoConPatente(resultado.id)
+                      ? {}
+                      : {
+                          patente: '',
+                          vehiculo_id: null,
+                          vehiculo_marca: '',
+                          vehiculo_modelo: '',
+                          vehiculo_anio: '',
+                        }),
                   }))
                 }
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-medium ${
@@ -262,6 +286,72 @@ export function FormAtencion({
                   </button>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {mostrarPatente && (
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-900">
+              Patente del vehículo
+              <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+            </label>
+            <p className="text-xs text-gray-500">
+              Si la cargás, el gomero recibe una orden pendiente con los datos del cliente.
+            </p>
+            <div className="relative">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={form.patente}
+                  onChange={(e) => onPatenteChange?.(e.target.value)}
+                  onBlur={() => setTimeout(() => onLimpiarSugerenciasPatente?.(), 150)}
+                  placeholder="Ej: AC 797 HP"
+                  className="flex-1 h-12 px-4 rounded-xl border-2 border-gray-200 text-lg font-bold tracking-wider uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={onBuscarPatenteExacta}
+                  className="h-12 px-4 shrink-0 bg-[#1F1F1F] text-white rounded-xl text-sm font-semibold"
+                >
+                  Buscar
+                </button>
+              </div>
+              {(buscandoPatente || sugerenciasPatente.length > 0) && (
+                <div className="absolute z-20 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  {buscandoPatente && (
+                    <p className="px-3 py-2 text-xs text-gray-500">Buscando…</p>
+                  )}
+                  {!buscandoPatente &&
+                    sugerenciasPatente.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onMouseDown={() => onSeleccionarVehiculoPatente?.(s)}
+                        className="w-full text-left px-3 py-3 hover:bg-gray-50 border-t border-gray-100 first:border-t-0"
+                      >
+                        <p className="text-sm font-bold text-gray-900">{s.patente}</p>
+                        <p className="text-xs text-gray-600">
+                          {s.marca} {s.modelo} {s.anio ? `· ${s.anio}` : ''}
+                        </p>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+            {form.vehiculo_id && form.vehiculo_marca && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                <p className="text-xs font-bold text-green-800 uppercase">Vehículo encontrado</p>
+                <p className="text-sm font-semibold text-gray-900 mt-1">
+                  {form.vehiculo_marca} {form.vehiculo_modelo}
+                  {form.vehiculo_anio ? ` · ${form.vehiculo_anio}` : ''}
+                </p>
+              </div>
+            )}
+            {form.patente.trim() && !form.vehiculo_id && (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Patente nueva: el gomero completará marca y modelo al tomar la orden.
+              </p>
             )}
           </div>
         )}

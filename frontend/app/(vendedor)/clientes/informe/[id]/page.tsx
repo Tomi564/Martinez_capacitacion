@@ -23,7 +23,11 @@ export default function InformeVisitaVendedorPage() {
           Volver
         </button>
       </div>
-      <InformeVisitaTaller visitaId={id} presupuestoApiBase="/vendedor/visitas" />
+      <InformeVisitaTaller
+        visitaId={id}
+        presupuestoApiBase="/vendedor/visitas"
+        habilitarArmarPresupuesto
+      />
     </div>
   );
 }

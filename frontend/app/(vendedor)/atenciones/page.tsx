@@ -61,6 +61,12 @@ export default function AtencionesPage() {
     onClienteEmailChange,
     seleccionarCliente,
     seleccionarProducto,
+    sugerenciasPatente,
+    buscandoPatente,
+    onPatenteChange,
+    buscarPatenteExacta,
+    seleccionarVehiculoPatente,
+    setSugerenciasPatente,
     handleGuardar,
     actualizarAtencion,
     cerrarForm,
@@ -395,6 +401,12 @@ export default function AtencionesPage() {
           onGuardar={handleGuardarConContexto}
           onLimpiarSugerencias={() => setSugerencias([])}
           onLimpiarSugerenciasCliente={() => setSugerenciasCliente([])}
+          sugerenciasPatente={sugerenciasPatente}
+          buscandoPatente={buscandoPatente}
+          onPatenteChange={onPatenteChange}
+          onBuscarPatenteExacta={buscarPatenteExacta}
+          onSeleccionarVehiculoPatente={seleccionarVehiculoPatente}
+          onLimpiarSugerenciasPatente={() => setSugerenciasPatente([])}
           title={editandoAtencion ? 'Editar atención' : 'Registrar atención'}
           submitLabel={editandoAtencion ? 'Guardar cambios' : 'Guardar'}
         />

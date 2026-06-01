@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/lib/api';
+import { formatPatenteArDisplay, normalizePatenteAr } from '@/lib/patente';
+import type { VehiculoSugerido } from '@/hooks/usePatenteSugerencias';
 
 export interface ClienteAtencion {
   id: string;
@@ -69,6 +71,11 @@ export interface FormAtencionState {
   cliente_apellido: string;
   cliente_email: string;
   cliente_telefono: string;
+  patente: string;
+  vehiculo_id: string | null;
+  vehiculo_marca: string;
+  vehiculo_modelo: string;
+  vehiculo_anio: string;
 }
 
 const FORM_VACIO: FormAtencionState = {
@@ -83,6 +90,11 @@ const FORM_VACIO: FormAtencionState = {
   cliente_apellido: '',
   cliente_email: '',
   cliente_telefono: '',
+  patente: '',
+  vehiculo_id: null,
+  vehiculo_marca: '',
+  vehiculo_modelo: '',
+  vehiculo_anio: '',
 };
 
 export function clienteFormCompleto(form: FormAtencionState): boolean {
@@ -158,6 +170,20 @@ function clientePayloadFromForm(form: FormAtencionState) {
   };
 }
 
+export function resultadoConPatente(resultado: string) {
+  return resultado === 'venta_cerrada' || resultado === 'pendiente';
+}
+
+function patentePayloadFromForm(form: FormAtencionState) {
+  if (!resultadoConPatente(form.resultado)) return {};
+  const canon = normalizePatenteAr(form.patente);
+  if (!canon && !form.vehiculo_id) return {};
+  return {
+    vehiculo_id: form.vehiculo_id,
+    patente: canon || null,
+  };
+}
+
 export function formFromAtencion(atencion: Atencion): FormAtencionState {
   const c = atencion.clientes;
   return {
@@ -172,6 +198,11 @@ export function formFromAtencion(atencion: Atencion): FormAtencionState {
     cliente_apellido: c?.apellido || '',
     cliente_email: c?.email || '',
     cliente_telefono: c?.telefono || '',
+    patente: '',
+    vehiculo_id: null,
+    vehiculo_marca: '',
+    vehiculo_modelo: '',
+    vehiculo_anio: '',
   };
 }
 
@@ -190,8 +221,11 @@ export function useAtenciones() {
   const [sugerenciasCliente, setSugerenciasCliente] = useState<ClienteSugerencia[]>([]);
   const [buscandoProducto, setBuscandoProducto] = useState(false);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [sugerenciasPatente, setSugerenciasPatente] = useState<VehiculoSugerido[]>([]);
+  const [buscandoPatente, setBuscandoPatente] = useState(false);
   const [form, setForm] = useState<FormAtencionState>(FORM_VACIO);
   const clienteDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const patenteDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadListaAtenciones = useCallback(async () => {
     try {
@@ -355,7 +389,85 @@ export function useAtenciones() {
           : null,
       observaciones: form.observaciones.trim() || null,
       ...clientePayloadFromForm(form),
+      ...patentePayloadFromForm(form),
     };
+  };
+
+  const limpiarVehiculoPatente = () => ({
+    vehiculo_id: null as string | null,
+    vehiculo_marca: '',
+    vehiculo_modelo: '',
+    vehiculo_anio: '',
+  });
+
+  const onPatenteChange = (texto: string) => {
+    setForm((prev) => ({
+      ...prev,
+      patente: texto.toUpperCase(),
+      ...limpiarVehiculoPatente(),
+    }));
+    programarBusquedaPatente(texto);
+  };
+
+  const aplicarVehiculoPatente = (v: VehiculoSugerido) => {
+    const canon = normalizePatenteAr(v.patente || '');
+    setForm((prev) => ({
+      ...prev,
+      patente: canon ? formatPatenteArDisplay(canon) : prev.patente,
+      vehiculo_id: v.id,
+      vehiculo_marca: v.marca || '',
+      vehiculo_modelo: v.modelo || '',
+      vehiculo_anio: v.anio ? String(v.anio) : '',
+    }));
+  };
+
+  const buscarPatenteExacta = async () => {
+    const canon = normalizePatenteAr(form.patente);
+    if (canon.length < 6) return;
+    try {
+      const res = await apiClient.get<{ vehiculo: VehiculoSugerido | null }>(
+        `/vendedor/vehiculos/buscar/${encodeURIComponent(canon)}`,
+      );
+      if (res.vehiculo) {
+        aplicarVehiculoPatente(res.vehiculo);
+        setSugerenciasPatente([]);
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          patente: formatPatenteArDisplay(canon),
+          ...limpiarVehiculoPatente(),
+        }));
+      }
+    } catch (err) {
+      console.error('[useAtenciones] Error buscando patente', err);
+    }
+  };
+
+  const programarBusquedaPatente = (texto: string) => {
+    if (patenteDebounce.current) clearTimeout(patenteDebounce.current);
+    const q = texto.trim();
+    if (q.length < 3) {
+      setSugerenciasPatente([]);
+      return;
+    }
+    patenteDebounce.current = setTimeout(async () => {
+      setBuscandoPatente(true);
+      try {
+        const res = await apiClient.get<{ vehiculos: VehiculoSugerido[] }>(
+          `/vendedor/vehiculos/sugerencias?q=${encodeURIComponent(q)}`,
+        );
+        setSugerenciasPatente((res.vehiculos || []).slice(0, 8));
+      } catch {
+        setSugerenciasPatente([]);
+      } finally {
+        setBuscandoPatente(false);
+      }
+    }, 300);
+  };
+
+  const seleccionarVehiculoPatente = (v: VehiculoSugerido) => {
+    aplicarVehiculoPatente(v);
+    setSugerenciasPatente([]);
   };
 
   const cerrarForm = () => {
@@ -363,6 +475,7 @@ export function useAtenciones() {
     setError(null);
     setSugerencias([]);
     setSugerenciasCliente([]);
+    setSugerenciasPatente([]);
     setMostrarDetalles(false);
   };
 
@@ -383,6 +496,7 @@ export function useAtenciones() {
       setMostrarDetalles(false);
       setSugerencias([]);
       setSugerenciasCliente([]);
+      setSugerenciasPatente([]);
       setShowForm(false);
       setSuccessMsg('¡Atención registrada!');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -411,6 +525,7 @@ export function useAtenciones() {
       setMostrarDetalles(false);
       setSugerencias([]);
       setSugerenciasCliente([]);
+      setSugerenciasPatente([]);
       setShowForm(false);
       setSuccessMsg('Atención actualizada');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -455,6 +570,13 @@ export function useAtenciones() {
     onClienteEmailChange,
     seleccionarCliente,
     seleccionarProducto,
+    sugerenciasPatente,
+    setSugerenciasPatente,
+    buscandoPatente,
+    onPatenteChange,
+    buscarPatenteExacta,
+    seleccionarVehiculoPatente,
+    resultadoConPatente,
     clienteFormCompleto,
     puedeGuardarAtencion,
     fetchAtenciones,

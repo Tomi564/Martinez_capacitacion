@@ -15,7 +15,9 @@ export class PresupuestoVisitaController {
         return res.status(400).json({ error: 'ID de visita inválido' });
       }
 
-      const { buffer, filename } = await presupuestoVisitaService.generarPdfPorVisitaId(visitaId);
+      const { buffer, filename } = await presupuestoVisitaService.generarPdfPorVisitaId(visitaId, {
+        verificarVendedor: req.user?.rol === 'vendedor',
+      });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

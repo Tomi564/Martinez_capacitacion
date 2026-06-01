@@ -13,7 +13,23 @@ export interface VehiculoSugerido {
   clientes: { id: string; nombre: string; apellido: string; telefono: string | null; email: string | null } | null;
 }
 
-export function usePatenteSugerencias(query: string, debounceMs = 300) {
+export type PatenteApiBase = '/gomero' | '/mecanico' | '/vendedor';
+
+function resolverApiBase(explicit?: PatenteApiBase): PatenteApiBase {
+  if (explicit) return explicit;
+  if (typeof window === 'undefined') return '/mecanico';
+  if (window.location.pathname.startsWith('/gomero')) return '/gomero';
+  if (window.location.pathname.startsWith('/vendedor') || window.location.pathname.startsWith('/atenciones')) {
+    return '/vendedor';
+  }
+  return '/mecanico';
+}
+
+export function usePatenteSugerencias(
+  query: string,
+  debounceMs = 300,
+  apiBase?: PatenteApiBase,
+) {
   const [sugerencias, setSugerencias] = useState<VehiculoSugerido[]>([]);
   const [isBuscandoSugerencias, setIsBuscandoSugerencias] = useState(false);
 
@@ -24,15 +40,12 @@ export function usePatenteSugerencias(query: string, debounceMs = 300) {
       return;
     }
 
+    const base = resolverApiBase(apiBase);
     const timeoutId = setTimeout(async () => {
       setIsBuscandoSugerencias(true);
       try {
-        const base =
-          typeof window !== 'undefined' && window.location.pathname.startsWith('/gomero')
-            ? '/gomero'
-            : '/mecanico';
         const res = await apiClient.get<{ vehiculos: VehiculoSugerido[] }>(
-          `${base}/vehiculos/sugerencias?q=${encodeURIComponent(q)}`
+          `${base}/vehiculos/sugerencias?q=${encodeURIComponent(q)}`,
         );
         setSugerencias(res.vehiculos || []);
       } catch (error) {
@@ -44,7 +57,7 @@ export function usePatenteSugerencias(query: string, debounceMs = 300) {
     }, debounceMs);
 
     return () => clearTimeout(timeoutId);
-  }, [query, debounceMs]);
+  }, [query, debounceMs, apiBase]);
 
   return {
     sugerencias,

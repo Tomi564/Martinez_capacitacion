@@ -6,6 +6,7 @@ import { normalizePatenteAr } from '../utils/patente';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { sendPushToUserIds } from '../services/push-send.service';
 import { presionPsiFromBody } from '../utils/presion-neumaticos';
+import { gomeroPuedeAccederOrden, tomarOrdenGomeroSiLibre } from '../utils/gomero-orden-access';
 
 const router = Router();
 router.use(authMiddleware);
@@ -186,12 +187,17 @@ router.get('/ordenes', requireRole('gomero', 'admin'), async (req: AuthRequest, 
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
+    const uid = req.user!.id;
     let q = supabase
       .from('visitas_taller')
-      .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' });
+      .select(
+        `*, vehiculos(patente, marca, modelo, clientes(nombre, apellido, telefono)),
+         atenciones(id, clientes(nombre, apellido, telefono))`,
+        { count: 'exact' },
+      );
 
     if (req.user!.rol !== 'admin') {
-      q = q.eq('gomero_id', req.user!.id);
+      q = q.or(`gomero_id.eq.${uid},and(gomero_id.is.null,atencion_id.not.is.null)`);
     } else {
       const g = String(req.query.gomero_id || '').trim();
       if (g && /^[0-9a-f-]{36}$/i.test(g)) q = q.eq('gomero_id', g);
@@ -253,15 +259,67 @@ router.patch('/ordenes/:id', requireRole('gomero', 'admin'), async (req: AuthReq
     const id = req.params.id;
     const { data: row, error: rErr } = await supabase
       .from('visitas_taller')
-      .select('id, gomero_id, orden_estado')
+      .select('id, gomero_id, orden_estado, atencion_id, vehiculo_id, patente_pendiente')
       .eq('id', id)
       .single();
     if (rErr || !row) throw new AppError('Orden no encontrada', 404);
-    if (row.gomero_id !== req.user!.id && req.user!.rol !== 'admin') {
+    if (!gomeroPuedeAccederOrden(row, req.user!.id, req.user!.rol)) {
       throw new AppError('No autorizado', 403);
     }
+    const ordenId = typeof id === 'string' ? id : id?.[0] || '';
+    await tomarOrdenGomeroSiLibre(ordenId, req.user!.id, req.user!.rol);
     if (row.orden_estado !== 'pendiente_gomero') {
       throw new AppError('Esta orden ya fue enviada o cerrada.', 400);
+    }
+
+    const { vehiculo_marca, vehiculo_modelo, vehiculo_anio } = req.body as {
+      vehiculo_marca?: string;
+      vehiculo_modelo?: string;
+      vehiculo_anio?: number | string | null;
+    };
+
+    if (!row.vehiculo_id && row.patente_pendiente) {
+      const marca = String(vehiculo_marca || '').trim();
+      const modelo = String(vehiculo_modelo || '').trim();
+      if (!marca || !modelo) {
+        throw new AppError('Completá marca y modelo del vehículo antes de continuar.', 400);
+      }
+
+      const { data: atencion } = await supabase
+        .from('atenciones')
+        .select('cliente_id')
+        .eq('id', row.atencion_id)
+        .maybeSingle();
+
+      const patente = normalizePatenteAr(row.patente_pendiente);
+      const { data: nuevoV, error: vErr } = await supabase
+        .from('vehiculos')
+        .insert({
+          patente,
+          marca,
+          modelo,
+          anio: vehiculo_anio ? Number(vehiculo_anio) : null,
+          cliente_id: atencion?.cliente_id || null,
+        })
+        .select('id')
+        .single();
+      if (vErr) throw new AppError('Error al dar de alta el vehículo', 500);
+
+      await supabase
+        .from('visitas_taller')
+        .update({
+          vehiculo_id: nuevoV.id,
+          patente_pendiente: null,
+          gomero_id: req.user!.rol === 'admin' ? row.gomero_id : req.user!.id,
+        })
+        .eq('id', ordenId);
+
+      if (atencion?.cliente_id) {
+        await supabase
+          .from('atenciones')
+          .update({ vehiculo_id: nuevoV.id, patente_manual: null })
+          .eq('id', row.atencion_id);
+      }
     }
 
     const {
@@ -295,7 +353,7 @@ router.patch('/ordenes/:id', requireRole('gomero', 'admin'), async (req: AuthReq
       updates.presion_psi = presionPsiFromBody(presion_psi);
     }
 
-    const { error } = await supabase.from('visitas_taller').update(updates).eq('id', id);
+    const { error } = await supabase.from('visitas_taller').update(updates).eq('id', ordenId);
     if (error) throw new AppError('Error al actualizar orden', 500);
     return res.json({ ok: true });
   } catch (e) {
@@ -310,13 +368,16 @@ router.post('/ordenes/:id/enviar-mecanico', requireRole('gomero', 'admin'), asyn
 
     const { data: row, error: rErr } = await supabase
       .from('visitas_taller')
-      .select('id, gomero_id, orden_estado, vehiculos(patente)')
+      .select('id, gomero_id, orden_estado, vehiculo_id, patente_pendiente, vehiculos(patente)')
       .eq('id', id)
       .single();
 
     if (rErr || !row) throw new AppError('Orden no encontrada', 404);
-    if (row.gomero_id !== req.user!.id && req.user!.rol !== 'admin') {
+    if (!gomeroPuedeAccederOrden(row, req.user!.id, req.user!.rol)) {
       throw new AppError('No autorizado', 403);
+    }
+    if (!row.vehiculo_id) {
+      throw new AppError('Completá los datos del vehículo antes de enviar al mecánico.', 400);
     }
     if (row.orden_estado !== 'pendiente_gomero') {
       throw new AppError('La orden no está pendiente de la parte gomería.', 400);
@@ -337,7 +398,10 @@ router.post('/ordenes/:id/enviar-mecanico', requireRole('gomero', 'admin'), asyn
 
     if (error) throw new AppError('Error al enviar la orden', 500);
 
-    const patente = (row.vehiculos as { patente?: string } | null)?.patente || 'vehículo';
+    const patente =
+      (row.vehiculos as { patente?: string } | null)?.patente ||
+      row.patente_pendiente ||
+      'vehículo';
     await sendPushToUserIds(
       [mecanicoId],
       'Nueva orden de trabajo',
@@ -352,16 +416,21 @@ router.post('/ordenes/:id/enviar-mecanico', requireRole('gomero', 'admin'), asyn
 
 router.get('/ordenes/:id', requireRole('gomero', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const ordenId = typeof req.params.id === 'string' ? req.params.id : req.params.id?.[0];
     const { data, error } = await supabase
       .from('visitas_taller')
-      .select(`*, vehiculos(patente, marca, modelo, anio, medida_rueda, clientes(nombre, apellido, email, telefono))`)
-      .eq('id', req.params.id)
+      .select(
+        `*, vehiculos(patente, marca, modelo, anio, medida_rueda, clientes(nombre, apellido, email, telefono)),
+         atenciones(id, clientes(nombre, apellido, email, telefono))`,
+      )
+      .eq('id', ordenId)
       .single();
 
     if (error || !data) throw new AppError('Orden no encontrada', 404);
-    if (req.user!.rol !== 'admin' && data.gomero_id !== req.user!.id) {
+    if (!gomeroPuedeAccederOrden(data, req.user!.id, req.user!.rol)) {
       throw new AppError('No autorizado', 403);
     }
+    await tomarOrdenGomeroSiLibre(ordenId!, req.user!.id, req.user!.rol);
 
     return res.json({ orden: data });
   } catch (e) {

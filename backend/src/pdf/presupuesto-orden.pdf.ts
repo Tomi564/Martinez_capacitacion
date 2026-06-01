@@ -6,23 +6,22 @@ import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
 
-import type {
-  PresupuestoOrdenData,
-  ItemTrenPresupuesto,
-  TrenDelanteroPresupuesto,
-} from './presupuesto-orden.types';
+import type { PresupuestoOrdenData, PresupuestoSeccionPdf } from './presupuesto-orden.types';
 
 const MARGIN = 40;
 const PAGE_W = 595.28;
+const PAGE_H = 841.89;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const COL_GAP = 16;
-const COL_W = (CONTENT_W - COL_GAP) / 2;
-const COL_LEFT = MARGIN;
-const COL_RIGHT = MARGIN + COL_W + COL_GAP;
+const FOOTER_Y_MIN = PAGE_H - MARGIN - 120;
 
 const COLOR_ROJO = '#C8102E';
 const COLOR_GRIS = '#4B5563';
 const COLOR_BORDE = '#D1D5DB';
+
+const COL_ITEM_W = CONTENT_W * 0.42;
+const COL_CANT_W = 48;
+const COL_PRECIO_W = 72;
+const COL_SUB_W = 72;
 
 function fmtMoney(n: number): string {
   return `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -36,26 +35,16 @@ function fmtFecha(d: Date): string {
   });
 }
 
-function alcanceTrenTxt(alcance: TrenDelanteroPresupuesto['alcance']): string {
-  if (alcance === 'x2') return '2 ruedas';
-  if (alcance === 'x4') return '4 ruedas';
-  if (alcance === 'no') return 'No aplica';
+function boolTxt(v: boolean | null | undefined): string {
+  if (v === true) return 'Sí';
+  if (v === false) return 'No';
   return '—';
 }
 
-function itemLinea(doc: PDFKit.PDFDocument, item: ItemTrenPresupuesto, y: number): number {
-  const marca = item.aplica ? '☑' : '☐';
-  const precio =
-    item.aplica && item.precio != null && item.precio > 0
-      ? fmtMoney(item.precio)
-      : item.aplica
-        ? 'Incl.'
-        : '—';
-
-  doc.font('Helvetica').fontSize(9).fillColor('#111827');
-  doc.text(`${marca}  ${item.etiqueta}`, COL_LEFT, y, { width: COL_W - 70 });
-  doc.text(precio, COL_LEFT + COL_W - 68, y, { width: 66, align: 'right' });
-  return y + 16;
+function ensureSpace(doc: PDFKit.PDFDocument, y: number, needed: number): number {
+  if (y + needed <= FOOTER_Y_MIN) return y;
+  doc.addPage();
+  return MARGIN;
 }
 
 function drawHeader(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData): number {
@@ -81,17 +70,14 @@ function drawHeader(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData): number
     .font('Helvetica')
     .fontSize(9)
     .fillColor(COLOR_GRIS)
-    .text(data.empresa.direccion, textX, y + 18, { width: 220 })
+    .text(data.empresa.direccion, textX, y + 18, { width: 260 })
     .text(`Tel.: ${data.empresa.telefono}`, textX, y + 30);
 
   doc
     .font('Helvetica-Bold')
     .fontSize(10)
     .fillColor('#111827')
-    .text('ORDEN DE REPARACIÓN / PRESUPUESTO', PAGE_W - MARGIN - 180, y, {
-      width: 180,
-      align: 'right',
-    });
+    .text('PRESUPUESTO INTERNO', PAGE_W - MARGIN - 180, y, { width: 180, align: 'right' });
 
   doc
     .font('Helvetica')
@@ -109,12 +95,12 @@ function drawHeader(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData): number
 }
 
 function drawClienteVehiculo(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, y: number): number {
+  y = ensureSpace(doc, y, 90);
   doc.font('Helvetica-Bold').fontSize(9).fillColor(COLOR_ROJO).text('DATOS DEL CLIENTE', MARGIN, y);
   y += 14;
 
   const filas: [string, string][] = [
     ['Nombre', `${data.cliente.nombre} ${data.cliente.apellido}`.trim()],
-    ['Domicilio', data.cliente.domicilio || '—'],
     ['Teléfono', data.cliente.telefono || '—'],
     ['Patente', data.vehiculo.patente],
     ['Vehículo', `${data.vehiculo.marca} ${data.vehiculo.modelo}`.trim()],
@@ -132,62 +118,148 @@ function drawClienteVehiculo(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData
   return y + 14;
 }
 
-function drawColumnaTitulo(
-  doc: PDFKit.PDFDocument,
-  titulo: string,
-  x: number,
-  y: number,
-  w: number
-): number {
-  doc.roundedRect(x, y, w, 20, 4).fillColor('#F3F4F6').fill();
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(9)
-    .fillColor('#111827')
-    .text(titulo, x + 8, y + 6, { width: w - 16 });
-  return y + 28;
-}
+function drawGomero(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, y: number): number {
+  y = ensureSpace(doc, y, 100);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLOR_ROJO).text('GOMERO', MARGIN, y);
+  y += 14;
 
-function drawCuerpoDosColumnas(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, startY: number): number {
-  let yLeft = drawColumnaTitulo(doc, 'TREN DELANTERO', COL_LEFT, startY, COL_W);
-  let yRight = drawColumnaTitulo(doc, 'CUBIERTAS', COL_RIGHT, startY, COL_W);
-
-  doc.font('Helvetica').fontSize(8).fillColor(COLOR_GRIS);
-  doc.text(`Alcance: ${alcanceTrenTxt(data.trenDelantero.alcance)}`, COL_LEFT, yLeft, { width: COL_W });
-  yLeft += 14;
-
-  yLeft = itemLinea(doc, data.trenDelantero.alineado, yLeft);
-  yLeft = itemLinea(doc, data.trenDelantero.balanceo, yLeft);
-  yLeft = itemLinea(doc, data.trenDelantero.amortiguadores, yLeft);
-  yLeft = itemLinea(doc, data.trenDelantero.auxilio, yLeft);
-
-  const cub = data.cubiertas;
-  const lineasCubiertas: [string, string][] = [
-    ['Marca', cub.marca || '—'],
-    ['Medida', cub.medida || '—'],
-    ['Presión', cub.presionBar || '—'],
-    ['Km', cub.kilometraje || '—'],
+  const g = data.gomero;
+  const filas: [string, string][] = [
+    ['Marca del neumático', g.marca || '—'],
+    ['Medida', g.medida || '—'],
+    ['Presión', g.presionBar || '—'],
+    ['Km actual', g.kilometraje || '—'],
     [
-      'Neumáticos',
-      cub.neumaticosCambiados === true
-        ? 'Cambiados'
-        : cub.neumaticosCambiados === false
-          ? 'Sin cambio'
-          : '—',
+      'Neumáticos cambiados',
+      g.neumaticosCambiados === true ? 'Sí' : g.neumaticosCambiados === false ? 'No' : '—',
     ],
   ];
 
-  doc.font('Helvetica').fontSize(9).fillColor('#111827');
-  for (const [label, valor] of lineasCubiertas) {
-    doc.fillColor(COLOR_GRIS).text(`${label}:`, COL_RIGHT, yRight, { width: 56 });
-    doc.fillColor('#111827').text(valor, COL_RIGHT + 60, yRight, { width: COL_W - 64 });
-    yRight += 16;
+  doc.font('Helvetica').fontSize(9);
+  for (const [label, valor] of filas) {
+    doc.fillColor(COLOR_GRIS).text(`${label}:`, MARGIN, y, { width: 120 });
+    doc.fillColor('#111827').text(valor, MARGIN + 124, y, { width: CONTENT_W - 124 });
+    y += 14;
   }
 
-  return Math.max(yLeft, yRight) + 8;
+  y += 4;
+  doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(COLOR_BORDE).lineWidth(0.5).stroke();
+  return y + 14;
+}
+
+function drawTablaEncabezado(doc: PDFKit.PDFDocument, y: number): number {
+  const xCant = MARGIN + COL_ITEM_W + 8;
+  const xPrecio = xCant + COL_CANT_W;
+  const xSub = xPrecio + COL_PRECIO_W;
+
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(COLOR_GRIS);
+  doc.text('Ítem', MARGIN + 4, y + 4, { width: COL_ITEM_W });
+  doc.text('Cant.', xCant, y + 4, { width: COL_CANT_W, align: 'center' });
+  doc.text('P. unit.', xPrecio, y + 4, { width: COL_PRECIO_W, align: 'right' });
+  doc.text('Subtotal', xSub, y + 4, { width: COL_SUB_W, align: 'right' });
+  return y + 18;
+}
+
+function drawTablaFila(
+  doc: PDFKit.PDFDocument,
+  etiqueta: string,
+  cantidad: number,
+  precioUnit: number,
+  subtotal: number,
+  y: number,
+): number {
+  const xCant = MARGIN + COL_ITEM_W + 8;
+  const xPrecio = xCant + COL_CANT_W;
+  const xSub = xPrecio + COL_PRECIO_W;
+  const rowH = 16;
+
+  doc.rect(MARGIN, y, CONTENT_W, rowH).fillColor('#FAFAFA').fill();
+
+  doc.font('Helvetica').fontSize(8).fillColor('#111827');
+  doc.text(etiqueta, MARGIN + 4, y + 4, { width: COL_ITEM_W - 4, lineBreak: false, ellipsis: true });
+  doc.text(String(cantidad), xCant, y + 4, { width: COL_CANT_W, align: 'center' });
+  doc.text(fmtMoney(precioUnit), xPrecio, y + 4, { width: COL_PRECIO_W, align: 'right' });
+  doc.text(fmtMoney(subtotal), xSub, y + 4, { width: COL_SUB_W, align: 'right' });
+
+  doc
+    .moveTo(MARGIN, y + rowH)
+    .lineTo(PAGE_W - MARGIN, y + rowH)
+    .strokeColor('#E5E7EB')
+    .lineWidth(0.5)
+    .stroke();
+
+  return y + rowH;
+}
+
+function drawSeccionMecanico(
+  doc: PDFKit.PDFDocument,
+  seccion: PresupuestoSeccionPdf,
+  y: number,
+): number {
+  const needed = 36 + seccion.lineas.length * 16 + 24;
+  y = ensureSpace(doc, y, Math.min(needed, 120));
+
+  doc.roundedRect(MARGIN, y, CONTENT_W, 20, 4).fillColor('#1F1F1F').fill();
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(9)
+    .fillColor('#FFFFFF')
+    .text(seccion.titulo, MARGIN + 10, y + 6, { width: CONTENT_W - 20 });
+  y += 26;
+
+  y = drawTablaEncabezado(doc, y);
+  for (const linea of seccion.lineas) {
+    y = ensureSpace(doc, y, 20);
+    y = drawTablaFila(doc, linea.etiqueta, linea.cantidad, linea.precioUnitario, linea.subtotal, y);
+  }
+
+  y += 4;
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827');
+  doc.text('Subtotal sección', MARGIN, y, { width: CONTENT_W - COL_SUB_W - 8, align: 'right' });
+  doc.text(fmtMoney(seccion.subtotal), PAGE_W - MARGIN - COL_SUB_W, y, {
+    width: COL_SUB_W,
+    align: 'right',
+  });
+
+  return y + 22;
+}
+
+function drawLegacyMecanico(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, y: number): number {
+  const leg = data.legacy;
+  if (!leg) return y;
+
+  y = ensureSpace(doc, y, 120);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLOR_ROJO).text('MECÁNICO (formato anterior)', MARGIN, y);
+  y += 14;
+
+  const filas: [string, string][] = [
+    ['Tren delantero', leg.trenDelantero],
+    ['Alineado', boolTxt(leg.alineado)],
+    ['Balanceo', boolTxt(leg.balanceo)],
+    ['Amortiguadores revisados', boolTxt(leg.amortiguadores)],
+    ['Auxilio revisado', boolTxt(leg.auxilio)],
+  ];
+
+  doc.font('Helvetica').fontSize(9);
+  for (const [label, valor] of filas) {
+    doc.fillColor(COLOR_GRIS).text(`${label}:`, MARGIN, y, { width: 140 });
+    doc.fillColor('#111827').text(valor, MARGIN + 144, y, { width: CONTENT_W - 144 });
+    y += 14;
+  }
+
+  if (leg.presupuestoTexto) {
+    y += 4;
+    doc.fillColor(COLOR_GRIS).text('Presupuesto:', MARGIN, y);
+    y += 12;
+    doc.fillColor('#111827').text(leg.presupuestoTexto, MARGIN, y, { width: CONTENT_W });
+    y += doc.heightOfString(leg.presupuestoTexto, { width: CONTENT_W }) + 8;
+  }
+
+  return y + 8;
 }
 
 function drawTotalGeneral(doc: PDFKit.PDFDocument, total: number, y: number): number {
+  y = ensureSpace(doc, y, 48);
   const boxH = 36;
   doc.roundedRect(MARGIN, y, CONTENT_W, boxH, 6).fillColor(COLOR_ROJO).fill();
 
@@ -208,14 +280,19 @@ function drawTotalGeneral(doc: PDFKit.PDFDocument, total: number, y: number): nu
 }
 
 function drawFooter(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, y: number): void {
+  y = ensureSpace(doc, y, 130);
+
+  if (data.operarioResponsable) {
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827').text('OPERARIO RESPONSABLE', MARGIN, y);
+    y += 12;
+    doc.font('Helvetica').fontSize(9).fillColor('#111827').text(data.operarioResponsable, MARGIN, y);
+    y += 20;
+  }
+
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827').text('OBSERVACIONES', MARGIN, y);
   y += 12;
 
-  doc
-    .roundedRect(MARGIN, y, CONTENT_W, 52, 4)
-    .strokeColor(COLOR_BORDE)
-    .lineWidth(0.5)
-    .stroke();
+  doc.roundedRect(MARGIN, y, CONTENT_W, 48, 4).strokeColor(COLOR_BORDE).lineWidth(0.5).stroke();
 
   doc
     .font('Helvetica')
@@ -226,20 +303,24 @@ function drawFooter(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, y: numb
       height: 40,
     });
 
-  y += 64;
+  y += 58;
 
   const firmaY = y;
   doc
     .moveTo(MARGIN, firmaY)
-    .lineTo(MARGIN + 200, firmaY)
+    .lineTo(MARGIN + 220, firmaY)
     .strokeColor(COLOR_GRIS)
     .lineWidth(0.5)
     .stroke();
 
-  doc.font('Helvetica').fontSize(8).fillColor(COLOR_GRIS).text('Firma del mecánico', MARGIN, firmaY + 4);
+  doc.font('Helvetica').fontSize(8).fillColor(COLOR_GRIS).text('Firma', MARGIN, firmaY + 4);
 
   if (data.firmaMecanico) {
-    doc.font('Helvetica').fontSize(9).fillColor('#111827').text(data.firmaMecanico, MARGIN, firmaY - 12);
+    doc
+      .font('Helvetica')
+      .fontSize(9)
+      .fillColor('#111827')
+      .text(data.firmaMecanico, MARGIN, firmaY - 12, { width: 220 });
   }
 
   doc
@@ -263,7 +344,16 @@ export function generarPresupuestoOrdenPdf(data: PresupuestoOrdenData): Promise<
 
     let y = drawHeader(doc, data);
     y = drawClienteVehiculo(doc, data, y);
-    y = drawCuerpoDosColumnas(doc, data, y);
+    y = drawGomero(doc, data, y);
+
+    if (data.usaChecklistNuevo) {
+      for (const seccion of data.secciones) {
+        y = drawSeccionMecanico(doc, seccion, y);
+      }
+    } else {
+      y = drawLegacyMecanico(doc, data, y);
+    }
+
     y = drawTotalGeneral(doc, data.totalGeneral, y);
     drawFooter(doc, data, y);
 

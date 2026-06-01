@@ -7,6 +7,12 @@ import { AppError } from '../middleware/errorHandler';
 import { validarCanalAtencion, mensajeCanalInvalido } from '../constants/atenciones';
 import { clientesService, type ClienteInput } from './clientes.service';
 import { procesarCambioRankingPorVenta } from './ranking-notificaciones.service';
+import {
+  crearOrdenDesdeAtencion,
+  debeCrearOrdenGomero,
+  resolverPatenteAtencion,
+  type PatenteAtencionInput,
+} from './orden-desde-atencion.service';
 
 /** Envía push a todos los admins activos */
 async function notificarAdmins(titulo: string, cuerpo: string) {
@@ -90,6 +96,38 @@ export interface AtencionPayload {
   cliente_id?: string | null;
   cliente: ClienteInput;
   participante_qr_id?: string | null;
+  vehiculo_id?: string | null;
+  patente?: string | null;
+  patente_manual?: string | null;
+}
+
+async function atencionYaTieneOrden(atencionId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('visitas_taller')
+    .select('id', { count: 'exact', head: true })
+    .eq('atencion_id', atencionId);
+  if (error) return false;
+  return (count || 0) > 0;
+}
+
+async function sincronizarOrdenGomero(
+  atencionId: string,
+  clienteId: string,
+  resultado: string,
+  patente: PatenteAtencionInput,
+  observaciones?: string | null,
+) {
+  if (!debeCrearOrdenGomero(resultado, patente)) return;
+  if (await atencionYaTieneOrden(atencionId)) return;
+
+  const resuelta = await resolverPatenteAtencion(patente);
+  await crearOrdenDesdeAtencion({
+    atencionId,
+    clienteId,
+    vehiculoId: resuelta.vehiculo_id,
+    patentePendiente: resuelta.patente_manual,
+    motivo: observaciones,
+  });
 }
 
 export class AtencionesService {
@@ -111,17 +149,42 @@ export class AtencionesService {
       participante_qr_id: data.participante_qr_id,
     });
 
-    const { error } = await supabase.from('atenciones').insert({
-      user_id: userId,
-      canal: data.canal,
-      resultado: data.resultado,
-      producto: data.producto || null,
-      monto: data.monto ?? null,
-      observaciones: data.observaciones || null,
-      cliente_id: clienteId,
-    });
+    const patenteInput: PatenteAtencionInput = {
+      vehiculo_id: data.vehiculo_id,
+      patente: data.patente,
+      patente_manual: data.patente_manual,
+    };
+    const patenteRes = debeCrearOrdenGomero(data.resultado, patenteInput)
+      ? await resolverPatenteAtencion(patenteInput)
+      : { vehiculo_id: null, patente_manual: null, patente_canon: null };
+
+    const { data: inserted, error } = await supabase
+      .from('atenciones')
+      .insert({
+        user_id: userId,
+        canal: data.canal,
+        resultado: data.resultado,
+        producto: data.producto || null,
+        monto: data.monto ?? null,
+        observaciones: data.observaciones || null,
+        cliente_id: clienteId,
+        vehiculo_id: patenteRes.vehiculo_id,
+        patente_manual: patenteRes.patente_manual,
+      })
+      .select('id')
+      .single();
 
     if (error) throw mapErrorSupabaseAtencion(error);
+
+    await sincronizarOrdenGomero(
+      inserted.id,
+      clienteId,
+      data.resultado,
+      patenteInput,
+      data.observaciones,
+    ).catch((err) => {
+      console.error('[AtencionesService] Error creando orden para gomero', err);
+    });
 
     if (data.resultado === 'venta_cerrada') {
       this.checkObjetivoHito(userId).catch((err) => {
@@ -147,6 +210,15 @@ export class AtencionesService {
       participante_qr_id: data.participante_qr_id,
     });
 
+    const patenteInput: PatenteAtencionInput = {
+      vehiculo_id: data.vehiculo_id,
+      patente: data.patente,
+      patente_manual: data.patente_manual,
+    };
+    const patenteRes = debeCrearOrdenGomero(data.resultado, patenteInput)
+      ? await resolverPatenteAtencion(patenteInput)
+      : { vehiculo_id: null, patente_manual: null, patente_canon: null };
+
     const { data: updated, error } = await supabase
       .from('atenciones')
       .update({
@@ -156,6 +228,8 @@ export class AtencionesService {
         monto: data.monto ?? null,
         observaciones: data.observaciones || null,
         cliente_id: clienteId,
+        vehiculo_id: patenteRes.vehiculo_id,
+        patente_manual: patenteRes.patente_manual,
       })
       .eq('id', atencionId)
       .eq('user_id', userId)
@@ -164,6 +238,16 @@ export class AtencionesService {
 
     if (error) throw mapErrorSupabaseAtencion(error);
     if (!updated) throw new AppError('Atención no encontrada', 404);
+
+    await sincronizarOrdenGomero(
+      atencionId,
+      clienteId,
+      data.resultado,
+      patenteInput,
+      data.observaciones,
+    ).catch((err) => {
+      console.error('[AtencionesService] Error creando orden para gomero (update)', err);
+    });
 
     return { mensaje: 'Atención actualizada correctamente' };
   }

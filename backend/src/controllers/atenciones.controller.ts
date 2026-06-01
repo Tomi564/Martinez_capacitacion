@@ -57,6 +57,9 @@ export class AtencionesController {
         producto: productoVal,
         monto: montoVal,
         observaciones,
+        vehiculo_id: (req.body.vehiculo_id as string) || null,
+        patente: (req.body.patente as string) || null,
+        patente_manual: (req.body.patente_manual as string) || null,
         ...clienteFields,
       });
 
@@ -104,6 +107,9 @@ export class AtencionesController {
         producto: productoVal,
         monto: montoVal,
         observaciones,
+        vehiculo_id: (req.body.vehiculo_id as string) || null,
+        patente: (req.body.patente as string) || null,
+        patente_manual: (req.body.patente_manual as string) || null,
         ...clienteFields,
       });
 
