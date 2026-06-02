@@ -41,9 +41,6 @@ export default function EncuestaPage() {
   const [dni, setDni] = useState('');
   const [contacto, setContacto] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [participanteYaRegistrado, setParticipanteYaRegistrado] = useState(false);
-  const [sorteoInscripto, setSorteoInscripto] = useState(false);
-
   useEffect(() => {
     const fetchVendedor = async () => {
       try {
@@ -66,10 +63,7 @@ export default function EncuestaPage() {
 
     setEstado('enviando');
     try {
-      const res = await apiClient.post<{
-        participanteYaRegistrado?: boolean;
-        sorteoInscripto?: boolean;
-      }>(`/qr/calificar/${codigo}`, {
+      await apiClient.post(`/qr/calificar/${codigo}`, {
         estrellasVendedor,
         estrellasEmpresa,
         comentario: comentario.trim() || null,
@@ -78,8 +72,6 @@ export default function EncuestaPage() {
         dni: dni.trim() || undefined,
         contacto: contacto.trim() || undefined,
       });
-      setParticipanteYaRegistrado(!!res.participanteYaRegistrado);
-      setSorteoInscripto(res.sorteoInscripto === true);
       setEstado('gracias');
     } catch (err) {
       setEstado('respondiendo');
@@ -145,30 +137,11 @@ export default function EncuestaPage() {
             <p className="text-sm font-semibold text-gray-900 mt-1">Tu valoración de Martínez: {estrellasEmpresa}/5</p>
           </div>
 
-          {sorteoInscripto ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
-              <p className="text-sm font-semibold text-amber-800">
-                {participanteYaRegistrado
-                  ? '🎁 Ya estabas registrado en el sorteo'
-                  : '🎁 ¡Ya estás participando!'}
-              </p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                {participanteYaRegistrado
-                  ? 'Mantenemos tu participación vigente para el próximo sorteo mensual.'
-                  : 'Tu calificación completó tu inscripción en el sorteo mensual de Martínez Neumáticos.'}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center">
-              <p className="text-sm font-medium text-gray-800 leading-snug">
-                Tu calificación quedó registrada.
-              </p>
-              <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
-                Para participar del sorteo mensual hace falta completar nombre, apellido, DNI y contacto en el formulario.
-                Si no los completaste, podés volver a escanear el QR cuando tengas los datos.
-              </p>
-            </div>
-          )}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center">
+            <p className="text-sm font-medium text-gray-800 leading-snug">
+              Tu calificación quedó registrada.
+            </p>
+          </div>
 
           <p className="text-sm text-gray-400">
             Podés cerrar esta página
@@ -270,14 +243,9 @@ export default function EncuestaPage() {
             </p>
           </div>
 
-          {/* Datos para el sorteo */}
+          {/* Datos de contacto opcionales */}
           <div className="flex flex-col gap-3 bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xl">🎁</span>
-              <p className="text-sm font-bold text-gray-900">
-                Completá tus datos para participar del sorteo mensual
-              </p>
-            </div>
+            <p className="text-sm font-bold text-gray-900">Datos de contacto (opcional)</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-gray-600">Nombre</label>
@@ -323,7 +291,7 @@ export default function EncuestaPage() {
               />
             </div>
             <p className="text-xs text-gray-400">
-              Opcional — solo se usa para contactarte si ganás
+              Opcional — para que podamos contactarte si hace falta
             </p>
           </div>
 

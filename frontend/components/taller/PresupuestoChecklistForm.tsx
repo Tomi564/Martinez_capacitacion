@@ -111,7 +111,9 @@ export function PresupuestoChecklistForm({
                           />
                         </div>
                         <div className="flex-1">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase">Precio</label>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">
+                            Precio (opcional)
+                          </label>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -120,7 +122,7 @@ export function PresupuestoChecklistForm({
                             onChange={(e) =>
                               actualizarLinea(key, { precio: e.target.value })
                             }
-                            placeholder="$0"
+                            placeholder="Opcional"
                             className="mt-1 w-full h-12 px-3 font-bold rounded-xl border-2 border-gray-200 text-base"
                           />
                         </div>

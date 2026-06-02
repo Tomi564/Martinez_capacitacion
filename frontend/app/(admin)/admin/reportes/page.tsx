@@ -785,10 +785,10 @@ export default function ReportesPage() {
                 return (
                   <div
                     key={c.id}
-                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 overflow-hidden"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{vendedor}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 break-words">{vendedor}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
                         Vendedor {c.estrellas_vendedor}★ · Empresa {c.estrellas_empresa}★ ·{' '}
                         {new Date(c.created_at).toLocaleDateString('es-AR', {
@@ -806,7 +806,7 @@ export default function ReportesPage() {
                     <button
                       type="button"
                       onClick={() => setCalificacionAEliminar(c)}
-                      className="text-xs px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-medium shrink-0 self-start sm:self-center"
+                      className="text-xs px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-medium shrink-0 self-end sm:self-center whitespace-nowrap"
                     >
                       Eliminar
                     </button>

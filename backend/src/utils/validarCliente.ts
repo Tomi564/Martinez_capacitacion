@@ -18,11 +18,9 @@ export function validarDatosCliente(input: ClienteInput): ClienteDatosValidados 
   const telefono = input.telefono?.trim() || '';
   const email = input.email?.trim() || '';
 
-  if (!nombre || !apellido) {
-    throw new AppError('Nombre y apellido del cliente son obligatorios', 400);
+  if (!nombre || !apellido || !telefono) {
+    throw new AppError('Nombre, apellido y teléfono del cliente son obligatorios', 400);
   }
-
-  // TODO: volver a hacer obligatorio cuando los datos estén completos
 
   if (email && (!email.includes('@') || !email.includes('.'))) {
     throw new AppError('El mail del cliente no es válido', 400);

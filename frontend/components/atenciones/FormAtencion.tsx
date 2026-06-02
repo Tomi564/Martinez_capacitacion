@@ -198,10 +198,11 @@ export function FormAtencion({
             <div className="relative">
               <input
                 type="tel"
+                required
                 value={form.cliente_telefono}
                 onChange={(e) => onClienteTelefonoChange(e.target.value)}
                 onBlur={() => setTimeout(onLimpiarSugerenciasCliente, 150)}
-                placeholder="Teléfono (opcional)"
+                placeholder="Teléfono *"
                 className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
               />
               {buscandoCliente && (
@@ -412,8 +413,8 @@ export function FormAtencion({
             value={form.observaciones}
             onChange={(e) => setForm((prev) => ({ ...prev, observaciones: e.target.value }))}
             placeholder="Ej: Cliente vuelve la semana que viene por otro modelo…"
-            rows={2}
-            className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none placeholder:text-gray-400"
+            rows={3}
+            className="w-full min-h-[5.5rem] px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-y placeholder:text-gray-400"
           />
         )}
 

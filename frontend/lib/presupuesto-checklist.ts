@@ -124,6 +124,12 @@ export function parsePrecioInput(raw: string): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+/** Precio del mecánico: vacío → null; 0 es válido. El vendedor define precios finales. */
+export function precioLineaParaApi(raw: string): number | null {
+  if (!raw.trim()) return null;
+  return parsePrecioInput(raw);
+}
+
 export function subtotalGrupo(lineas: PresupuestoLineaState[]): number {
   return lineas
     .filter((l) => l.marcado)
@@ -264,7 +270,7 @@ export function lineasMarcadasParaApi(
       etiqueta: l.etiqueta,
       marcado: true,
       cantidad: l.cantidad || 1,
-      precio: parsePrecioInput(precios[l.item_catalogo_id] ?? String(l.precio ?? '')) || null,
+      precio: precioLineaParaApi(precios[l.item_catalogo_id] ?? String(l.precio ?? '')),
     }));
 }
 
@@ -277,6 +283,6 @@ export function lineasParaApi(lineas: PresupuestoLineaState[]) {
       etiqueta: l.etiqueta,
       marcado: true,
       cantidad: parsePrecioInput(l.cantidad) || 1,
-      precio: parsePrecioInput(l.precio) || null,
+      precio: precioLineaParaApi(l.precio),
     }));
 }

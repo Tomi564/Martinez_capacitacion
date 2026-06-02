@@ -41,7 +41,11 @@ const marcasEjemplo = [
   'SEAT Agrícola',
   'Otras',
 ];
-const medidasEjemplo = ['175/70 R13', '185/65 R14', '195/55 R15', '205/55 R16'];
+/** Solo dígitos, barras y letras típicas de medidas (ej. 195/65R15). */
+function sanitizarMedidaNeumatico(texto: string): string {
+  return texto.toUpperCase().replace(/[^0-9A-Z/]/g, '');
+}
+
 const KM_MIN = 0;
 const KM_MAX = 400_000;
 const KM_STEP = 1000;
@@ -318,16 +322,15 @@ export default function OrdenGomeroDetallePage() {
             <>
               <div className="bg-white rounded-2xl border border-gray-200 p-4">
                 <p className="text-xs font-bold text-gray-500 uppercase mb-2">Medida</p>
-                <select
+                <input
+                  type="text"
+                  inputMode="text"
+                  autoComplete="off"
                   value={medida}
-                  onChange={(e) => setMedida(e.target.value)}
-                  className="w-full h-14 px-3 text-base font-medium rounded-xl border border-gray-200 bg-white"
-                >
-                  <option value="">Elegir…</option>
-                  {medidasEjemplo.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  onChange={(e) => setMedida(sanitizarMedidaNeumatico(e.target.value))}
+                  placeholder="Ej: 195/65R15"
+                  className="w-full h-14 px-3 text-base font-medium rounded-xl border border-gray-200 bg-white uppercase tracking-wide"
+                />
               </div>
               <NumberWheelPicker
                 label="Presión"

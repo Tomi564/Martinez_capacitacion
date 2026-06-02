@@ -460,29 +460,35 @@ export default function ClientesAdminPage() {
         >
           <div className="flex flex-col gap-2">
             {filtradosParticipantes.map(p => (
-              <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-1">
+              <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-2 overflow-hidden">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-gray-900">{p.nombre} {p.apellido}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 break-words">{p.nombre} {p.apellido}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       <p className="text-xs text-gray-500">DNI: {p.dni}</p>
                       <BadgeRangoEtario dni={p.dni} />
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400 shrink-0">{new Date(p.created_at).toLocaleDateString('es-AR')}</p>
+                  <p className="text-xs text-gray-400 shrink-0 whitespace-nowrap">
+                    {new Date(p.created_at).toLocaleDateString('es-AR')}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-gray-600">{p.contacto}</p>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {p.vendedor && <p className="text-xs text-gray-400">vía {p.vendedor.nombre} {p.vendedor.apellido}</p>}
-                    <button
-                      type="button"
-                      onClick={() => void abrirEliminarParticipante(p)}
-                      className="text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium"
-                    >
-                      Eliminar
-                    </button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-gray-600 break-all">{p.contacto}</p>
+                    {p.vendedor && (
+                      <p className="text-xs text-gray-400 mt-0.5 break-words">
+                        vía {p.vendedor.nombre} {p.vendedor.apellido}
+                      </p>
+                    )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void abrirEliminarParticipante(p)}
+                    className="text-xs px-2.5 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium shrink-0 self-end sm:self-center"
+                  >
+                    Eliminar
+                  </button>
                 </div>
               </div>
             ))}
