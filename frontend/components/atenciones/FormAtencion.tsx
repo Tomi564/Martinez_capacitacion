@@ -56,6 +56,7 @@ interface FormAtencionProps {
   onLimpiarSugerenciasPatente?: () => void;
   title?: string;
   submitLabel?: string;
+  modoEdicion?: boolean;
 }
 
 export function FormAtencion({
@@ -88,13 +89,14 @@ export function FormAtencion({
   onLimpiarSugerenciasPatente,
   title = 'Registrar atención',
   submitLabel = 'Guardar',
+  modoEdicion = false,
 }: FormAtencionProps) {
   const user = useAuth((s) => s.user);
   const esVentaCerrada = form.resultado === 'venta_cerrada';
   const mostrarPatente = resultadoConPatente(form.resultado);
   const labelProducto = esVentaCerrada ? 'Producto vendido' : 'Producto de interés';
   const mailPropioVendedor = emailEsDelVendedor(form.cliente_email, user?.email);
-  const puedeGuardar = puedeGuardarAtencion(form, { mailPropioVendedor });
+  const puedeGuardar = puedeGuardarAtencion(form, { mailPropioVendedor, modoEdicion });
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">

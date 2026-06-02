@@ -185,21 +185,23 @@ export class ClientesService {
       }
     }
 
-    const { data: porTel } = await supabase
-      .from('clientes')
-      .select('id')
-      .eq('telefono', datos.telefono)
-      .maybeSingle();
-    if (porTel) {
-      await supabase
+    if (datos.telefono) {
+      const { data: porTel } = await supabase
         .from('clientes')
-        .update({
-          nombre: datos.nombre,
-          apellido: datos.apellido,
-          email: datos.email,
-        })
-        .eq('id', porTel.id);
-      return porTel.id;
+        .select('id')
+        .eq('telefono', datos.telefono)
+        .maybeSingle();
+      if (porTel) {
+        await supabase
+          .from('clientes')
+          .update({
+            nombre: datos.nombre,
+            apellido: datos.apellido,
+            email: datos.email,
+          })
+          .eq('id', porTel.id);
+        return porTel.id;
+      }
     }
 
     if (datos.email) {

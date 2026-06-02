@@ -138,17 +138,18 @@ export function ventaCerradaCamposCompletos(form: FormAtencionState): boolean {
 
 export function puedeGuardarAtencion(
   form: FormAtencionState,
-  opts?: { mailPropioVendedor?: boolean },
+  opts?: { mailPropioVendedor?: boolean; modoEdicion?: boolean },
 ): boolean {
-  if (opts?.mailPropioVendedor) return false;
+  if (!opts?.modoEdicion && opts?.mailPropioVendedor) return false;
   const email = form.cliente_email.trim();
   if (email && !email.includes('@')) return false;
-  return !!form.canal && !!form.resultado && clienteFormCompleto(form) && ventaCerradaCamposCompletos(form);
+  const ventaOk = opts?.modoEdicion ? true : ventaCerradaCamposCompletos(form);
+  return !!form.canal && !!form.resultado && clienteFormCompleto(form) && ventaOk;
 }
 
 export function validarFormularioAtencion(
   form: FormAtencionState,
-  opts?: { vendedorEmail?: string | null },
+  opts?: { vendedorEmail?: string | null; modoEdicion?: boolean },
 ): string | null {
   if (!form.canal || !form.resultado) {
     return 'Canal y resultado son requeridos';
@@ -161,7 +162,10 @@ export function validarFormularioAtencion(
   if (email && !email.includes('@')) {
     return 'Ingresá un mail válido o dejá el campo vacío';
   }
-  if (emailEsDelVendedor(form.cliente_email, opts?.vendedorEmail)) {
+  if (
+    !opts?.modoEdicion &&
+    emailEsDelVendedor(form.cliente_email, opts?.vendedorEmail)
+  ) {
     return 'Este mail es el tuyo. Si el cliente no tiene mail, dejá el campo vacío.';
   }
   if (form.resultado === 'venta_cerrada') {
@@ -230,7 +234,7 @@ export function formFromAtencion(atencion: Atencion): FormAtencionState {
   };
 }
 
-export function useAtenciones() {
+export function useAtenciones(atencionEnEdicionId: string | null = null) {
   const user = useAuth((s) => s.user);
   const [data, setData] = useState<AtencionesData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -294,6 +298,8 @@ export function useAtenciones() {
     participante_qr_id: null as string | null,
   });
 
+  const vinculoClienteSiAlta = () => (atencionEnEdicionId ? {} : limpiarVinculoCliente());
+
   const buscarProductos = async (texto: string) => {
     setForm((prev) => ({ ...prev, producto: texto }));
     if (texto.length < 2) {
@@ -348,7 +354,7 @@ export function useAtenciones() {
     setForm((prev) => ({
       ...prev,
       cliente_nombre: texto,
-      ...limpiarVinculoCliente(),
+      ...vinculoClienteSiAlta(),
     }));
     programarBusquedaCliente(texto, 'nombre');
   };
@@ -357,7 +363,7 @@ export function useAtenciones() {
     setForm((prev) => ({
       ...prev,
       cliente_telefono: texto,
-      ...limpiarVinculoCliente(),
+      ...vinculoClienteSiAlta(),
     }));
     programarBusquedaCliente(texto, 'telefono');
   };
@@ -366,7 +372,7 @@ export function useAtenciones() {
     setForm((prev) => ({
       ...prev,
       cliente_apellido: texto,
-      ...limpiarVinculoCliente(),
+      ...vinculoClienteSiAlta(),
     }));
   };
 
@@ -375,7 +381,7 @@ export function useAtenciones() {
     setForm((prev) => ({
       ...prev,
       cliente_email: texto,
-      ...limpiarVinculoCliente(),
+      ...vinculoClienteSiAlta(),
     }));
   };
 
@@ -535,7 +541,10 @@ export function useAtenciones() {
   };
 
   const actualizarAtencion = async (atencionId: string) => {
-    const validacion = validarFormularioAtencion(form, { vendedorEmail: user?.email });
+    const validacion = validarFormularioAtencion(form, {
+      vendedorEmail: user?.email,
+      modoEdicion: true,
+    });
     if (validacion) {
       setError(validacion);
       return false;

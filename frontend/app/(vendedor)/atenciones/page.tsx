@@ -30,6 +30,9 @@ const RESULTADOS = [
 ];
 
 export default function AtencionesPage() {
+  const [editandoAtencion, setEditandoAtencion] = useState<Atencion | null>(null);
+  const [mostrarConfirmacionEdicion, setMostrarConfirmacionEdicion] = useState(false);
+
   const {
     data,
     isLoading,
@@ -70,9 +73,7 @@ export default function AtencionesPage() {
     handleGuardar,
     actualizarAtencion,
     cerrarForm,
-  } = useAtenciones();
-  const [editandoAtencion, setEditandoAtencion] = useState<Atencion | null>(null);
-  const [mostrarConfirmacionEdicion, setMostrarConfirmacionEdicion] = useState(false);
+  } = useAtenciones(editandoAtencion?.id ?? null);
 
   const formatCanal = (canal: string) =>
     CANALES.find(c => c.id === canal) || { label: canal, icono: '📞' };
@@ -409,6 +410,7 @@ export default function AtencionesPage() {
           onLimpiarSugerenciasPatente={() => setSugerenciasPatente([])}
           title={editandoAtencion ? 'Editar atención' : 'Registrar atención'}
           submitLabel={editandoAtencion ? 'Guardar cambios' : 'Guardar'}
+          modoEdicion={!!editandoAtencion}
         />
       )}
 
