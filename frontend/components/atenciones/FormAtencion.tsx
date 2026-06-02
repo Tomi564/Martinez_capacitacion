@@ -196,11 +196,10 @@ export function FormAtencion({
             <div className="relative">
               <input
                 type="tel"
-                required
                 value={form.cliente_telefono}
                 onChange={(e) => onClienteTelefonoChange(e.target.value)}
                 onBlur={() => setTimeout(onLimpiarSugerenciasCliente, 150)}
-                placeholder="Teléfono *"
+                placeholder="Teléfono (opcional)"
                 className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400 w-full"
               />
               {buscandoCliente && (

@@ -126,11 +126,8 @@ export function emailEsDelVendedor(clienteEmail: string, vendedorEmail: string |
 }
 
 export function clienteFormCompleto(form: FormAtencionState): boolean {
-  return (
-    form.cliente_nombre.trim().length > 0 &&
-    form.cliente_apellido.trim().length > 0 &&
-    form.cliente_telefono.trim().length > 0
-  );
+  // TODO: volver a hacer obligatorio cuando los datos estén completos
+  return form.cliente_nombre.trim().length > 0 && form.cliente_apellido.trim().length > 0;
 }
 
 export function ventaCerradaCamposCompletos(form: FormAtencionState): boolean {
@@ -159,9 +156,7 @@ export function validarFormularioAtencion(
   if (!form.cliente_nombre.trim() || !form.cliente_apellido.trim()) {
     return 'Nombre y apellido del cliente son obligatorios';
   }
-  if (!form.cliente_telefono.trim()) {
-    return 'El teléfono del cliente es obligatorio';
-  }
+  // TODO: volver a hacer obligatorio cuando los datos estén completos
   const email = form.cliente_email.trim();
   if (email && !email.includes('@')) {
     return 'Ingresá un mail válido o dejá el campo vacío';
