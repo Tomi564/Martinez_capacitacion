@@ -89,7 +89,9 @@ router.post('/vehiculos', requireRole('gomero', 'admin'), async (req: AuthReques
   try {
     const { patente: patenteRaw, marca, modelo, anio, medida_rueda, cliente_id, cliente } = req.body;
     const patente = normalizePatenteAr(String(patenteRaw || ''));
-    if (!patente || !marca || !modelo) throw new AppError('Patente, marca y modelo requeridos', 400);
+    const modeloTrim = String(modelo || '').trim();
+    if (!patente || !modeloTrim) throw new AppError('Patente y modelo requeridos', 400);
+    const marcaTrim = String(marca || '').trim();
 
     let clienteId = cliente_id;
 
@@ -111,7 +113,7 @@ router.post('/vehiculos', requireRole('gomero', 'admin'), async (req: AuthReques
 
     const { data, error } = await supabase
       .from('vehiculos')
-      .insert({ patente, marca, modelo, anio: anio || null, medida_rueda: medida_rueda || null, cliente_id: clienteId || null })
+      .insert({ patente, marca: marcaTrim, modelo: modeloTrim, anio: anio || null, medida_rueda: medida_rueda || null, cliente_id: clienteId || null })
       .select(`*, clientes(id, nombre, apellido, telefono, email)`)
       .single();
     if (error) throw new AppError('Error al crear vehículo', 500);
@@ -279,11 +281,11 @@ router.patch('/ordenes/:id', requireRole('gomero', 'admin'), async (req: AuthReq
     };
 
     if (!row.vehiculo_id && row.patente_pendiente) {
-      const marca = String(vehiculo_marca || '').trim();
       const modelo = String(vehiculo_modelo || '').trim();
-      if (!marca || !modelo) {
-        throw new AppError('Completá marca y modelo del vehículo antes de continuar.', 400);
+      if (!modelo) {
+        throw new AppError('Completá el modelo del vehículo antes de continuar.', 400);
       }
+      const marca = String(vehiculo_marca || '').trim();
 
       const { data: atencion } = await supabase
         .from('atenciones')

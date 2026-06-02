@@ -43,6 +43,8 @@ export interface InformeVisita {
   updated_at?: string | null;
   enviado_al_mecanico_at?: string | null;
   mecanico_tomo_at?: string | null;
+  gomero?: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null;
+  mecanico?: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null;
   vehiculos: {
     patente: string;
     marca: string;
@@ -102,6 +104,25 @@ function mapLineasApi(raw: PresupuestoLineaInforme[] | undefined): PresupuestoLi
     cantidad: Number(l.cantidad ?? 1),
     precio: l.precio != null ? Number(l.precio) : null,
   }));
+}
+
+function preciosDesdeLineas(lineas: PresupuestoLineaInforme[]): Record<string, string> {
+  const precios: Record<string, string> = {};
+  for (const l of lineas) {
+    if (l.marcado && l.precio != null) {
+      precios[l.item_catalogo_id] = String(Math.round(l.precio));
+    }
+  }
+  return precios;
+}
+
+function nombreUsuario(
+  u: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null | undefined,
+): string | null {
+  if (!u) return null;
+  const row = Array.isArray(u) ? u[0] : u;
+  if (!row?.nombre && !row?.apellido) return null;
+  return `${row.nombre || ''} ${row.apellido || ''}`.trim();
 }
 
 function PresupuestoChecklistInforme({ lineas }: { lineas: PresupuestoLineaInforme[] }) {
@@ -221,13 +242,7 @@ export function InformeVisitaTaller({
       setVisita(r.visita);
       const lineas = mapLineasApi(r.presupuesto_lineas);
       setPresupuestoLineas(lineas);
-      const preciosIniciales: Record<string, string> = {};
-      for (const l of lineas) {
-        if (l.marcado && l.precio != null) {
-          preciosIniciales[l.item_catalogo_id] = String(Math.round(l.precio));
-        }
-      }
-      setPreciosVendedor(preciosIniciales);
+      setPreciosVendedor(preciosDesdeLineas(lineas));
     } catch {
       setError(true);
     } finally {
@@ -270,6 +285,8 @@ export function InformeVisitaTaller({
       );
       const lineas = mapLineasApi(res.presupuesto_lineas);
       setPresupuestoLineas(lineas);
+      setPreciosVendedor(preciosDesdeLineas(lineas));
+      setModo('presupuesto');
 
       const patente = visita.vehiculos?.patente || 'sin-patente';
       const fallback = nombrePresupuestoPdf(patente, visita.created_at);
@@ -311,6 +328,8 @@ export function InformeVisitaTaller({
   const usaPresupuestoNuevo = tienePresupuestoNuevoInforme(presupuestoLineas);
   const itemsMarcados = tieneItemsMarcadosInforme(presupuestoLineas);
   const mostrarModoPresupuesto = habilitarArmarPresupuesto && itemsMarcados;
+  const nombreGomero = nombreUsuario(visita.gomero);
+  const nombreMecanico = nombreUsuario(visita.mecanico);
 
   return (
     <div className="px-4 py-5 pb-24 flex flex-col gap-5 max-w-lg mx-auto lg:max-w-3xl">
@@ -346,7 +365,7 @@ export function InformeVisitaTaller({
               modo === 'presupuesto' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}
           >
-            Armar presupuesto
+            {usaPresupuestoNuevo ? 'Editar presupuesto' : 'Armar presupuesto'}
           </button>
         </div>
       )}
@@ -354,7 +373,7 @@ export function InformeVisitaTaller({
       {modo === 'presupuesto' && mostrarModoPresupuesto ? (
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-            Presupuesto para el cliente
+            {usaPresupuestoNuevo ? 'Editar presupuesto del cliente' : 'Presupuesto para el cliente'}
           </p>
           <PresupuestoVendedorEditor
             lineas={presupuestoLineas}
@@ -367,6 +386,7 @@ export function InformeVisitaTaller({
             onGenerarPdf={generarPresupuestoVendedor}
             generando={descargandoPdf}
             errorPdf={errorPdf}
+            yaGuardado={usaPresupuestoNuevo}
           />
         </section>
       ) : (
@@ -374,15 +394,26 @@ export function InformeVisitaTaller({
       <div className="flex flex-col gap-2">
         {usaPresupuestoNuevo && (
           <>
-            <button
-              type="button"
-              onClick={descargarPresupuesto}
-              disabled={descargandoPdf}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#a50d26] disabled:opacity-60"
-            >
-              <Download className="w-4 h-4" />
-              {descargandoPdf ? 'Generando PDF…' : 'Descargar presupuesto'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={descargarPresupuesto}
+                disabled={descargandoPdf}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#a50d26] disabled:opacity-60"
+              >
+                <Download className="w-4 h-4" />
+                {descargandoPdf ? 'Generando PDF…' : 'Descargar presupuesto'}
+              </button>
+              {mostrarModoPresupuesto && (
+                <button
+                  type="button"
+                  onClick={() => setModo('presupuesto')}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-900 shadow-sm hover:bg-gray-50"
+                >
+                  Editar precios
+                </button>
+              )}
+            </div>
             {errorPdf && <p className="text-sm text-red-600">{errorPdf}</p>}
           </>
         )}
@@ -392,7 +423,7 @@ export function InformeVisitaTaller({
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Vehículo y cliente</p>
         <p className="text-3xl font-black tracking-widest text-gray-900">{v?.patente}</p>
         <p className="text-gray-700 font-medium mt-1">
-          {v?.marca} {v?.modelo}
+          {v?.modelo}
           {v?.anio ? ` · ${v.anio}` : ''}
         </p>
         {v?.medida_rueda && <p className="text-sm text-gray-500 mt-1">Medida rueda: {v.medida_rueda}</p>}
@@ -499,6 +530,22 @@ export function InformeVisitaTaller({
 
       <section className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Etapas y horarios</p>
+        {(nombreGomero || nombreMecanico) && (
+          <ul className="text-sm space-y-2 mb-4 pb-4 border-b border-gray-200">
+            {nombreGomero && (
+              <li className="flex justify-between gap-3">
+                <span className="text-gray-500">Gomero (orden creada)</span>
+                <span className="font-medium text-gray-900 text-right">{nombreGomero}</span>
+              </li>
+            )}
+            {nombreMecanico && (
+              <li className="flex justify-between gap-3">
+                <span className="text-gray-500">Mecánico (orden completada)</span>
+                <span className="font-medium text-gray-900 text-right">{nombreMecanico}</span>
+              </li>
+            )}
+          </ul>
+        )}
         <ul className="text-sm space-y-2">
           <li className="flex justify-between gap-3">
             <span className="text-gray-500">Visita creada</span>

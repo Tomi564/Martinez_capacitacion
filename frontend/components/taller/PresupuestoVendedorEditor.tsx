@@ -18,6 +18,7 @@ type Props = {
   onGenerarPdf: () => void;
   generando: boolean;
   errorPdf: string | null;
+  yaGuardado?: boolean;
 };
 
 export function PresupuestoVendedorEditor({
@@ -29,6 +30,7 @@ export function PresupuestoVendedorEditor({
   onGenerarPdf,
   generando,
   errorPdf,
+  yaGuardado = false,
 }: Props) {
   const secciones = useMemo(() => agruparLineasMarcadasInforme(lineas), [lineas]);
 
@@ -62,7 +64,9 @@ export function PresupuestoVendedorEditor({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-gray-600">
-        Revisá los ítems marcados por el mecánico y cargá o ajustá los precios para el cliente.
+        {yaGuardado
+          ? 'Podés modificar los precios guardados y volver a generar el PDF cuando quieras.'
+          : 'Revisá los ítems marcados por el mecánico y cargá los precios para el cliente.'}
       </p>
 
       {secciones.map((sec) => {
@@ -150,7 +154,7 @@ export function PresupuestoVendedorEditor({
         className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#a50d26] disabled:opacity-60"
       >
         <Download className="w-4 h-4" />
-        {generando ? 'Generando PDF…' : 'Generar presupuesto PDF'}
+        {generando ? 'Generando PDF…' : yaGuardado ? 'Actualizar presupuesto PDF' : 'Generar presupuesto PDF'}
       </button>
       {faltanPrecios && (
         <p className="text-xs text-amber-700">Completá el precio de todos los ítems marcados.</p>

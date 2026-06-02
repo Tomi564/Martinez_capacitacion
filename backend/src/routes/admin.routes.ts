@@ -13,6 +13,7 @@ import { WHATSAPP_SUGERENCIAS } from '../config/whatsapp';
 import { enviarPushComunicado } from '../services/comunicados-scheduler.service';
 import { preguntasDiariasService } from '../services/preguntas-diarias.service';
 import { presupuestoVisitaController } from '../controllers/presupuesto-visita.controller';
+import { tallerController } from '../controllers/taller.controller';
 import { visitaTieneDiagnosticoCargado } from '../utils/visita-diagnostico';
 
 const router = Router();
@@ -890,6 +891,9 @@ router.delete('/visitas/:id', async (req, res, next) => {
     next(error);
   }
 });
+
+// GET /api/admin/calificaciones-taller — promedios y comentarios del taller
+router.get('/calificaciones-taller', tallerController.getReporteAdmin.bind(tallerController));
 
 // GET /api/admin/calificaciones-qr — listado individual para gestión
 router.get('/calificaciones-qr', async (req, res, next) => {

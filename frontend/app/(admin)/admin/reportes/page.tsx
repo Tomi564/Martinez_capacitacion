@@ -83,7 +83,23 @@ interface VelocidadCapacitacion {
   moduloMasLento: string | null;
 }
 
-type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados' | 'velocidad';
+interface ReporteTallerEmpleado {
+  empleado_id: string;
+  nombre: string;
+  apellido: string;
+  rol: 'gomero' | 'mecanico';
+  rolLabel: string;
+  promedio: number;
+  total: number;
+  comentarios: {
+    id: string;
+    estrellas: number;
+    comentario: string | null;
+    created_at: string;
+  }[];
+}
+
+type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados' | 'velocidad' | 'taller';
 
 type VelocidadSortKey =
   | 'vendedor'
@@ -97,6 +113,7 @@ const TAB_LABELS: Record<TabAnaliticas, string> = {
   calificaciones: 'Calificaciones QR',
   bloqueados: 'Bloqueados',
   velocidad: 'Velocidad',
+  taller: 'Taller',
 };
 
 function compareVelocidad(
@@ -144,6 +161,9 @@ export default function ReportesPage() {
   const [calificacionAEliminar, setCalificacionAEliminar] = useState<CalificacionQrDetalle | null>(null);
   const [eliminandoCalificacion, setEliminandoCalificacion] = useState(false);
   const [msgEliminar, setMsgEliminar] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [tallerEmpleados, setTallerEmpleados] = useState<ReporteTallerEmpleado[]>([]);
+  const [isLoadingTaller, setIsLoadingTaller] = useState(false);
+  const [errorTaller, setErrorTaller] = useState<string | null>(null);
 
   const loadBloqueados = useCallback(async () => {
     const res = await apiClient.get<{ vendedoresBloqueados: VendedorBloqueado[] }>(
@@ -186,6 +206,25 @@ export default function ReportesPage() {
     }
   }, []);
 
+  const loadTaller = useCallback(async () => {
+    setIsLoadingTaller(true);
+    setErrorTaller(null);
+    try {
+      const res = await apiClient.get<{ empleados: ReporteTallerEmpleado[] }>(
+        '/admin/calificaciones-taller',
+      );
+      setTallerEmpleados(res.empleados || []);
+    } catch (err) {
+      console.error('[ReportesPage] Error cargando calificaciones taller', err);
+      setErrorTaller(
+        'No se pudieron cargar las calificaciones del taller. Verificá que la migración 036 esté aplicada en Supabase.',
+      );
+      setTallerEmpleados([]);
+    } finally {
+      setIsLoadingTaller(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tabActiva === 'velocidad') {
       void loadVelocidad();
@@ -193,7 +232,10 @@ export default function ReportesPage() {
     if (tabActiva === 'calificaciones') {
       void loadCalificacionesDetalle();
     }
-  }, [tabActiva, loadVelocidad, loadCalificacionesDetalle]);
+    if (tabActiva === 'taller') {
+      void loadTaller();
+    }
+  }, [tabActiva, loadVelocidad, loadCalificacionesDetalle, loadTaller]);
 
   const fetchReportesRefresh = useCallback(async () => {
     try {
@@ -371,9 +413,9 @@ export default function ReportesPage() {
             Intentos, promedios y calificaciones del equipo
           </p>
         </div>
-        {tabActiva !== 'bloqueados' && tabActiva !== 'velocidad' && (
+        {tabActiva !== 'bloqueados' && tabActiva !== 'velocidad' && tabActiva !== 'taller' && (
         <button
-          onClick={() => exportarCSV(tabActiva)}
+          onClick={() => exportarCSV(tabActiva as 'progreso' | 'calificaciones')}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -388,7 +430,7 @@ export default function ReportesPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
-        {(['progreso', 'calificaciones', 'bloqueados', 'velocidad'] as const).map((tab) => (
+        {(['progreso', 'calificaciones', 'bloqueados', 'velocidad', 'taller'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setTabActiva(tab)}
@@ -814,6 +856,78 @@ export default function ReportesPage() {
                 );
               })}
             </div>
+          )}
+        </div>
+      )}
+
+      {tabActiva === 'taller' && (
+        <div className="flex flex-col gap-4">
+          {errorTaller && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900" role="alert">
+              {errorTaller}
+            </div>
+          )}
+
+          {isLoadingTaller ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : tallerEmpleados.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+              <p className="text-sm text-gray-400">No hay empleados del taller o aún no recibieron calificaciones.</p>
+            </div>
+          ) : (
+            tallerEmpleados.map((e) => (
+              <div key={e.empleado_id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-4 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {e.nombre} {e.apellido}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{e.rolLabel}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-amber-400 text-sm">★</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {e.total > 0 ? e.promedio.toFixed(1) : '—'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {e.total} {e.total === 1 ? 'calificación' : 'calificaciones'}
+                    </span>
+                  </div>
+                </div>
+
+                {e.comentarios.length === 0 ? (
+                  <p className="text-sm text-gray-400 px-4 py-6 text-center">Sin comentarios aún.</p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {e.comentarios.map((c) => (
+                      <div key={c.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-gray-900">{c.estrellas}★</span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(c.created_at).toLocaleDateString('es-AR', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        {c.comentario ? (
+                          <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{c.comentario}</p>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-1 italic">Sin comentario</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </div>
       )}

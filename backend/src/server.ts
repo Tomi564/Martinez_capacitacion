@@ -37,6 +37,7 @@ import gomeroRoutes from './routes/gomero.routes';
 import preguntasDiariasRoutes from './routes/preguntas-diarias.routes';
 import pushRoutes from './routes/push.routes';
 import vendedorRoutes from './routes/vendedor.routes';
+import tallerRoutes from './routes/taller.routes';
 import {
   recordatorioModuloInactivo,
   recordatorioObjetivoMitadMes,
@@ -156,6 +157,7 @@ app.use('/api/push', pushRoutes);
 app.use('/api/mecanico', mecanicoRoutes);
 app.use('/api/gomero', gomeroRoutes);
 app.use('/api/vendedor', vendedorRoutes);
+app.use('/api/taller', tallerRoutes);
 app.use('/api/preguntas-diarias', preguntasDiariasRoutes);
 
 // ─────────────────────────────────────────────────────

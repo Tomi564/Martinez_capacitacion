@@ -84,9 +84,7 @@ export default function OrdenGomeroDetallePage() {
   const [guardando, setGuardando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [marcaVehiculo, setMarcaVehiculo] = useState('');
   const [modeloVehiculo, setModeloVehiculo] = useState('');
-  const [anioVehiculo, setAnioVehiculo] = useState('');
 
   const cargar = async () => {
     setLoading(true);
@@ -117,17 +115,15 @@ export default function OrdenGomeroDetallePage() {
   const necesitaCompletarVehiculo = !!orden?.patente_pendiente && !orden?.vehiculos;
 
   const guardarVehiculoPendiente = async (): Promise<boolean> => {
-    if (!marcaVehiculo.trim() || !modeloVehiculo.trim()) {
-      setMsg('Completá marca y modelo del vehículo.');
+    if (!modeloVehiculo.trim()) {
+      setMsg('Completá el modelo del vehículo.');
       return false;
     }
     setGuardando(true);
     setMsg(null);
     try {
       await apiClient.patch(`/gomero/ordenes/${id}`, {
-        vehiculo_marca: marcaVehiculo.trim(),
         vehiculo_modelo: modeloVehiculo.trim(),
-        vehiculo_anio: anioVehiculo.trim() ? Number(anioVehiculo) : null,
       });
       await cargar();
       setMsg('Vehículo registrado.');
@@ -239,25 +235,12 @@ export default function OrdenGomeroDetallePage() {
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
           <p className="text-xs font-bold text-amber-900 uppercase">Completar vehículo</p>
           <p className="text-sm text-amber-950">
-            Esta orden viene del vendedor. Cargá marca y modelo para continuar.
+            Esta orden viene del vendedor. Cargá el modelo para continuar.
           </p>
-          <input
-            placeholder="Marca"
-            value={marcaVehiculo}
-            onChange={(e) => setMarcaVehiculo(e.target.value)}
-            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white"
-          />
           <input
             placeholder="Modelo"
             value={modeloVehiculo}
             onChange={(e) => setModeloVehiculo(e.target.value)}
-            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white"
-          />
-          <input
-            placeholder="Año (opcional)"
-            type="number"
-            value={anioVehiculo}
-            onChange={(e) => setAnioVehiculo(e.target.value)}
             className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white"
           />
           <Button className="w-full h-12 rounded-xl font-bold" disabled={guardando} onClick={guardarVehiculoPendiente}>

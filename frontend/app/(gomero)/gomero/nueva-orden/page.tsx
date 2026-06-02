@@ -21,7 +21,6 @@ export default function NuevaOrdenGomeroPage() {
   const router = useRouter();
   const [patente, setPatente] = useState('');
   const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
-  const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
@@ -35,7 +34,6 @@ export default function NuevaOrdenGomeroPage() {
 
   const aplicarVehiculo = (v: Vehiculo) => {
     setVehiculo(v);
-    setMarca(v.marca);
     setModelo(v.modelo);
     setNombre(v.clientes?.nombre || '');
     setApellido(v.clientes?.apellido || '');
@@ -57,11 +55,10 @@ export default function NuevaOrdenGomeroPage() {
       if (res.vehiculo) aplicarVehiculo(res.vehiculo);
       else {
         setVehiculo(null);
-        setMarca('');
         setModelo('');
         setNombre('');
         setApellido('');
-        setMsg('No encontramos la patente. Completá marca y modelo abajo.');
+        setMsg('No encontramos la patente. Completá el modelo abajo.');
       }
     } catch {
       setMsg('Error al buscar la patente.');
@@ -72,8 +69,8 @@ export default function NuevaOrdenGomeroPage() {
 
   const crearOrden = async () => {
     setMsg(null);
-    if (!patenteCanon || !marca.trim() || !modelo.trim()) {
-      setMsg('Patente, marca y modelo son obligatorios.');
+    if (!patenteCanon || !modelo.trim()) {
+      setMsg('Patente y modelo son obligatorios.');
       return;
     }
     if (!nombre.trim() || !apellido.trim()) {
@@ -87,7 +84,6 @@ export default function NuevaOrdenGomeroPage() {
       if (!vid) {
         const vRes = await apiClient.post<{ vehiculo: { id: string } }>('/gomero/vehiculos', {
           patente: patenteCanon,
-          marca: marca.trim(),
           modelo: modelo.trim(),
           cliente: {
             nombre: nombre.trim(),
@@ -150,12 +146,6 @@ export default function NuevaOrdenGomeroPage() {
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
         <p className="text-xs font-bold text-gray-500 uppercase">Datos del vehículo</p>
-        <input
-          placeholder="Marca"
-          value={marca}
-          onChange={(e) => setMarca(e.target.value)}
-          className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base"
-        />
         <input
           placeholder="Modelo"
           value={modelo}

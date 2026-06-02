@@ -8,6 +8,21 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { suscribirPush } from '@/hooks/usePushNotifications';
 import { InstallPWA } from '@/components/ui/InstallPWA';
 
+const NAV_MI_QR = {
+  href: '/gomero/mi-qr',
+  label: 'Mi QR',
+  exactMatch: false,
+  icon: (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+      <rect x="14" y="14" width="3" height="3"/>
+      <rect x="18" y="18" width="3" height="3"/>
+    </svg>
+  ),
+};
+
 const NAV_PRIMARY = [
   {
     href: '/gomero',
@@ -72,11 +87,15 @@ export default function GomeroLayout({ children }: { children: React.ReactNode }
         ) : undefined}
       />
 
-      <main className="flex-1 pb-6">
+      <main className="flex-1 pb-20">
         {children}
       </main>
 
-      <BottomNav pathname={pathname} primaryItems={[NAV_PRIMARY[0], NAV_PRIMARY[1]]} />
+      <BottomNav
+        pathname={pathname}
+        primaryItems={[NAV_PRIMARY[0], NAV_PRIMARY[1]]}
+        fabItems={[NAV_MI_QR]}
+      />
 
       <InstallPWA />
     </div>

@@ -323,11 +323,23 @@ function drawFooter(doc: PDFKit.PDFDocument, data: PresupuestoOrdenData, y: numb
       .text(data.firmaMecanico, MARGIN, firmaY - 12, { width: 220 });
   }
 
+  const validezY = firmaY + 22;
   doc
     .font('Helvetica')
     .fontSize(8)
     .fillColor(COLOR_GRIS)
-    .text(`Documento generado el ${fmtFecha(new Date())}`, PAGE_W - MARGIN - 160, firmaY + 4, {
+    .text(
+      `Este presupuesto tiene validez de 20 días desde la fecha de emisión (${fmtFecha(data.orden.fecha)}).`,
+      MARGIN,
+      validezY,
+      { width: CONTENT_W, align: 'center' },
+    );
+
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor(COLOR_GRIS)
+    .text(`Documento generado el ${fmtFecha(new Date())}`, PAGE_W - MARGIN - 160, validezY + 14, {
       width: 160,
       align: 'right',
     });
