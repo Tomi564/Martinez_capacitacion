@@ -39,6 +39,53 @@ function etiquetaSugerencia(
   return partes.filter(Boolean).join(' · ');
 }
 
+function mapErrorActualizacionCliente(err: { code?: string; message?: string }): AppError {
+  if (err.code === '23505') {
+    return new AppError('Ya existe otro cliente con ese teléfono, mail o DNI', 400);
+  }
+  console.error('[ClientesService] Error actualizando cliente', err);
+  return new AppError('Error al actualizar datos del cliente', 500);
+}
+
+/** Payload de update: no envía email vacío/null para no violar NOT NULL ni borrar sin intención. */
+function buildClienteUpdatePayload(datos: ClienteDatosValidados): Record<string, string | null> {
+  const payload: Record<string, string | null> = {
+    nombre: datos.nombre,
+    apellido: datos.apellido,
+    telefono: datos.telefono || null,
+  };
+  if (datos.email) {
+    payload.email = datos.email;
+  }
+  return payload;
+}
+
+async function actualizarClientePorId(clienteId: string, datos: ClienteDatosValidados): Promise<void> {
+  if (datos.telefono) {
+    const { data: conflicto, error: conflictoErr } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('telefono', datos.telefono)
+      .neq('id', clienteId)
+      .maybeSingle();
+    if (conflictoErr) {
+      throw new AppError('Error al validar el teléfono del cliente', 500);
+    }
+    if (conflicto) {
+      throw new AppError('Ya existe otro cliente con ese teléfono', 400);
+    }
+  }
+
+  const { error: updErr } = await supabase
+    .from('clientes')
+    .update(buildClienteUpdatePayload(datos))
+    .eq('id', clienteId);
+
+  if (updErr) {
+    throw mapErrorActualizacionCliente(updErr);
+  }
+}
+
 export class ClientesService {
   /**
    * Sugerencias para autocompletar en el formulario de atenciones.
@@ -125,12 +172,16 @@ export class ClientesService {
   /**
    * Resuelve cliente_id al crear/editar atención: vincula existente o crea en clientes.
    */
-  async resolverClienteParaAtencion(input: {
-    cliente_id?: string | null;
-    cliente: ClienteInput | ClienteDatosValidados;
-    participante_qr_id?: string | null;
-  }): Promise<string> {
+  async resolverClienteParaAtencion(
+    input: {
+      cliente_id?: string | null;
+      cliente: ClienteInput | ClienteDatosValidados;
+      participante_qr_id?: string | null;
+    },
+    opts?: { mutarDatosCliente?: boolean },
+  ): Promise<string> {
     const datos = validarDatosCliente(input.cliente);
+    const mutarDatosCliente = opts?.mutarDatosCliente !== false;
 
     if (input.cliente_id) {
       const { data, error } = await supabase
@@ -141,16 +192,9 @@ export class ClientesService {
       if (error) throw new AppError('Error al validar el cliente', 500);
       if (!data) throw new AppError('El cliente seleccionado no existe', 400);
 
-      const { error: updErr } = await supabase
-        .from('clientes')
-        .update({
-          nombre: datos.nombre,
-          apellido: datos.apellido,
-          telefono: datos.telefono,
-          email: datos.email,
-        })
-        .eq('id', data.id);
-      if (updErr) throw new AppError('Error al actualizar datos del cliente', 500);
+      if (mutarDatosCliente) {
+        await actualizarClientePorId(data.id, datos);
+      }
 
       return data.id;
     }
@@ -171,15 +215,7 @@ export class ClientesService {
           .eq('dni', p.dni)
           .maybeSingle();
         if (porDni) {
-          await supabase
-            .from('clientes')
-            .update({
-              nombre: datos.nombre,
-              apellido: datos.apellido,
-              telefono: datos.telefono,
-              email: datos.email,
-            })
-            .eq('id', porDni.id);
+          await actualizarClientePorId(porDni.id, datos);
           return porDni.id;
         }
       }
@@ -192,14 +228,7 @@ export class ClientesService {
         .eq('telefono', datos.telefono)
         .maybeSingle();
       if (porTel) {
-        await supabase
-          .from('clientes')
-          .update({
-            nombre: datos.nombre,
-            apellido: datos.apellido,
-            email: datos.email,
-          })
-          .eq('id', porTel.id);
+        await actualizarClientePorId(porTel.id, datos);
         return porTel.id;
       }
     }
@@ -211,14 +240,7 @@ export class ClientesService {
         .ilike('email', datos.email)
         .maybeSingle();
       if (porEmail) {
-        await supabase
-          .from('clientes')
-          .update({
-            nombre: datos.nombre,
-            apellido: datos.apellido,
-            telefono: datos.telefono,
-          })
-          .eq('id', porEmail.id);
+        await actualizarClientePorId(porEmail.id, datos);
         return porEmail.id;
       }
     }

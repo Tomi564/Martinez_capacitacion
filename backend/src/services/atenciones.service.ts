@@ -205,11 +205,15 @@ export class AtencionesService {
   async actualizar(userId: string, atencionId: string, data: AtencionPayload) {
     this.assertCanal(data.canal);
 
-    const clienteId = await clientesService.resolverClienteParaAtencion({
-      cliente_id: data.cliente_id,
-      cliente: data.cliente,
-      participante_qr_id: data.participante_qr_id,
-    });
+    const clienteId = await clientesService.resolverClienteParaAtencion(
+      {
+        cliente_id: data.cliente_id,
+        cliente: data.cliente,
+        participante_qr_id: data.participante_qr_id,
+      },
+      // Editar atención: solo re-vincular cliente existente; evita fallos al tocar email/teléfono en clientes.
+      { mutarDatosCliente: !data.cliente_id },
+    );
 
     const patenteInput: PatenteAtencionInput = {
       vehiculo_id: data.vehiculo_id,
