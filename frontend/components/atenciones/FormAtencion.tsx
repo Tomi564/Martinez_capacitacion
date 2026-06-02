@@ -1,6 +1,8 @@
 'use client';
 
+import { useAuth } from '@/hooks/useAuth';
 import {
+  emailEsDelVendedor,
   puedeGuardarAtencion,
   resultadoConPatente,
   type ClienteSugerencia,
@@ -87,10 +89,12 @@ export function FormAtencion({
   title = 'Registrar atención',
   submitLabel = 'Guardar',
 }: FormAtencionProps) {
+  const user = useAuth((s) => s.user);
   const esVentaCerrada = form.resultado === 'venta_cerrada';
   const mostrarPatente = resultadoConPatente(form.resultado);
   const labelProducto = esVentaCerrada ? 'Producto vendido' : 'Producto de interés';
-  const puedeGuardar = puedeGuardarAtencion(form);
+  const mailPropioVendedor = emailEsDelVendedor(form.cliente_email, user?.email);
+  const puedeGuardar = puedeGuardarAtencion(form, { mailPropioVendedor });
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
@@ -205,14 +209,28 @@ export function FormAtencion({
                 </div>
               )}
             </div>
-            <input
-              type="email"
-              required
-              value={form.cliente_email}
-              onChange={(e) => onClienteEmailChange(e.target.value)}
-              placeholder="Mail *"
-              className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#C8102E] placeholder:text-gray-400"
-            />
+            <div className="col-span-2 flex flex-col gap-1">
+              <input
+                type="text"
+                inputMode="email"
+                autoComplete="off"
+                name="cliente-mail-atencion"
+                value={form.cliente_email}
+                onChange={(e) => onClienteEmailChange(e.target.value)}
+                onFocus={onLimpiarSugerenciasCliente}
+                placeholder="Mail (opcional)"
+                className={`h-10 px-3 bg-white border rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 placeholder:text-gray-400 w-full ${
+                  mailPropioVendedor
+                    ? 'border-red-300 focus:ring-red-400'
+                    : 'border-gray-200 focus:ring-[#C8102E]'
+                }`}
+              />
+              {mailPropioVendedor && (
+                <p className="text-sm text-red-600 font-medium">
+                  Este mail es el tuyo. Si el cliente no tiene mail, dejá el campo vacío.
+                </p>
+              )}
+            </div>
           </div>
           {sugerenciasCliente.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">

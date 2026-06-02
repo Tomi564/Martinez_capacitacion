@@ -1,5 +1,5 @@
 /**
- * Validación de datos de cliente (obligatorios en atenciones).
+ * Validación de datos de cliente (atenciones).
  */
 
 import { AppError } from '../middleware/errorHandler';
@@ -9,7 +9,7 @@ export interface ClienteDatosValidados {
   nombre: string;
   apellido: string;
   telefono: string;
-  email: string;
+  email: string | null;
 }
 
 export function validarDatosCliente(input: ClienteInput): ClienteDatosValidados {
@@ -18,16 +18,13 @@ export function validarDatosCliente(input: ClienteInput): ClienteDatosValidados 
   const telefono = input.telefono?.trim() || '';
   const email = input.email?.trim() || '';
 
-  if (!nombre || !apellido || !telefono || !email) {
-    throw new AppError(
-      'Nombre, apellido, teléfono y mail del cliente son obligatorios',
-      400
-    );
+  if (!nombre || !apellido || !telefono) {
+    throw new AppError('Nombre, apellido y teléfono del cliente son obligatorios', 400);
   }
 
-  if (!email.includes('@') || !email.includes('.')) {
+  if (email && (!email.includes('@') || !email.includes('.'))) {
     throw new AppError('El mail del cliente no es válido', 400);
   }
 
-  return { nombre, apellido, telefono, email };
+  return { nombre, apellido, telefono, email: email || null };
 }

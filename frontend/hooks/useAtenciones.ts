@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
 import { formatPatenteArDisplay, normalizePatenteAr } from '@/lib/patente';
 import type { VehiculoSugerido } from '@/hooks/usePatenteSugerencias';
@@ -97,13 +98,38 @@ const FORM_VACIO: FormAtencionState = {
   vehiculo_anio: '',
 };
 
+const MIN_BUSQUEDA_NOMBRE = 4;
+const MIN_BUSQUEDA_TELEFONO_DIGITOS = 6;
+
+function digitosTelefono(texto: string): string {
+  return texto.replace(/\D/g, '');
+}
+
+function esTextoSoloTelefono(texto: string): boolean {
+  const sinEspacios = texto.replace(/\s/g, '');
+  if (!sinEspacios.length) return false;
+  return /^\d+$/.test(sinEspacios);
+}
+
+export function cumpleMinimoBusquedaCliente(texto: string, campo: 'nombre' | 'telefono'): boolean {
+  if (campo === 'telefono' || esTextoSoloTelefono(texto)) {
+    return digitosTelefono(texto).length >= MIN_BUSQUEDA_TELEFONO_DIGITOS;
+  }
+  return texto.trim().length >= MIN_BUSQUEDA_NOMBRE;
+}
+
+export function emailEsDelVendedor(clienteEmail: string, vendedorEmail: string | undefined | null): boolean {
+  const cliente = clienteEmail.trim().toLowerCase();
+  const vendedor = (vendedorEmail || '').trim().toLowerCase();
+  if (!cliente || !vendedor) return false;
+  return cliente === vendedor;
+}
+
 export function clienteFormCompleto(form: FormAtencionState): boolean {
   return (
     form.cliente_nombre.trim().length > 0 &&
     form.cliente_apellido.trim().length > 0 &&
-    form.cliente_telefono.trim().length > 0 &&
-    form.cliente_email.trim().length > 0 &&
-    form.cliente_email.includes('@')
+    form.cliente_telefono.trim().length > 0
   );
 }
 
@@ -113,11 +139,20 @@ export function ventaCerradaCamposCompletos(form: FormAtencionState): boolean {
   return form.producto.trim().length > 0 && form.monto.trim().length > 0 && !Number.isNaN(monto) && monto > 0;
 }
 
-export function puedeGuardarAtencion(form: FormAtencionState): boolean {
+export function puedeGuardarAtencion(
+  form: FormAtencionState,
+  opts?: { mailPropioVendedor?: boolean },
+): boolean {
+  if (opts?.mailPropioVendedor) return false;
+  const email = form.cliente_email.trim();
+  if (email && !email.includes('@')) return false;
   return !!form.canal && !!form.resultado && clienteFormCompleto(form) && ventaCerradaCamposCompletos(form);
 }
 
-export function validarFormularioAtencion(form: FormAtencionState): string | null {
+export function validarFormularioAtencion(
+  form: FormAtencionState,
+  opts?: { vendedorEmail?: string | null },
+): string | null {
   if (!form.canal || !form.resultado) {
     return 'Canal y resultado son requeridos';
   }
@@ -127,11 +162,12 @@ export function validarFormularioAtencion(form: FormAtencionState): string | nul
   if (!form.cliente_telefono.trim()) {
     return 'El teléfono del cliente es obligatorio';
   }
-  if (!form.cliente_email.trim()) {
-    return 'El mail del cliente es obligatorio';
+  const email = form.cliente_email.trim();
+  if (email && !email.includes('@')) {
+    return 'Ingresá un mail válido o dejá el campo vacío';
   }
-  if (!form.cliente_email.includes('@')) {
-    return 'Ingresá un mail válido';
+  if (emailEsDelVendedor(form.cliente_email, opts?.vendedorEmail)) {
+    return 'Este mail es el tuyo. Si el cliente no tiene mail, dejá el campo vacío.';
   }
   if (form.resultado === 'venta_cerrada') {
     if (!form.producto.trim()) {
@@ -143,13 +179,6 @@ export function validarFormularioAtencion(form: FormAtencionState): string | nul
     }
   }
   return null;
-}
-
-function emailDesdeSugerencia(s: ClienteSugerencia): string {
-  if (s.email?.trim()) return s.email.trim();
-  const contacto = (s.contacto || '').trim();
-  if (contacto.includes('@')) return contacto;
-  return '';
 }
 
 function telefonoDesdeSugerencia(s: ClienteSugerencia): string {
@@ -166,7 +195,7 @@ function clientePayloadFromForm(form: FormAtencionState) {
     cliente_nombre: form.cliente_nombre.trim(),
     cliente_apellido: form.cliente_apellido.trim(),
     cliente_telefono: form.cliente_telefono.trim(),
-    cliente_email: form.cliente_email.trim(),
+    cliente_email: form.cliente_email.trim() || null,
   };
 }
 
@@ -207,6 +236,7 @@ export function formFromAtencion(atencion: Atencion): FormAtencionState {
 }
 
 export function useAtenciones() {
+  const user = useAuth((s) => s.user);
   const [data, setData] = useState<AtencionesData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -289,8 +319,8 @@ export function useAtenciones() {
     }
   };
 
-  const ejecutarBusquedaCliente = async (texto: string) => {
-    if (texto.length < 2) {
+  const ejecutarBusquedaCliente = async (texto: string, campo: 'nombre' | 'telefono') => {
+    if (!cumpleMinimoBusquedaCliente(texto, campo)) {
       setSugerenciasCliente([]);
       return;
     }
@@ -308,14 +338,14 @@ export function useAtenciones() {
     }
   };
 
-  const programarBusquedaCliente = (texto: string) => {
+  const programarBusquedaCliente = (texto: string, campo: 'nombre' | 'telefono') => {
     if (clienteDebounce.current) clearTimeout(clienteDebounce.current);
-    if (texto.length < 2) {
+    if (!cumpleMinimoBusquedaCliente(texto, campo)) {
       setSugerenciasCliente([]);
       return;
     }
     clienteDebounce.current = setTimeout(() => {
-      ejecutarBusquedaCliente(texto);
+      void ejecutarBusquedaCliente(texto, campo);
     }, 300);
   };
 
@@ -325,7 +355,7 @@ export function useAtenciones() {
       cliente_nombre: texto,
       ...limpiarVinculoCliente(),
     }));
-    programarBusquedaCliente(texto);
+    programarBusquedaCliente(texto, 'nombre');
   };
 
   const onClienteTelefonoChange = (texto: string) => {
@@ -334,7 +364,7 @@ export function useAtenciones() {
       cliente_telefono: texto,
       ...limpiarVinculoCliente(),
     }));
-    programarBusquedaCliente(texto);
+    programarBusquedaCliente(texto, 'telefono');
   };
 
   const onClienteApellidoChange = (texto: string) => {
@@ -346,6 +376,7 @@ export function useAtenciones() {
   };
 
   const onClienteEmailChange = (texto: string) => {
+    setSugerenciasCliente([]);
     setForm((prev) => ({
       ...prev,
       cliente_email: texto,
@@ -354,7 +385,6 @@ export function useAtenciones() {
   };
 
   const seleccionarCliente = (s: ClienteSugerencia) => {
-    const email = emailDesdeSugerencia(s);
     const telefono = telefonoDesdeSugerencia(s);
     setForm((prev) => ({
       ...prev,
@@ -362,7 +392,6 @@ export function useAtenciones() {
       participante_qr_id: s.tipo === 'qr' ? s.id : null,
       cliente_nombre: s.nombre,
       cliente_apellido: s.apellido,
-      cliente_email: email || prev.cliente_email,
       cliente_telefono: telefono || prev.cliente_telefono,
     }));
     setSugerenciasCliente([]);
@@ -482,7 +511,7 @@ export function useAtenciones() {
   const resetForm = () => setForm(FORM_VACIO);
 
   const handleGuardar = async () => {
-    const validacion = validarFormularioAtencion(form);
+    const validacion = validarFormularioAtencion(form, { vendedorEmail: user?.email });
     if (validacion) {
       setError(validacion);
       return false;
@@ -511,7 +540,7 @@ export function useAtenciones() {
   };
 
   const actualizarAtencion = async (atencionId: string) => {
-    const validacion = validarFormularioAtencion(form);
+    const validacion = validarFormularioAtencion(form, { vendedorEmail: user?.email });
     if (validacion) {
       setError(validacion);
       return false;

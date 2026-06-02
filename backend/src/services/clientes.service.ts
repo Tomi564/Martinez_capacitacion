@@ -4,12 +4,12 @@
 
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
-import { validarDatosCliente } from '../utils/validarCliente';
+import { validarDatosCliente, type ClienteDatosValidados } from '../utils/validarCliente';
 
 export interface ClienteInput {
   nombre?: string;
   apellido?: string;
-  email?: string;
+  email?: string | null;
   telefono?: string;
 }
 
@@ -45,14 +45,27 @@ export class ClientesService {
    */
   async buscarSugerencias(q: string, limit = 12) {
     const term = q.trim();
-    if (term.length < 2) {
+    const soloDigitos = term.replace(/\D/g, '');
+    const esSoloTelefono = soloDigitos.length > 0 && soloDigitos.length === term.replace(/\s/g, '').length;
+
+    if (term.includes('@')) {
+      return { sugerencias: [] as SugerenciaCliente[] };
+    }
+
+    if (esSoloTelefono) {
+      if (soloDigitos.length < 6) {
+        return { sugerencias: [] as SugerenciaCliente[] };
+      }
+    } else if (term.length < 4) {
       return { sugerencias: [] as SugerenciaCliente[] };
     }
 
     const esc = term.replace(/,/g, '').replace(/%/g, '');
     const pattern = `%${esc}%`;
-    const orClientes = `nombre.ilike.${pattern},apellido.ilike.${pattern},email.ilike.${pattern},telefono.ilike.${pattern},dni.ilike.${pattern}`;
-    const orQr = `nombre.ilike.${pattern},apellido.ilike.${pattern},dni.ilike.${pattern},contacto.ilike.${pattern}`;
+    const orClientes = `nombre.ilike.${pattern},apellido.ilike.${pattern},telefono.ilike.${pattern},dni.ilike.${pattern}`;
+    const orQr = esSoloTelefono
+      ? `nombre.ilike.${pattern},apellido.ilike.${pattern},dni.ilike.${pattern},contacto.ilike.${pattern}`
+      : `nombre.ilike.${pattern},apellido.ilike.${pattern},dni.ilike.${pattern}`;
 
     const [clientesRes, qrRes] = await Promise.all([
       supabase
@@ -114,7 +127,7 @@ export class ClientesService {
    */
   async resolverClienteParaAtencion(input: {
     cliente_id?: string | null;
-    cliente: ClienteInput;
+    cliente: ClienteInput | ClienteDatosValidados;
     participante_qr_id?: string | null;
   }): Promise<string> {
     const datos = validarDatosCliente(input.cliente);
@@ -189,21 +202,23 @@ export class ClientesService {
       return porTel.id;
     }
 
-    const { data: porEmail } = await supabase
-      .from('clientes')
-      .select('id')
-      .ilike('email', datos.email)
-      .maybeSingle();
-    if (porEmail) {
-      await supabase
+    if (datos.email) {
+      const { data: porEmail } = await supabase
         .from('clientes')
-        .update({
-          nombre: datos.nombre,
-          apellido: datos.apellido,
-          telefono: datos.telefono,
-        })
-        .eq('id', porEmail.id);
-      return porEmail.id;
+        .select('id')
+        .ilike('email', datos.email)
+        .maybeSingle();
+      if (porEmail) {
+        await supabase
+          .from('clientes')
+          .update({
+            nombre: datos.nombre,
+            apellido: datos.apellido,
+            telefono: datos.telefono,
+          })
+          .eq('id', porEmail.id);
+        return porEmail.id;
+      }
     }
 
     const dniQr = input.participante_qr_id

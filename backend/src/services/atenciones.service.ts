@@ -5,7 +5,8 @@
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { validarCanalAtencion, mensajeCanalInvalido } from '../constants/atenciones';
-import { clientesService, type ClienteInput } from './clientes.service';
+import { clientesService } from './clientes.service';
+import type { ClienteDatosValidados } from '../utils/validarCliente';
 import { procesarCambioRankingPorVenta } from './ranking-notificaciones.service';
 import {
   crearOrdenDesdeAtencion,
@@ -94,7 +95,7 @@ export interface AtencionPayload {
   monto?: number | null;
   observaciones?: string;
   cliente_id?: string | null;
-  cliente: ClienteInput;
+  cliente: ClienteDatosValidados;
   participante_qr_id?: string | null;
   vehiculo_id?: string | null;
   patente?: string | null;
