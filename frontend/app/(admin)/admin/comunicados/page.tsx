@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient, ApiError } from '@/lib/api';
 import { esComunicadoVigente } from '@/lib/comunicadoVigencia';
+import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
 
 interface Comunicado {
   id: string;
@@ -35,6 +36,8 @@ export default function ComunicadosPage() {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [comunicadoAEliminar, setComunicadoAEliminar] = useState<Comunicado | null>(null);
   const [eliminando, setEliminando] = useState(false);
+  const [modalResetPush, setModalResetPush] = useState(false);
+  const [reseteandoPush, setReseteandoPush] = useState(false);
 
   const fetchComunicados = async () => {
     try {
@@ -155,6 +158,28 @@ export default function ComunicadosPage() {
       setMsg({ tipo: 'error', texto: 'No se pudo eliminar el comunicado' });
     } finally {
       setEliminando(false);
+    }
+  };
+
+  const confirmarResetPush = async () => {
+    setReseteandoPush(true);
+    setMsg(null);
+    try {
+      const res = await apiClient.delete<{ mensaje: string; eliminadas: number }>(
+        '/admin/push-subscriptions'
+      );
+      setModalResetPush(false);
+      setMsg({
+        tipo: 'ok',
+        texto: `${res.mensaje} (${res.eliminadas} suscripción${res.eliminadas === 1 ? '' : 'es'})`,
+      });
+      setTimeout(() => setMsg(null), 5000);
+    } catch (err) {
+      const texto =
+        err instanceof ApiError ? err.message : 'No se pudieron resetear las suscripciones push';
+      setMsg({ tipo: 'error', texto });
+    } finally {
+      setReseteandoPush(false);
     }
   };
 
@@ -317,6 +342,28 @@ export default function ComunicadosPage() {
         </div>
       )}
 
+      {/* Suscripciones push */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Notificaciones push
+        </p>
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Resetear suscripciones</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Borra todos los dispositivos registrados. Útil tras cambiar claves VAPID o depurar envíos.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setModalResetPush(true)}
+            className="text-sm px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-medium shrink-0"
+          >
+            Resetear push
+          </button>
+        </div>
+      </div>
+
       {/* Notificaciones de ranking enviadas */}
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -465,6 +512,16 @@ export default function ComunicadosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmarEliminacionModal
+        open={modalResetPush}
+        titulo="¿Resetear suscripciones push?"
+        descripcion="Esto eliminará todas las suscripciones push. Los usuarios verán el modal de activación en su próximo login."
+        eliminando={reseteandoPush}
+        onCancelar={() => setModalResetPush(false)}
+        onConfirmar={confirmarResetPush}
+        idTitulo="reset-push-subscriptions-titulo"
+      />
     </div>
   );
 }

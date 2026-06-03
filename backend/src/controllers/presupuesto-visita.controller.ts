@@ -17,6 +17,8 @@ export class PresupuestoVisitaController {
 
       const { buffer, filename } = await presupuestoVisitaService.generarPdfPorVisitaId(visitaId, {
         verificarVendedor: req.user?.rol === 'vendedor',
+        vendedorId: req.user?.id,
+        sucursal: req.user?.rol === 'vendedor' ? ((req.user.sucursal as string | null) ?? null) : null,
       });
 
       res.setHeader('Content-Type', 'application/pdf');

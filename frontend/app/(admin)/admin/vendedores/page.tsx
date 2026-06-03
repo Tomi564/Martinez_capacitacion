@@ -10,7 +10,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { apiClient, ApiError } from '@/lib/api';
+import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { appendSucursalQuery } from '@/lib/sucursales';
 
 interface Vendedor {
   id: string;
@@ -20,6 +23,7 @@ interface Vendedor {
   activo: boolean;
   created_at: string;
   rol: string;
+  sucursal: string | null;
   modulosAprobados: number;
   totalModulos: number;
 }
@@ -30,6 +34,7 @@ interface NuevoVendedor {
   email: string;
   password: string;
   rol: 'vendedor' | 'gomero' | 'mecanico';
+  sucursal: string;
 }
 
 const ROL_LABEL: Record<string, string> = {
@@ -48,6 +53,7 @@ export default function VendedoresPage() {
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroRol, setFiltroRol] = useState<'todos' | 'vendedor' | 'gomero' | 'mecanico'>('todos');
+  const [filtroSucursal, setFiltroSucursal] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -57,6 +63,7 @@ export default function VendedoresPage() {
     nombre: '',
     apellido: '',
     email: '',
+    sucursal: '',
   });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -67,6 +74,7 @@ export default function VendedoresPage() {
     email: '',
     password: '',
     rol: 'vendedor',
+    sucursal: '',
   });
   const [usuarioAEliminar, setUsuarioAEliminar] = useState<Vendedor | null>(null);
   const [confirmacionNombre, setConfirmacionNombre] = useState('');
@@ -76,7 +84,7 @@ export default function VendedoresPage() {
   const fetchVendedores = async () => {
     try {
       const res = await apiClient.get<{ vendedores: Vendedor[] }>(
-        '/admin/vendedores'
+        appendSucursalQuery('/admin/vendedores', filtroSucursal),
       );
       setVendedores(res.vendedores);
     } catch (err) {
@@ -88,12 +96,14 @@ export default function VendedoresPage() {
   };
 
   useEffect(() => {
-    fetchVendedores();
-  }, []);
+    setIsLoading(true);
+    void fetchVendedores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarga al cambiar filtro sucursal
+  }, [filtroSucursal]);
 
   const handleCrear = async () => {
-    if (!form.nombre || !form.apellido || !form.email || !form.password) {
-      setCreateError('Todos los campos son requeridos');
+    if (!form.nombre || !form.apellido || !form.email || !form.password || !form.sucursal) {
+      setCreateError('Completá todos los campos, incluida la sucursal');
       return;
     }
     if (form.password.length < 8) {
@@ -107,7 +117,7 @@ export default function VendedoresPage() {
     try {
       await apiClient.post('/admin/vendedores', form);
       setShowModal(false);
-      setForm({ nombre: '', apellido: '', email: '', password: '', rol: 'vendedor' });
+      setForm({ nombre: '', apellido: '', email: '', password: '', rol: 'vendedor', sucursal: '' });
       fetchVendedores();
     } catch (err) {
       setCreateError(
@@ -151,6 +161,7 @@ export default function VendedoresPage() {
       nombre: vendedor.nombre,
       apellido: vendedor.apellido,
       email: vendedor.email,
+      sucursal: vendedor.sucursal || '',
     });
     setEditError(null);
     setShowEditModal(true);
@@ -204,6 +215,7 @@ export default function VendedoresPage() {
         nombre: editForm.nombre.trim(),
         apellido: editForm.apellido.trim(),
         email: editForm.email.trim().toLowerCase(),
+        sucursal: editForm.sucursal || null,
       });
       setShowEditModal(false);
       setEditingUser(null);
@@ -286,15 +298,23 @@ export default function VendedoresPage() {
           <option value="gomero">Gomeros</option>
           <option value="mecanico">Mecánicos</option>
         </select>
+        <SelectorSucursal
+          modo="filtro"
+          label="Filtrar por sucursal"
+          value={filtroSucursal}
+          onChange={setFiltroSucursal}
+          className="sm:w-56"
+        />
       </div>
 
       {/* Lista de vendedores */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
         {/* Header tabla desktop */}
-        <div className="hidden lg:grid grid-cols-6 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <div className="hidden lg:grid grid-cols-7 px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
           <span className="col-span-2">Usuario</span>
           <span className="text-center">Rol</span>
+          <span className="text-center">Sucursal</span>
           <span className="text-center">Progreso</span>
           <span className="text-center">Estado</span>
           <span className="text-center">Acciones</span>
@@ -328,80 +348,110 @@ export default function VendedoresPage() {
                 index !== 0 ? 'border-t border-gray-100' : ''
               } ${!vendedor.activo ? 'opacity-50' : ''}`}
             >
-              {/* Avatar */}
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-600 shrink-0">
-                {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
-              </div>
+              <Link
+                href={`/admin/vendedores/${vendedor.id}`}
+                className="flex flex-1 items-center gap-3 min-w-0 rounded-xl hover:bg-gray-50 transition-colors -my-1 py-1"
+              >
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-600 shrink-0">
+                  {vendedor.nombre.charAt(0)}{vendedor.apellido.charAt(0)}
+                </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">
-                  {vendedor.nombre} {vendedor.apellido}
-                </p>
-                <p className="text-xs text-gray-400 truncate">
-                  {vendedor.email}
-                </p>
-                <p className="text-xs font-medium text-[#C8102E] lg:hidden mt-0.5">{rolUi}</p>
-                <p className="text-xs text-gray-400 lg:hidden mt-0.5">
-                  {esVendedor
-                    ? `${vendedor.modulosAprobados}/${vendedor.totalModulos} módulos · ${porcentaje}%`
-                    : 'Sin módulos de capacitación'}
-                </p>
-              </div>
-
-              <div className="hidden lg:flex w-24 items-center justify-center">
-                <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded-full">
-                  {rolUi}
-                </span>
-              </div>
-
-              {/* Progreso desktop */}
-              <div className="hidden lg:block w-28">
-                {esVendedor ? (
-                  <>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-gray-500">
-                        {vendedor.modulosAprobados}/{vendedor.totalModulos}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 flex flex-wrap items-center gap-1.5">
+                    <span>
+                      {vendedor.nombre} {vendedor.apellido}
+                    </span>
+                    {!vendedor.sucursal && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                        Sin sucursal
                       </span>
-                      <span className="font-semibold text-gray-900">
-                        {porcentaje}%
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full">
-                      <div
-                        className="h-full bg-gray-900 rounded-full"
-                        style={{ width: `${porcentaje}%` }}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-xs text-gray-400 block text-center">—</span>
-                )}
-              </div>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {vendedor.email}
+                  </p>
+                  <p className="text-xs font-medium text-[#C8102E] lg:hidden mt-0.5">{rolUi}</p>
+                  <p className="text-xs text-gray-400 lg:hidden mt-0.5">
+                    {esVendedor
+                      ? `${vendedor.modulosAprobados}/${vendedor.totalModulos} módulos · ${porcentaje}%`
+                      : 'Sin módulos de capacitación'}
+                  </p>
+                </div>
 
-              {/* Badge activo/inactivo desktop */}
-              <div className="hidden lg:block w-24 text-center">
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  vendedor.activo
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {vendedor.activo ? 'Activo' : 'Inactivo'}
-                </span>
-              </div>
+                <div className="hidden lg:flex w-24 items-center justify-center shrink-0">
+                  <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded-full">
+                    {rolUi}
+                  </span>
+                </div>
 
-              {/* Acciones */}
-              <div className="flex flex-col items-stretch gap-1.5 shrink-0 w-[8.5rem]">
+                <div className="hidden lg:flex w-32 items-center justify-center shrink-0 px-1">
+                  {vendedor.sucursal ? (
+                    <span className="text-[10px] text-gray-600 text-center leading-tight">
+                      {vendedor.sucursal.replace('Sucursal ', '')}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                      Sin sucursal
+                    </span>
+                  )}
+                </div>
+
+                <div className="hidden lg:block w-28 shrink-0">
+                  {esVendedor ? (
+                    <>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-500">
+                          {vendedor.modulosAprobados}/{vendedor.totalModulos}
+                        </span>
+                        <span className="font-semibold text-gray-900">
+                          {porcentaje}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-100 rounded-full">
+                        <div
+                          className="h-full bg-gray-900 rounded-full"
+                          style={{ width: `${porcentaje}%` }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-xs text-gray-400 block text-center">—</span>
+                  )}
+                </div>
+
+                <div className="hidden lg:block w-24 text-center shrink-0">
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    vendedor.activo
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {vendedor.activo ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+              </Link>
+
+              <div
+                className="flex flex-col items-stretch gap-1.5 shrink-0 w-[8.5rem]"
+                onClick={(e) => e.stopPropagation()}
+              >
               <button
                 type="button"
-                onClick={() => openEditModal(vendedor)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openEditModal(vendedor);
+                }}
                 className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors text-center"
               >
                 Editar
               </button>
               <button
                 type="button"
-                onClick={() => void handleToggleActivo(vendedor)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void handleToggleActivo(vendedor);
+                }}
                 className={`w-full text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors text-center ${
                   vendedor.activo
                     ? 'border-amber-200 text-amber-600 hover:bg-amber-50'
@@ -412,7 +462,9 @@ export default function VendedoresPage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setUsuarioAEliminar(vendedor);
                   setConfirmacionNombre('');
                   setErrorEliminar(null);
@@ -491,6 +543,12 @@ export default function VendedoresPage() {
                   <option value="mecanico">Mecánico (taller)</option>
                 </select>
               </div>
+
+              <SelectorSucursal
+                modo="requerido"
+                value={form.sucursal}
+                onChange={(sucursal) => setForm({ ...form, sucursal })}
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
@@ -663,6 +721,12 @@ export default function VendedoresPage() {
                 <p className="text-sm text-red-600">{editError}</p>
               </div>
             )}
+
+            <SelectorSucursal
+              modo="opcional"
+              value={editForm.sucursal}
+              onChange={(sucursal) => setEditForm((f) => ({ ...f, sucursal }))}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">

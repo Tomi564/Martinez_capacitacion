@@ -14,6 +14,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { InstallPWA } from '@/components/ui/InstallPWA';
+import { ActivatePushModal } from '@/components/ui/ActivatePushModal';
 import { apiClient } from '@/lib/api';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -230,6 +231,7 @@ export default function AdminLayout({
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
   if (!mounted || !isAuthenticated() || !isAdmin()) return null;
 
   const isActive = (item: typeof NAV_ITEMS[number]) => {
@@ -343,6 +345,7 @@ export default function AdminLayout({
 
       </div>
       <InstallPWA />
+      <ActivatePushModal />
     </div>
   );
 }

@@ -5,6 +5,7 @@
 import { Response, NextFunction } from 'express';
 import { atencionesService } from '../services/atenciones.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { parseSucursalQueryAdmin } from '../constants/sucursales';
 import { validarDatosCliente } from '../utils/validarCliente';
 import { validarProductoMontoPorResultado } from '../utils/validarAtencion';
 import { mensajeResultadoInvalido, validarResultadoAtencion } from '../constants/atenciones';
@@ -137,7 +138,8 @@ export class AtencionesController {
    */
   async getTodas(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const result = await atencionesService.getTodasAtenciones();
+      const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+      const result = await atencionesService.getTodasAtenciones(filtroSucursal);
       return res.status(200).json(result);
     } catch (error) {
       next(error);

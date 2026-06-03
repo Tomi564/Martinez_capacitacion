@@ -133,7 +133,9 @@ export default function NuevaOrdenGomeroPage() {
                 onClick={() => aplicarVehiculo(s)}
               >
                 <span className="font-bold">{formatPatenteArDisplay(s.patente)}</span>{' '}
-                <span className="text-gray-600">{s.marca} {s.modelo}</span>
+                {s.modelo ? (
+                  <span className="text-gray-600">{s.modelo}</span>
+                ) : null}
               </button>
             ))}
           </div>

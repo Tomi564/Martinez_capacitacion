@@ -120,6 +120,8 @@ router.patch(
       const lineas = await presupuestoVisitaService.guardarPresupuestoVendedor(
         visitaId,
         presupuesto_lineas,
+        req.user!.id,
+        (req.user!.sucursal as string | null) ?? null,
       );
 
       return res.json({ presupuesto_lineas: lineas });

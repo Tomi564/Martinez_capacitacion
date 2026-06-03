@@ -11,10 +11,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
+import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
 
 const MAX_INTENTOS_EXAMEN = 3;
+
+const ROL_LABEL: Record<string, string> = {
+  vendedor: 'Vendedor',
+  gomero: 'Gomero',
+  mecanico: 'Mecánico',
+};
 
 interface VendedorDetalle {
   id: string;
@@ -23,6 +32,8 @@ interface VendedorDetalle {
   email: string;
   activo: boolean;
   created_at: string;
+  rol: string;
+  sucursal: string | null;
   progreso: {
     modulo_id: string;
     modulo_titulo: string;
@@ -45,6 +56,25 @@ interface VendedorDetalle {
       comentario: string | null;
     }[];
   };
+  calificacionesTaller: {
+    promedio: number;
+    total: number;
+    distribucion: Record<number, number>;
+    ultimas5: {
+      fecha: string;
+      estrellas: number;
+      comentario: string | null;
+    }[];
+  };
+  ordenesTaller: {
+    id: string;
+    created_at: string;
+    estado: string;
+    orden_estado: string | null;
+    motivo: string | null;
+    patente: string | null;
+    modelo: string | null;
+  }[];
 }
 
 export default function VendedorDetallePage() {
@@ -66,6 +96,7 @@ export default function VendedorDetallePage() {
     nombre: '',
     apellido: '',
     email: '',
+    sucursal: '',
   });
   const [showResetProgresoModal, setShowResetProgresoModal] = useState(false);
   const [resetProgresoLoading, setResetProgresoLoading] = useState(false);
@@ -82,28 +113,34 @@ export default function VendedorDetallePage() {
   const fetchVendedor = useCallback(async (showLoading = false) => {
     if (showLoading) setIsLoading(true);
     try {
-      const [vendRes, objRes] = await Promise.all([
-        apiClient.get<{ vendedor: VendedorDetalle }>(`/admin/vendedores/${vendedorId}`),
-        apiClient.get<{ objetivo: { meta_ventas: number; meta_conversion: number } | null }>(
-          `/admin/vendedores/${vendedorId}/objetivo`
-        ),
-      ]);
+      const vendRes = await apiClient.get<{ vendedor: VendedorDetalle }>(
+        `/admin/vendedores/${vendedorId}`,
+      );
       setVendedor(vendRes.vendedor);
       setEditPerfilForm({
         nombre: vendRes.vendedor.nombre,
         apellido: vendRes.vendedor.apellido,
         email: vendRes.vendedor.email,
+        sucursal: vendRes.vendedor.sucursal || '',
       });
       setError(null);
-      if (objRes.objetivo) {
-        setObjetivo(objRes.objetivo);
-        setObjForm({
-          meta_ventas: String(objRes.objetivo.meta_ventas || ''),
-          meta_conversion: String(objRes.objetivo.meta_conversion || ''),
-        });
+
+      if (vendRes.vendedor.rol === 'vendedor') {
+        const objRes = await apiClient.get<{
+          objetivo: { meta_ventas: number; meta_conversion: number } | null;
+        }>(`/admin/vendedores/${vendedorId}/objetivo`);
+        if (objRes.objetivo) {
+          setObjetivo(objRes.objetivo);
+          setObjForm({
+            meta_ventas: String(objRes.objetivo.meta_ventas || ''),
+            meta_conversion: String(objRes.objetivo.meta_conversion || ''),
+          });
+        }
+      } else {
+        setObjetivo(null);
       }
     } catch (err) {
-      setError('Error al cargar el vendedor');
+      setError('Error al cargar el usuario');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -135,6 +172,7 @@ export default function VendedorDetallePage() {
         nombre: editPerfilForm.nombre.trim(),
         apellido: editPerfilForm.apellido.trim(),
         email: editPerfilForm.email.trim().toLowerCase(),
+        sucursal: editPerfilForm.sucursal || null,
       };
 
       await apiClient.patch(`/admin/vendedores/${vendedorId}`, payload);
@@ -259,17 +297,19 @@ export default function VendedorDetallePage() {
     return (
       <div className="p-6">
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-sm text-red-600">{error || 'Vendedor no encontrado'}</p>
+          <p className="text-sm text-red-600">{error || 'Usuario no encontrado'}</p>
         </div>
       </div>
     );
   }
 
-  const aprobados = vendedor.progreso.filter(
-    (p) => p.estado === 'aprobado'
-  ).length;
-  const total = vendedor.progreso.length;
-  const porcentaje = total > 0 ? Math.round((aprobados / total) * 100) : 0;
+  const esVendedor = vendedor.rol === 'vendedor';
+  const esTaller = vendedor.rol === 'gomero' || vendedor.rol === 'mecanico';
+  const rolUi = ROL_LABEL[vendedor.rol] || vendedor.rol;
+
+  const aprobados = vendedor.progreso.filter((p) => p.estado === 'aprobado').length;
+  const totalModulos = vendedor.progreso.length;
+  const porcentaje = totalModulos > 0 ? Math.round((aprobados / totalModulos) * 100) : 0;
 
   return (
     <>
@@ -285,9 +325,15 @@ export default function VendedorDetallePage() {
             <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
-        <h1 className="text-xl font-bold text-gray-900">
-          {vendedor.nombre} {vendedor.apellido}
-        </h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 truncate">
+            {vendedor.nombre} {vendedor.apellido}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {rolUi}
+            {vendedor.sucursal ? ` · ${vendedor.sucursal}` : ' · Sin sucursal asignada'}
+          </p>
+        </div>
       </div>
 
       {/* Tarjeta de perfil */}
@@ -302,6 +348,11 @@ export default function VendedorDetallePage() {
                 {vendedor.nombre} {vendedor.apellido}
               </p>
               <p className="text-sm text-gray-500 truncate">{vendedor.email}</p>
+              {!vendedor.sucursal && (
+                <span className="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                  Sin sucursal — asigná una para activar el filtrado
+                </span>
+              )}
               <p className="text-xs text-gray-400 mt-1">
                 Registrado el{' '}
                 {new Date(vendedor.created_at).toLocaleDateString('es-AR', {
@@ -320,6 +371,7 @@ export default function VendedorDetallePage() {
                   nombre: vendedor.nombre,
                   apellido: vendedor.apellido,
                   email: vendedor.email,
+                  sucursal: vendedor.sucursal || '',
                 });
                 setEditPerfilMsg(null);
                 setShowEditPerfilModal(true);
@@ -344,49 +396,72 @@ export default function VendedorDetallePage() {
             >
               Cambiar contraseña
             </button>
-            <button
-              onClick={() => setShowResetProgresoModal(true)}
-              className="text-sm px-4 py-2 rounded-xl border border-orange-200 text-orange-600 hover:bg-orange-50 font-medium transition-colors"
-            >
-              Reiniciar progreso
-            </button>
+            {esVendedor && (
+              <button
+                onClick={() => setShowResetProgresoModal(true)}
+                className="text-sm px-4 py-2 rounded-xl border border-orange-200 text-orange-600 hover:bg-orange-50 font-medium transition-colors"
+              >
+                Reiniciar progreso
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Stats rápidas */}
-        <div className="grid grid-cols-3 gap-3 mt-5">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">{porcentaje}%</p>
-            <p className="text-xs text-gray-500 mt-0.5">Completado</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">
-              {aprobados}/{total}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">Módulos</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">
-              {vendedor.calificaciones.promedio > 0
-                ? vendedor.calificaciones.promedio.toFixed(1)
-                : '—'}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">Calificación</p>
-          </div>
-        </div>
+        {esVendedor && (
+          <>
+            <div className="grid grid-cols-3 gap-3 mt-5">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">{porcentaje}%</p>
+                <p className="text-xs text-gray-500 mt-0.5">Completado</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">
+                  {aprobados}/{totalModulos}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">Módulos</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">
+                  {vendedor.calificaciones.promedio > 0
+                    ? vendedor.calificaciones.promedio.toFixed(1)
+                    : '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">Calificación QR</p>
+              </div>
+            </div>
 
-        {/* Barra de progreso */}
-        <div className="mt-4">
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gray-900 rounded-full transition-all duration-500"
-              style={{ width: `${porcentaje}%` }}
-            />
+            <div className="mt-4">
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gray-900 rounded-full transition-all duration-500"
+                  style={{ width: `${porcentaje}%` }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {esTaller && (
+          <div className="grid grid-cols-2 gap-3 mt-5">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900">
+                {vendedor.calificacionesTaller.promedio > 0
+                  ? vendedor.calificacionesTaller.promedio.toFixed(1)
+                  : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Calificación taller</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900">
+                {vendedor.ordenesTaller.length}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Órdenes recientes</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Progreso por módulo */}
+      {esVendedor && (
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Progreso por módulo
@@ -489,8 +564,9 @@ export default function VendedorDetallePage() {
             ))}
         </div>
       </div>
+      )}
 
-      {/* Calificaciones QR */}
+      {esVendedor && (
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Calificaciones recibidas
@@ -554,8 +630,9 @@ export default function VendedorDetallePage() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Desglose de valoraciones QR */}
+      {esVendedor && (
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Desglose de valoraciones (QR)
@@ -619,8 +696,165 @@ export default function VendedorDetallePage() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Objetivo del mes */}
+      {esTaller && (
+        <>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Calificaciones del taller (QR)
+            </p>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              {vendedor.calificacionesTaller.total === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">
+                  Sin calificaciones aún
+                </p>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <p className="text-4xl font-bold text-gray-900">
+                      {vendedor.calificacionesTaller.promedio.toFixed(1)}
+                    </p>
+                    <div className="flex gap-0.5 mt-1 justify-center">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
+                          className={`text-lg ${
+                            star <= Math.round(vendedor.calificacionesTaller.promedio)
+                              ? 'text-amber-400'
+                              : 'text-gray-200'
+                          }`}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {vendedor.calificacionesTaller.total}{' '}
+                      {vendedor.calificacionesTaller.total === 1
+                        ? 'calificación'
+                        : 'calificaciones'}
+                    </p>
+                  </div>
+                  <div className="flex-1 flex flex-col gap-1">
+                    {[5, 4, 3, 2, 1].map((star) => {
+                      const cantidad =
+                        vendedor.calificacionesTaller.distribucion[star] || 0;
+                      const pct =
+                        vendedor.calificacionesTaller.total > 0
+                          ? (cantidad / vendedor.calificacionesTaller.total) * 100
+                          : 0;
+                      return (
+                        <div key={star} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 w-3">{star}</span>
+                          <span className="text-amber-400 text-xs">★</span>
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-amber-400 rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-400 w-4 text-right">
+                            {cantidad}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {vendedor.calificacionesTaller.ultimas5.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Últimas valoraciones
+              </p>
+              <div className="flex flex-col gap-2">
+                {vendedor.calificacionesTaller.ultimas5.map((item, idx) => (
+                  <div
+                    key={`${item.fecha}-${idx}`}
+                    className="bg-white border border-gray-200 rounded-xl p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {item.estrellas}★
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(item.fecha).toLocaleDateString('es-AR', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    {item.comentario ? (
+                      <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">
+                        {item.comentario}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-1 italic">Sin comentario</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Órdenes de trabajo recientes
+            </p>
+            {vendedor.ordenesTaller.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
+                <p className="text-sm text-gray-400">
+                  {vendedor.rol === 'gomero'
+                    ? 'Todavía no creó órdenes registradas.'
+                    : 'Todavía no completó órdenes asignadas.'}
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {vendedor.ordenesTaller.map((orden) => (
+                  <Link
+                    key={orden.id}
+                    href={`/admin/clientes/informe/${orden.id}`}
+                    className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {orden.patente || 'Sin patente'}
+                        {orden.modelo ? ` · ${orden.modelo}` : ''}
+                      </p>
+                      {orden.motivo && (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{orden.motivo}</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(orden.created_at).toLocaleDateString('es-AR', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {orden.orden_estado && (
+                        <BadgeOrdenEstado ordenEstado={orden.orden_estado} />
+                      )}
+                      <span className="text-xs text-gray-500 capitalize">{orden.estado}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {esVendedor && (
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -694,6 +928,7 @@ export default function VendedorDetallePage() {
           </div>
         )}
       </div>
+      )}
 
     </div>
 
@@ -722,6 +957,12 @@ export default function VendedorDetallePage() {
               {editPerfilMsg}
             </div>
           )}
+
+          <SelectorSucursal
+            modo="opcional"
+            value={editPerfilForm.sucursal}
+            onChange={(sucursal) => setEditPerfilForm((v) => ({ ...v, sucursal }))}
+          />
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-gray-700">Nombre</label>
@@ -779,8 +1020,7 @@ export default function VendedorDetallePage() {
       </div>
     )}
 
-    {/* Modal reiniciar progreso */}
-    {showResetProgresoModal && (
+    {esVendedor && showResetProgresoModal && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-end lg:items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">

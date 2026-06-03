@@ -22,4 +22,16 @@ router.get(
   clientesController.ventas.bind(clientesController)
 );
 
+router.get(
+  '/:id/dependencias',
+  requireRole('vendedor', 'admin'),
+  clientesController.dependencias.bind(clientesController)
+);
+
+router.delete(
+  '/:id',
+  requireRole('vendedor', 'admin'),
+  clientesController.eliminar.bind(clientesController)
+);
+
 export default router;

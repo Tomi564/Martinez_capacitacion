@@ -16,6 +16,8 @@ interface Vehiculo {
   id: string; patente: string; marca: string; modelo: string; anio: number | null;
   clientes: { nombre: string; apellido: string; dni: string | null; telefono: string | null; email: string | null } | null;
   visitas_taller: Visita[];
+  es_cliente_propio?: boolean;
+  es_patente_pendiente?: boolean;
 }
 interface Participante {
   id: string; nombre: string; apellido: string; dni: string; contacto: string; created_at: string;
@@ -118,7 +120,11 @@ export default function ClientesVendedorPage() {
                   <button onClick={() => setExpandido(abierto ? null : v.id)} className="w-full p-4 text-left flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-black text-gray-900 tracking-wider">{v.patente}</p>
-                      <p className="text-sm text-gray-600">{v.marca} {v.modelo}{v.anio && ` · ${v.anio}`}</p>
+                      {v.es_patente_pendiente ? (
+                        <p className="text-sm text-amber-700 font-medium">Patente pendiente de alta en taller</p>
+                      ) : (
+                        <p className="text-sm text-gray-600">{v.marca} {v.modelo}{v.anio && ` · ${v.anio}`}</p>
+                      )}
                       {c ? (
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                           <p className="text-xs text-gray-500">
@@ -126,6 +132,11 @@ export default function ClientesVendedorPage() {
                             {c.telefono && ` · ${c.telefono}`}
                           </p>
                           <BadgeRangoEtario dni={c.dni} />
+                          {v.es_cliente_propio && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#C8102E]/10 text-[#C8102E]">
+                              Tu cliente
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <p className="text-xs text-gray-300 mt-0.5">Sin cliente</p>

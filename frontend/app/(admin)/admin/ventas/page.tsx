@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiClient, ApiError } from '@/lib/api';
 import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
+import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { appendSucursalQuery } from '@/lib/sucursales';
 
 interface Atencion {
   id: string;
@@ -64,13 +66,16 @@ export default function VentasAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [filtroVendedor, setFiltroVendedor] = useState('todos');
   const [filtroResultado, setFiltroResultado] = useState('todos');
+  const [filtroSucursal, setFiltroSucursal] = useState('');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [atencionAEliminar, setAtencionAEliminar] = useState<Atencion | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
   const cargarAtenciones = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ atenciones: Atencion[] }>('/atenciones/todas');
+      const res = await apiClient.get<{ atenciones: Atencion[] }>(
+        appendSucursalQuery('/atenciones/todas', filtroSucursal),
+      );
       setAtenciones(res.atenciones);
       setError(null);
     } catch {
@@ -78,7 +83,7 @@ export default function VentasAdminPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [filtroSucursal]);
 
   useEffect(() => {
     void cargarAtenciones();
@@ -236,6 +241,14 @@ export default function VentasAdminPage() {
           <option value="pendiente">Pendiente</option>
           <option value="no_venta">Sin venta</option>
         </select>
+
+        <SelectorSucursal
+          modo="filtro"
+          label="Sucursal"
+          value={filtroSucursal}
+          onChange={setFiltroSucursal}
+          className="sm:flex-1 min-w-0"
+        />
       </div>
 
       {filtradas.length === 0 ? (

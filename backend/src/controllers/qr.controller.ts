@@ -96,7 +96,7 @@ export class QRController {
 
   /**
    * GET /api/qr/participantes
-   * Lista de participantes del sorteo — solo admin
+   * Admin: todos. Vendedor: solo los de su QR (vendedor_id).
    */
   async getParticipantes(
     req: AuthRequest,
@@ -106,7 +106,9 @@ export class QRController {
     try {
       const limit = Number(req.query.limit) || 20;
       const offset = Number(req.query.offset) || 0;
-      const result = await qrService.getParticipantesSorteo(limit, offset);
+      const user = req.user!;
+      const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
+      const result = await qrService.getParticipantesSorteo(limit, offset, { vendedorId });
       return res.status(200).json(result);
     } catch (error) {
       next(error);

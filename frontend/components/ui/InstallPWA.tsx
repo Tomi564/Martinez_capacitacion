@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   dismissPwaInstallThisSession,
   isPwaInstallDismissedThisSession,
+  isPwaModalCerradoSession,
+  isPwaPromptPendingSession,
 } from '@/lib/pwa-install-session';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -39,6 +41,7 @@ function detectIOSSafari(): boolean {
 export function InstallPWA() {
   const pendingPwaPrompt = useAuth((s) => s.pendingPwaPrompt);
   const clearPendingPwaPrompt = useAuth((s) => s.clearPendingPwaPrompt);
+  const markPwaModalCerrado = useAuth((s) => s.markPwaModalCerrado);
 
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -53,6 +56,8 @@ export function InstallPWA() {
   useEffect(() => {
     if (isAppStandalone()) {
       setIsInstalled(true);
+      markPwaModalCerrado();
+      clearPendingPwaPrompt();
       return;
     }
 
@@ -69,10 +74,14 @@ export function InstallPWA() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     };
-  }, []);
+  }, [clearPendingPwaPrompt, markPwaModalCerrado]);
 
   useEffect(() => {
-    if (!pendingPwaPrompt || isInstalled || isPwaInstallDismissedThisSession()) {
+    if (!pendingPwaPrompt && !isPwaPromptPendingSession()) {
+      setShowModal(false);
+      return;
+    }
+    if (isInstalled || isPwaInstallDismissedThisSession() || isPwaModalCerradoSession()) {
       setShowModal(false);
       return;
     }
@@ -90,9 +99,38 @@ export function InstallPWA() {
     setShowModal(false);
   }, [pendingPwaPrompt, isInstalled, isIOS, promptEvent]);
 
+  /** Sin modal PWA posible: liberar gate para el modal push */
+  useEffect(() => {
+    const pwaPending = pendingPwaPrompt || isPwaPromptPendingSession();
+    if (!pwaPending || isInstalled) return;
+
+    if (isPwaInstallDismissedThisSession()) {
+      markPwaModalCerrado();
+      clearPendingPwaPrompt();
+      return;
+    }
+
+    if (isIOS || promptEvent) return;
+
+    const id = window.setTimeout(() => {
+      markPwaModalCerrado();
+      clearPendingPwaPrompt();
+    }, 2500);
+
+    return () => window.clearTimeout(id);
+  }, [
+    pendingPwaPrompt,
+    isInstalled,
+    isIOS,
+    promptEvent,
+    markPwaModalCerrado,
+    clearPendingPwaPrompt,
+  ]);
+
   const cerrarModal = () => {
     setShowModal(false);
     clearPendingPwaPrompt();
+    markPwaModalCerrado();
   };
 
   const handleInstalar = async () => {

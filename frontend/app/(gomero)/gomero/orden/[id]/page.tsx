@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { Button } from '@/components/ui/button';
 import { NumberWheelPicker } from '@/components/ui/NumberWheelPicker';
+import { FotosNeumaticoPicker } from '@/components/taller/FotosNeumaticoPicker';
 
 interface Orden {
   id: string;
@@ -17,6 +18,7 @@ interface Orden {
   marca_neumatico: string | null;
   medida_neumatico: string | null;
   observaciones_gomero: string | null;
+  fotos_neumatico_urls?: string[] | null;
   vehiculos: {
     patente: string;
     marca: string;
@@ -81,6 +83,7 @@ export default function OrdenGomeroDetallePage() {
   const [medida, setMedida] = useState('');
   const [presionBar, setPresionBar] = useState(2.2);
   const [obs, setObs] = useState('');
+  const [fotos, setFotos] = useState<string[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -101,6 +104,7 @@ export default function OrdenGomeroDetallePage() {
         snapBar(o.presion_psi != null ? psiToBar(o.presion_psi) : 2.2)
       );
       setObs(o.observaciones_gomero || '');
+      setFotos(Array.isArray(o.fotos_neumatico_urls) ? o.fotos_neumatico_urls : []);
     } catch {
       setLoadError(true);
     } finally {
@@ -149,8 +153,8 @@ export default function OrdenGomeroDetallePage() {
       setMsg('Elegí una marca de neumático.');
       return false;
     }
-    if (!neumaticosCambiados && !medida) {
-      setMsg('Sin cambio de neumáticos, la medida es obligatoria.');
+    if (!medida.trim()) {
+      setMsg('Completá la medida del neumático.');
       return false;
     }
     setMsg(null);
@@ -160,9 +164,10 @@ export default function OrdenGomeroDetallePage() {
         neumaticos_cambiados: neumaticosCambiados,
         km: km || null,
         marca_neumatico: marca,
-        medida_neumatico: neumaticosCambiados ? null : medida,
-        presion_psi: Number((barToPsi(presionBar)).toFixed(1)),
+        medida_neumatico: medida.trim(),
+        presion_psi: Number(barToPsi(presionBar).toFixed(1)),
         observaciones_gomero: obs.trim() || null,
+        fotos_neumatico_urls: fotos.length ? fotos : null,
       });
       setMsg('Guardado.');
       return true;
@@ -301,31 +306,28 @@ export default function OrdenGomeroDetallePage() {
             </select>
           </div>
 
-          {!neumaticosCambiados && (
-            <>
-              <div className="bg-white rounded-2xl border border-gray-200 p-4">
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Medida</p>
-                <input
-                  type="text"
-                  inputMode="text"
-                  autoComplete="off"
-                  value={medida}
-                  onChange={(e) => setMedida(sanitizarMedidaNeumatico(e.target.value))}
-                  placeholder="Ej: 195/65R15"
-                  className="w-full h-14 px-3 text-base font-medium rounded-xl border border-gray-200 bg-white uppercase tracking-wide"
-                />
-              </div>
-              <NumberWheelPicker
-                label="Presión"
-                min={BAR_MIN}
-                max={BAR_MAX}
-                step={BAR_STEP}
-                value={presionBar}
-                onChange={(v) => setPresionBar(snapBar(v))}
-                suffix="BAR"
-              />
-            </>
-          )}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4">
+            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Medida</p>
+            <input
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              value={medida}
+              onChange={(e) => setMedida(sanitizarMedidaNeumatico(e.target.value))}
+              placeholder="Ej: 195/65R15"
+              className="w-full h-14 px-3 text-base font-medium rounded-xl border border-gray-200 bg-white uppercase tracking-wide"
+            />
+          </div>
+
+          <NumberWheelPicker
+            label="Presión"
+            min={BAR_MIN}
+            max={BAR_MAX}
+            step={BAR_STEP}
+            value={presionBar}
+            onChange={(v) => setPresionBar(snapBar(v))}
+            suffix="BAR"
+          />
 
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Observaciones (opcional)</p>
@@ -337,6 +339,8 @@ export default function OrdenGomeroDetallePage() {
               placeholder="Algo puntual…"
             />
           </div>
+
+          <FotosNeumaticoPicker fotos={fotos} onChange={setFotos} />
         </>
       )}
 

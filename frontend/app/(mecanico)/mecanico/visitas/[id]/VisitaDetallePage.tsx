@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 import { PresupuestoChecklistForm } from '@/components/taller/PresupuestoChecklistForm';
+import { FotosNeumaticoPicker } from '@/components/taller/FotosNeumaticoPicker';
 import {
   type CatalogoItemApi,
   type LineaGuardadaApi,
@@ -29,6 +30,7 @@ interface Visita {
   marca_neumatico?: string | null;
   medida_neumatico?: string | null;
   observaciones_gomero?: string | null;
+  fotos_neumatico_urls?: string[] | null;
   vehiculos: {
     patente: string;
     marca: string;
@@ -46,6 +48,7 @@ export default function VisitaDetallePage() {
   const [lineas, setLineas] = useState<PresupuestoLineaState[]>(emptyPresupuestoState());
   const [operario, setOperario] = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [fotos, setFotos] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEnviando, setIsEnviando] = useState(false);
@@ -69,6 +72,9 @@ export default function VisitaDetallePage() {
       setVisita(res.visita);
       setObservaciones(res.visita.observaciones || '');
       setOperario(res.visita.operario_responsable || '');
+      setFotos(
+        Array.isArray(res.visita.fotos_neumatico_urls) ? res.visita.fotos_neumatico_urls : [],
+      );
 
       const catalogo = res.presupuesto_catalogo || [];
       const guardadas = (res.presupuesto_lineas || []).map((l) => ({
@@ -107,6 +113,7 @@ export default function VisitaDetallePage() {
         observaciones: observaciones.trim() || null,
         operario_responsable: operario.trim() || null,
         presupuesto_lineas: payloadLineas,
+        fotos_neumatico_urls: fotos.length ? fotos : null,
       });
       setMsg({ tipo: 'ok', texto: 'Guardado correctamente' });
       return true;
@@ -144,6 +151,12 @@ export default function VisitaDetallePage() {
   };
 
   const finalizarOrden = async () => {
+    if (!tienePresupuesto) {
+      const confirmar = window.confirm(
+        '¿Seguro que querés finalizar sin marcar ningún ítem?',
+      );
+      if (!confirmar) return;
+    }
     setFinalizando(true);
     setMsg(null);
     try {
@@ -247,9 +260,7 @@ export default function VisitaDetallePage() {
             )}
             {visita.km != null && <li>Km: {visita.km}</li>}
             {visita.marca_neumatico && <li>Marca: {visita.marca_neumatico}</li>}
-            {!visita.neumaticos_cambiados && visita.medida_neumatico && (
-              <li>Medida: {visita.medida_neumatico}</li>
-            )}
+            {visita.medida_neumatico && <li>Medida: {visita.medida_neumatico}</li>}
             {visita.observaciones_gomero && <li>Obs.: {visita.observaciones_gomero}</li>}
           </ul>
         </div>
@@ -280,6 +291,8 @@ export default function VisitaDetallePage() {
           Esta visita está cerrada. Reabrila para editar el presupuesto.
         </div>
       )}
+
+      <FotosNeumaticoPicker fotos={fotos} onChange={setFotos} disabled={entregado} />
 
       {msg && (
         <div

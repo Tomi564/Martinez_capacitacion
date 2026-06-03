@@ -5,8 +5,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { suscribirPush } from '@/hooks/usePushNotifications';
 import { InstallPWA } from '@/components/ui/InstallPWA';
+import { ActivatePushModal } from '@/components/ui/ActivatePushModal';
 
 const NAV_MI_QR = {
   href: '/gomero/mi-qr',
@@ -62,13 +62,6 @@ export default function GomeroLayout({ children }: { children: React.ReactNode }
     if (user?.rol !== 'gomero') { router.replace('/login'); return; }
   }, []);
 
-  useEffect(() => {
-    if (!mounted || user?.rol !== 'gomero') return;
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      suscribirPush();
-    }
-  }, [mounted, user?.rol]);
-
   if (!mounted || !isAuthenticated()) return null;
 
   return (
@@ -98,6 +91,7 @@ export default function GomeroLayout({ children }: { children: React.ReactNode }
       />
 
       <InstallPWA />
+      <ActivatePushModal />
     </div>
   );
 }

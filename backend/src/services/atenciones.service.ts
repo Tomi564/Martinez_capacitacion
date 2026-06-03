@@ -117,18 +117,25 @@ async function sincronizarOrdenGomero(
   resultado: string,
   patente: PatenteAtencionInput,
   observaciones?: string | null,
-) {
-  if (!debeCrearOrdenGomero(resultado, patente)) return;
-  if (await atencionYaTieneOrden(atencionId)) return;
+): Promise<string | null> {
+  if (!debeCrearOrdenGomero(resultado, patente)) return null;
+  if (await atencionYaTieneOrden(atencionId)) return null;
 
-  const resuelta = await resolverPatenteAtencion(patente);
-  await crearOrdenDesdeAtencion({
-    atencionId,
-    clienteId,
-    vehiculoId: resuelta.vehiculo_id,
-    patentePendiente: resuelta.patente_manual,
-    motivo: observaciones,
-  });
+  try {
+    const resuelta = await resolverPatenteAtencion(patente);
+    await crearOrdenDesdeAtencion({
+      atencionId,
+      clienteId,
+      vehiculoId: resuelta.vehiculo_id,
+      patentePendiente: resuelta.patente_manual,
+      motivo: observaciones,
+    });
+    return null;
+  } catch (err) {
+    console.error('[AtencionesService] Error creando orden para gomero', err);
+    if (err instanceof AppError) return err.message;
+    return 'No se pudo crear la orden de trabajo para el gomero. Contactá al administrador.';
+  }
 }
 
 export class AtencionesService {
@@ -177,15 +184,13 @@ export class AtencionesService {
 
     if (error) throw mapErrorSupabaseAtencion(error);
 
-    await sincronizarOrdenGomero(
+    const advertenciaOrden = await sincronizarOrdenGomero(
       inserted.id,
       clienteId,
       data.resultado,
       patenteInput,
       data.observaciones,
-    ).catch((err) => {
-      console.error('[AtencionesService] Error creando orden para gomero', err);
-    });
+    );
 
     if (data.resultado === 'venta_cerrada') {
       this.checkObjetivoHito(userId).catch((err) => {
@@ -196,7 +201,10 @@ export class AtencionesService {
       });
     }
 
-    return { mensaje: 'Atención registrada correctamente' };
+    return {
+      mensaje: 'Atención registrada correctamente',
+      ...(advertenciaOrden ? { advertencia_orden: advertenciaOrden } : {}),
+    };
   }
 
   /**
@@ -244,17 +252,18 @@ export class AtencionesService {
     if (error) throw mapErrorSupabaseAtencion(error);
     if (!updated) throw new AppError('Atención no encontrada', 404);
 
-    await sincronizarOrdenGomero(
+    const advertenciaOrden = await sincronizarOrdenGomero(
       atencionId,
       clienteId,
       data.resultado,
       patenteInput,
       data.observaciones,
-    ).catch((err) => {
-      console.error('[AtencionesService] Error creando orden para gomero (update)', err);
-    });
+    );
 
-    return { mensaje: 'Atención actualizada correctamente' };
+    return {
+      mensaje: 'Atención actualizada correctamente',
+      ...(advertenciaOrden ? { advertencia_orden: advertenciaOrden } : {}),
+    };
   }
 
   /**
@@ -350,15 +359,28 @@ export class AtencionesService {
   /**
    * Todas las atenciones — solo admin.
    */
-  async getTodasAtenciones() {
-    const { data, error } = await supabase
+  async getTodasAtenciones(filtroSucursal?: string | null) {
+    let query = supabase
       .from('atenciones')
       .select(`
         *,
-        users (nombre, apellido, email),
+        users (nombre, apellido, email, sucursal),
         clientes (id, nombre, apellido, telefono, email)
       `)
       .order('created_at', { ascending: false });
+
+    if (filtroSucursal) {
+      const { data: vendedores } = await supabase
+        .from('users')
+        .select('id')
+        .eq('rol', 'vendedor')
+        .eq('sucursal', filtroSucursal);
+      const ids = (vendedores || []).map((v) => v.id);
+      if (!ids.length) return { atenciones: [] };
+      query = query.in('user_id', ids);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw new AppError('Error al obtener las atenciones', 500);
 

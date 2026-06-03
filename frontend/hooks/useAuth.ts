@@ -18,7 +18,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ApiError, apiClient, bindAuthTokenSource } from '@/lib/api';
-import { resetPwaInstallSession } from '@/lib/pwa-install-session';
+import { resetPwaInstallSession, markPwaPromptPendingSession, markPwaModalCerradoSession } from '@/lib/pwa-install-session';
+import { resetPushPromptSession } from '@/lib/push-prompt-session';
 import type { User, LoginResponse } from '@/types';
 
 interface AuthState {
@@ -31,6 +32,8 @@ interface AuthState {
   sessionExpiredBanner: boolean;
   /** True tras login exitoso — InstallPWA muestra el modal una vez por sesión */
   pendingPwaPrompt: boolean;
+  /** True cuando el usuario cerró el modal PWA o no aplica — habilita modal push */
+  pwaModalCerrado: boolean;
 
   // Acciones
   login: (email: string, password: string) => Promise<void>;
@@ -38,6 +41,7 @@ interface AuthState {
   clearError: () => void;
   clearSessionExpiredBanner: () => void;
   clearPendingPwaPrompt: () => void;
+  markPwaModalCerrado: () => void;
   refreshUser: () => Promise<void>;
 
   // Guards
@@ -61,6 +65,7 @@ export const useAuth = create<AuthState>()(
       error: null,
       sessionExpiredBanner: false,
       pendingPwaPrompt: false,
+      pwaModalCerrado: false,
 
       // ─────────────────────────────────────────────────────
       // Login: llama al backend y guarda token + user
@@ -90,6 +95,8 @@ export const useAuth = create<AuthState>()(
           }
 
           resetPwaInstallSession();
+          resetPushPromptSession();
+          markPwaPromptPendingSession();
           set({
             token: response.token,
             user: response.user as User,
@@ -97,6 +104,7 @@ export const useAuth = create<AuthState>()(
             error: null,
             sessionExpiredBanner: false,
             pendingPwaPrompt: true,
+            pwaModalCerrado: false,
           });
         } catch (error) {
           set({
@@ -130,6 +138,7 @@ export const useAuth = create<AuthState>()(
           error: null,
           sessionExpiredBanner: false,
           pendingPwaPrompt: false,
+          pwaModalCerrado: false,
         });
 
         // Redirigir al login
@@ -171,6 +180,11 @@ export const useAuth = create<AuthState>()(
       clearSessionExpiredBanner: () => set({ sessionExpiredBanner: false }),
 
       clearPendingPwaPrompt: () => set({ pendingPwaPrompt: false }),
+
+      markPwaModalCerrado: () => {
+        markPwaModalCerradoSession();
+        set({ pwaModalCerrado: true });
+      },
 
       // ─────────────────────────────────────────────────────
       // Guards de rol

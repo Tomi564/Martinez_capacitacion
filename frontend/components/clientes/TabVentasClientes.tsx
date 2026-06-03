@@ -46,10 +46,17 @@ const RESULTADO_LABEL: Record<string, string> = {
 interface TabVentasClientesProps {
   busqueda: string;
   showVendedor?: boolean;
+  /** Base API sin prefijo /api — ej. `/clientes` (vendedor) o `/admin/clientes` (admin). */
+  clientesApiBase?: string;
   onMensaje?: (msg: { tipo: 'ok' | 'error'; texto: string }) => void;
 }
 
-export function TabVentasClientes({ busqueda, showVendedor = false, onMensaje }: TabVentasClientesProps) {
+export function TabVentasClientes({
+  busqueda,
+  showVendedor = false,
+  clientesApiBase = '/clientes',
+  onMensaje,
+}: TabVentasClientesProps) {
   const [clientes, setClientes] = useState<ClienteVenta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -81,7 +88,7 @@ export function TabVentasClientes({ busqueda, showVendedor = false, onMensaje }:
     setClienteAEliminar(c);
     try {
       const res = await apiClient.get<{ vehiculos: number; atenciones: number; visitas: number }>(
-        `/admin/clientes/${c.id}/dependencias`
+        `${clientesApiBase}/${c.id}/dependencias`
       );
       const partes: string[] = [];
       if (res.vehiculos > 0) partes.push(`${res.vehiculos} vehículo${res.vehiculos === 1 ? '' : 's'}`);
@@ -106,7 +113,7 @@ export function TabVentasClientes({ busqueda, showVendedor = false, onMensaje }:
     if (!c) return;
     setEliminando(true);
     try {
-      await apiClient.delete(`/admin/clientes/${c.id}`);
+      await apiClient.delete(`${clientesApiBase}/${c.id}`);
       setClienteAEliminar(null);
       setAdvertencia(null);
       onMensaje?.({ tipo: 'ok', texto: 'Cliente eliminado' });

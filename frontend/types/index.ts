@@ -21,12 +21,13 @@ export interface User {
   activo: boolean;
   avatar_url: string | null;
   created_at: string;
+  sucursal?: string | null;
 }
 
 // Lo que devuelve el endpoint de login
 export interface LoginResponse {
   token: string;
-  user: Omit<User, 'activo' | 'created_at'>;
+  user: Omit<User, 'activo' | 'created_at'> & { sucursal?: string | null };
 }
 
 // ─────────────────────────────────────────────────────

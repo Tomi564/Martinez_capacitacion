@@ -45,6 +45,7 @@ export default function AtencionesPage() {
     error,
     setError,
     successMsg,
+    warningMsg,
     atencionDetalle,
     setAtencionDetalle,
     mostrarDetalles,
@@ -150,6 +151,13 @@ export default function AtencionesPage() {
       {successMsg && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
           <p className="text-sm text-green-700 font-medium">{successMsg}</p>
+        </div>
+      )}
+
+      {warningMsg && (
+        <div role="alert" className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-sm font-semibold text-amber-900">Orden de taller no creada</p>
+          <p className="text-sm text-amber-800 mt-1">{warningMsg}</p>
         </div>
       )}
 

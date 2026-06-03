@@ -12,6 +12,11 @@ import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { modulosService } from './modulos.service';
 import bcrypt from 'bcryptjs';
+import {
+  esSucursalValida,
+  parseSucursalRequerida,
+  type SucursalNombre,
+} from '../constants/sucursales';
 
 /** Roles que el admin puede crear/gestionar desde el mismo panel que vendedores */
 const ROLES_EQUIPO = ['vendedor', 'gomero', 'mecanico'] as const;
@@ -289,12 +294,18 @@ export class AdminService {
   /**
    * Lista todos los vendedores con su progreso.
    */
-  async getVendedores() {
-    const { data: usuarios, error } = await supabase
+  async getVendedores(filtroSucursal?: SucursalNombre | null) {
+    let query = supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, created_at, rol')
+      .select('id, nombre, apellido, email, activo, created_at, rol, sucursal')
       .in('rol', [...ROLES_EQUIPO])
       .order('created_at', { ascending: false });
+
+    if (filtroSucursal) {
+      query = query.eq('sucursal', filtroSucursal);
+    }
+
+    const { data: usuarios, error } = await query;
 
     if (error) throw new AppError('Error al obtener usuarios del equipo', 500);
 
@@ -339,6 +350,7 @@ export class AdminService {
         activo: u.activo,
         created_at: u.created_at,
         rol,
+        sucursal: (u.sucursal as string | null) ?? null,
         modulosAprobados,
         totalModulos: esVendedor ? totalModulos : 0,
         promedioNotas: Math.round(promedioNotas * 10) / 10,
@@ -357,8 +369,15 @@ export class AdminService {
     email: string;
     password: string;
     rol?: string;
+    sucursal: string;
   }) {
     const rol = parseRolEquipo(data.rol);
+    let sucursal: SucursalNombre;
+    try {
+      sucursal = parseSucursalRequerida(data.sucursal);
+    } catch {
+      throw new AppError('Seleccioná una sucursal válida', 400);
+    }
 
     // Verificar que el email no esté en uso
     const { data: existente } = await supabase
@@ -389,6 +408,7 @@ export class AdminService {
         password_hash: passwordHash,
         rol,
         activo: true,
+        sucursal,
       })
       .select('id')
       .single();
@@ -416,6 +436,7 @@ export class AdminService {
       apellido?: string;
       email?: string;
       activo?: boolean;
+      sucursal?: string | null;
     },
     actor?: ActorAuditoria
   ) {
@@ -425,18 +446,35 @@ export class AdminService {
     if (typeof data.apellido === 'string') payload.apellido = data.apellido.trim();
     if (typeof data.email === 'string') payload.email = data.email.toLowerCase().trim();
 
-    if (Object.keys(payload).length === 0) {
+    if (Object.keys(payload).length === 0 && data.sucursal === undefined) {
       throw new AppError('No hay cambios para actualizar', 400);
     }
 
     const { data: antes } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at, rol')
+      .select('id, nombre, apellido, email, activo, updated_at, rol, sucursal')
       .eq('id', vendedorId)
       .in('rol', [...ROLES_EQUIPO])
       .single();
 
     if (!antes) throw new AppError('Usuario no encontrado', 404);
+
+    if (data.sucursal !== undefined) {
+      if (data.sucursal === null || data.sucursal === '') {
+        if (antes.sucursal) {
+          throw new AppError('No se puede quitar la sucursal una vez asignada.', 400);
+        }
+        payload.sucursal = null;
+      } else if (esSucursalValida(data.sucursal)) {
+        payload.sucursal = data.sucursal;
+      } else {
+        throw new AppError('Sucursal inválida', 400);
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      throw new AppError('No hay cambios para actualizar', 400);
+    }
 
     if (typeof payload.email === 'string' && payload.email !== antes.email) {
       const { data: emailEnUso } = await supabase
@@ -460,7 +498,7 @@ export class AdminService {
 
     const { data: despues } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, updated_at, rol')
+      .select('id, nombre, apellido, email, activo, updated_at, rol, sucursal')
       .eq('id', vendedorId)
       .in('rol', [...ROLES_EQUIPO])
       .single();
@@ -604,7 +642,7 @@ export class AdminService {
   /**
    * Reportes completos de progreso y calificaciones.
    */
-  async getReportes(): Promise<{
+  async getReportes(filtroSucursal?: SucursalNombre | null): Promise<{
     progreso: ReporteProgresoItem[];
     calificaciones: ReporteCalificacionesItem[];
   }> {
@@ -617,7 +655,19 @@ export class AdminService {
     if (progresoError) throw new AppError('Error al obtener reporte de progreso', 500);
     if (calificacionesError) throw new AppError('Error al obtener reporte de calificaciones', 500);
 
-    const reporteProgreso: ReporteProgresoItem[] = (progresoRows || []).map((row: AdminReporteProgresoRow) => ({
+    let emailsSucursal: Set<string> | null = null;
+    if (filtroSucursal) {
+      const { data: usersSuc } = await supabase
+        .from('users')
+        .select('email')
+        .eq('rol', 'vendedor')
+        .eq('sucursal', filtroSucursal);
+      emailsSucursal = new Set((usersSuc || []).map((u) => u.email as string));
+    }
+
+    const reporteProgreso: ReporteProgresoItem[] = (progresoRows || [])
+      .filter((row: AdminReporteProgresoRow) => !emailsSucursal || emailsSucursal.has(row.email))
+      .map((row: AdminReporteProgresoRow) => ({
       vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
       email: row.email,
       modulosAprobados: Number(row.modulos_aprobados || 0),
@@ -628,8 +678,9 @@ export class AdminService {
       fechaUltimaActividad: row.fecha_ultima_actividad || null,
     }));
 
-    const reporteCalificaciones: ReporteCalificacionesItem[] = (calificacionesRows || []).map(
-      (row: AdminReporteCalificacionesRow) => ({
+    const reporteCalificaciones: ReporteCalificacionesItem[] = (calificacionesRows || [])
+      .filter((row: AdminReporteCalificacionesRow) => !emailsSucursal || emailsSucursal.has(row.email))
+      .map((row: AdminReporteCalificacionesRow) => ({
       vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
       email: row.email,
       promedio: Math.round(Number(row.promedio || 0) * 10) / 10,
@@ -663,13 +714,29 @@ export class AdminService {
   /**
    * Velocidad de capacitación por vendedor (RPC admin_velocidad_capacitacion).
    */
-  async getVelocidadCapacitacion(): Promise<{ velocidad: VelocidadCapacitacionItem[] }> {
+  async getVelocidadCapacitacion(
+    filtroSucursal?: SucursalNombre | null,
+  ): Promise<{ velocidad: VelocidadCapacitacionItem[] }> {
     const { data, error } = await supabase.rpc('admin_velocidad_capacitacion');
 
     if (error) throw new AppError('Error al obtener velocidad de capacitación', 500);
 
-    const velocidad: VelocidadCapacitacionItem[] = (data || []).map(
-      (row: AdminVelocidadCapacitacionRow) => ({
+    let userIdsSucursal: Set<string> | null = null;
+    if (filtroSucursal) {
+      const { data: usersSuc } = await supabase
+        .from('users')
+        .select('id')
+        .eq('rol', 'vendedor')
+        .eq('sucursal', filtroSucursal);
+      userIdsSucursal = new Set((usersSuc || []).map((u) => u.id as string));
+    }
+
+    const velocidad: VelocidadCapacitacionItem[] = (data || [])
+      .filter(
+        (row: AdminVelocidadCapacitacionRow) =>
+          !userIdsSucursal || userIdsSucursal.has(row.user_id),
+      )
+      .map((row: AdminVelocidadCapacitacionRow) => ({
         userId: row.user_id,
         vendedor: `${row.nombre || ''} ${row.apellido || ''}`.trim(),
         promedioExamenMinutos:
@@ -682,8 +749,7 @@ export class AdminService {
             : null,
         moduloMasRapido: row.modulo_mas_rapido || null,
         moduloMasLento: row.modulo_mas_lento || null,
-      })
-    );
+      }));
 
     return { velocidad };
   }
@@ -798,90 +864,203 @@ export class AdminService {
   }
 
   /**
-   * Obtiene el detalle completo de un vendedor con su progreso y calificaciones.
+   * Detalle de un usuario del equipo (vendedor, gomero o mecánico).
    */
-  async getVendedorById(vendedorId: string) {
-    // Datos del vendedor
-    const { data: vendedor, error } = await supabase
+  async getVendedorById(userId: string) {
+    const { data: usuario, error } = await supabase
       .from('users')
-      .select('id, nombre, apellido, email, activo, created_at')
-      .eq('id', vendedorId)
-      .eq('rol', 'vendedor')
+      .select('id, nombre, apellido, email, activo, created_at, rol, sucursal')
+      .eq('id', userId)
+      .in('rol', [...ROLES_EQUIPO])
       .single();
 
-    if (error || !vendedor) {
-      throw new AppError('Vendedor no encontrado', 404);
+    if (error || !usuario) {
+      throw new AppError('Usuario del equipo no encontrado', 404);
     }
 
-    // Progreso con nombre del módulo
-    const { data: progresos } = await supabase
-      .from('progreso')
-      .select(`
-        modulo_id,
-        estado,
-        mejor_nota,
-        intentos,
-        completado_at,
-        modulos (
-          titulo,
-          orden
-        )
-      `)
-      .eq('user_id', vendedorId);
+    const rol = String(usuario.rol || 'vendedor') as RolEquipo;
+    const esVendedor = rol === 'vendedor';
+    const esTaller = rol === 'gomero' || rol === 'mecanico';
 
-    const progreso = (progresos || []).map((p: any) => ({
-      modulo_id: p.modulo_id,
-      modulo_titulo: p.modulos?.titulo || '',
-      modulo_orden: p.modulos?.orden || 0,
-      estado: p.estado,
-      mejor_nota: p.mejor_nota || 0,
-      intentos: p.intentos || 0,
-      completado_at: p.completado_at,
-    }));
-
-    // Calificaciones
-    const { data: calificaciones } = await supabase
-      .from('calificaciones_qr')
-      .select('estrellas, estrellas_vendedor, estrellas_empresa, comentario, created_at')
-      .eq('vendedor_id', vendedorId);
-
-    const total = calificaciones?.length || 0;
-    const sumaVendedor = (calificaciones || []).reduce(
-      (acc, c: any) => acc + (c.estrellas_vendedor ?? c.estrellas), 0
-    );
-    const sumaEmpresa = (calificaciones || []).reduce(
-      (acc, c: any) => acc + (c.estrellas_empresa ?? c.estrellas), 0
-    );
-    const distribucion: Record<number, number> = {
-      1: 0, 2: 0, 3: 0, 4: 0, 5: 0,
+    const calificacionesVacias = {
+      promedio: 0,
+      promedioVendedor: 0,
+      promedioEmpresa: 0,
+      total: 0,
+      distribucion: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<number, number>,
+      ultimas5: [] as {
+        fecha: string;
+        estrellasVendedor: number;
+        estrellasEmpresa: number;
+        comentario: string | null;
+      }[],
     };
-    (calificaciones || []).forEach((c: any) => {
-      const estrellaVendedor = c.estrellas_vendedor ?? c.estrellas;
-      distribucion[estrellaVendedor] = (distribucion[estrellaVendedor] || 0) + 1;
-    });
 
-    const ultimas5 = [...(calificaciones || [])]
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 5)
-      .map((c: any) => ({
-        fecha: c.created_at,
-        estrellasVendedor: c.estrellas_vendedor ?? c.estrellas,
-        estrellasEmpresa: c.estrellas_empresa ?? c.estrellas,
-        comentario: c.comentario || null,
-      }));
+    const calificacionesTallerVacias = {
+      promedio: 0,
+      total: 0,
+      distribucion: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<number, number>,
+      ultimas5: [] as { fecha: string; estrellas: number; comentario: string | null }[],
+    };
+
+    let progreso: {
+      modulo_id: string;
+      modulo_titulo: string;
+      modulo_orden: number;
+      estado: string;
+      mejor_nota: number;
+      intentos: number;
+      completado_at: string | null;
+    }[] = [];
+
+    let calificaciones = { ...calificacionesVacias };
+
+    if (esVendedor) {
+      const { data: progresos } = await supabase
+        .from('progreso')
+        .select(`
+          modulo_id,
+          estado,
+          mejor_nota,
+          intentos,
+          completado_at,
+          modulos (
+            titulo,
+            orden
+          )
+        `)
+        .eq('user_id', userId);
+
+      progreso = (progresos || []).map((p: Record<string, unknown>) => {
+        const mod = p.modulos as { titulo?: string; orden?: number } | null;
+        return {
+          modulo_id: String(p.modulo_id),
+          modulo_titulo: mod?.titulo || '',
+          modulo_orden: mod?.orden || 0,
+          estado: String(p.estado),
+          mejor_nota: Number(p.mejor_nota) || 0,
+          intentos: Number(p.intentos) || 0,
+          completado_at: (p.completado_at as string) || null,
+        };
+      });
+
+      const { data: calificacionesQr } = await supabase
+        .from('calificaciones_qr')
+        .select('estrellas, estrellas_vendedor, estrellas_empresa, comentario, created_at')
+        .eq('vendedor_id', userId);
+
+      const total = calificacionesQr?.length || 0;
+      const sumaVendedor = (calificacionesQr || []).reduce(
+        (acc, c) => acc + (c.estrellas_vendedor ?? c.estrellas),
+        0,
+      );
+      const sumaEmpresa = (calificacionesQr || []).reduce(
+        (acc, c) => acc + (c.estrellas_empresa ?? c.estrellas),
+        0,
+      );
+      const distribucion: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      (calificacionesQr || []).forEach((c) => {
+        const estrellaVendedor = c.estrellas_vendedor ?? c.estrellas;
+        distribucion[estrellaVendedor] = (distribucion[estrellaVendedor] || 0) + 1;
+      });
+
+      const ultimas5 = [...(calificacionesQr || [])]
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        .slice(0, 5)
+        .map((c) => ({
+          fecha: c.created_at,
+          estrellasVendedor: c.estrellas_vendedor ?? c.estrellas,
+          estrellasEmpresa: c.estrellas_empresa ?? c.estrellas,
+          comentario: c.comentario || null,
+        }));
+
+      calificaciones = {
+        promedio: total > 0 ? Math.round((sumaVendedor / total) * 10) / 10 : 0,
+        promedioVendedor: total > 0 ? Math.round((sumaVendedor / total) * 10) / 10 : 0,
+        promedioEmpresa: total > 0 ? Math.round((sumaEmpresa / total) * 10) / 10 : 0,
+        total,
+        distribucion,
+        ultimas5,
+      };
+    }
+
+    let calificacionesTaller = { ...calificacionesTallerVacias };
+    let ordenesTaller: {
+      id: string;
+      created_at: string;
+      estado: string;
+      orden_estado: string | null;
+      motivo: string | null;
+      patente: string | null;
+      modelo: string | null;
+    }[] = [];
+
+    if (esTaller) {
+      const { data: calTaller } = await supabase
+        .from('calificaciones_taller')
+        .select('estrellas, comentario, created_at')
+        .eq('empleado_id', userId)
+        .order('created_at', { ascending: false });
+
+      const totalTaller = calTaller?.length || 0;
+      const sumaTaller = (calTaller || []).reduce((acc, c) => acc + c.estrellas, 0);
+      const distTaller: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      (calTaller || []).forEach((c) => {
+        distTaller[c.estrellas] = (distTaller[c.estrellas] || 0) + 1;
+      });
+
+      calificacionesTaller = {
+        promedio: totalTaller > 0 ? Math.round((sumaTaller / totalTaller) * 10) / 10 : 0,
+        total: totalTaller,
+        distribucion: distTaller,
+        ultimas5: (calTaller || []).slice(0, 5).map((c) => ({
+          fecha: c.created_at,
+          estrellas: c.estrellas,
+          comentario: c.comentario || null,
+        })),
+      };
+
+      let visitasQuery = supabase
+        .from('visitas_taller')
+        .select(
+          `id, created_at, estado, orden_estado, motivo, vehiculos(patente, modelo)`,
+        )
+        .order('created_at', { ascending: false })
+        .limit(15);
+
+      if (rol === 'gomero') {
+        visitasQuery = visitasQuery.eq('gomero_id', userId);
+      } else {
+        visitasQuery = visitasQuery.eq('mecanico_id', userId);
+      }
+
+      const { data: visitas } = await visitasQuery;
+
+      ordenesTaller = (visitas || []).map((v: Record<string, unknown>) => {
+        const veh = v.vehiculos as { patente?: string; modelo?: string } | null;
+        return {
+          id: String(v.id),
+          created_at: String(v.created_at),
+          estado: String(v.estado),
+          orden_estado: v.orden_estado != null ? String(v.orden_estado) : null,
+          motivo: v.motivo != null ? String(v.motivo) : null,
+          patente: veh?.patente || null,
+          modelo: veh?.modelo || null,
+        };
+      });
+    }
 
     return {
       vendedor: {
-        ...vendedor,
+        ...usuario,
+        rol,
         progreso,
-        calificaciones: {
-          promedio: total > 0 ? Math.round((sumaVendedor / total) * 10) / 10 : 0,
-          promedioVendedor: total > 0 ? Math.round((sumaVendedor / total) * 10) / 10 : 0,
-          promedioEmpresa: total > 0 ? Math.round((sumaEmpresa / total) * 10) / 10 : 0,
-          total,
-          distribucion,
-          ultimas5,
-        },
+        calificaciones,
+        calificacionesTaller,
+        ordenesTaller,
       },
     };
   }

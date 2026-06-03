@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { InstallPWA } from '@/components/ui/InstallPWA';
+import { ActivatePushModal } from '@/components/ui/ActivatePushModal';
 
 const NAV_MI_QR = {
   href: '/mecanico/mi-qr',
@@ -90,6 +91,7 @@ export default function MecanicoLayout({ children }: { children: React.ReactNode
       />
 
       <InstallPWA />
+      <ActivatePushModal />
     </div>
   );
 }

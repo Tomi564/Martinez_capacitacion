@@ -8,6 +8,8 @@ import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { TabVentasClientes } from '@/components/clientes/TabVentasClientes';
 import { BadgeOrdenEstado } from '@/components/taller/BadgeOrdenEstado';
 import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
+import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { appendSucursalQuery } from '@/lib/sucursales';
 
 interface Visita {
   id: string; estado: string; orden_estado?: string | null; motivo: string | null; observaciones: string | null;
@@ -39,6 +41,7 @@ export default function ClientesAdminPage() {
   const [busqueda, setBusqueda] = useState('');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [tab, setTab] = useState<'taller' | 'qr' | 'ventas'>('taller');
+  const [filtroSucursal, setFiltroSucursal] = useState('');
   const [hasError, setHasError] = useState(false);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [eliminando, setEliminando] = useState(false);
@@ -56,7 +59,9 @@ export default function ClientesAdminPage() {
     setHasError(false);
     try {
       const [vRes, pRes] = await Promise.all([
-      apiClient.get<{ vehiculos: Vehiculo[] }>('/mecanico/clientes'),
+      apiClient.get<{ vehiculos: Vehiculo[] }>(
+        appendSucursalQuery('/mecanico/clientes?include_empty=true', filtroSucursal),
+      ),
       apiClient.get<{ participantes: Participante[] }>('/qr/participantes'),
       ]);
       setVehiculos(vRes.vehiculos);
@@ -67,7 +72,7 @@ export default function ClientesAdminPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [filtroSucursal]);
 
   useEffect(() => {
     void cargarClientes();
@@ -278,11 +283,19 @@ export default function ClientesAdminPage() {
 
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-5 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Clientes y visitas</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Historial por vehículo, checklist y base del taller y del QR
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Clientes y visitas</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Historial por vehículo, checklist y base del taller y del QR
+          </p>
+        </div>
+        <SelectorSucursal
+          modo="filtro"
+          value={filtroSucursal}
+          onChange={setFiltroSucursal}
+          className="sm:w-56 shrink-0"
+        />
       </div>
 
       {/* Stats */}
@@ -500,6 +513,7 @@ export default function ClientesAdminPage() {
         <TabVentasClientes
           busqueda={busqueda}
           showVendedor
+          clientesApiBase="/admin/clientes"
           onMensaje={(m) => setMsg(m)}
         />
       )}

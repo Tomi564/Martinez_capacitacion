@@ -45,10 +45,15 @@ router.post('/subscribe', async (req: AuthRequest, res: Response, next: NextFunc
       return res.status(400).json({ error: 'Suscripción inválida' });
     }
 
-    await supabase.from('push_subscriptions').upsert(
+    const { error: upsertError } = await supabase.from('push_subscriptions').upsert(
       { user_id: userId, endpoint, p256dh: keys.p256dh, auth: keys.auth },
       { onConflict: 'user_id,endpoint' }
     );
+
+    if (upsertError) {
+      console.error('[push/subscribe] Error guardando suscripción:', upsertError);
+      return res.status(500).json({ error: 'Error al guardar la suscripción' });
+    }
 
     return res.status(200).json({ mensaje: 'Suscripción guardada' });
   } catch (error) {

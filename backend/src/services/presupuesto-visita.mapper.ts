@@ -35,6 +35,7 @@ export const VISITA_PRESUPUESTO_SELECT = `
   operario_responsable,
   observaciones,
   motivo,
+  patente_pendiente,
   vehiculos (
     patente,
     marca,
@@ -63,6 +64,7 @@ export type VisitaRow = {
   operario_responsable?: string | null;
   observaciones: string | null;
   motivo: string | null;
+  patente_pendiente?: string | null;
   vehiculos: {
     patente: string;
     marca: string;
@@ -184,7 +186,7 @@ export function mapVisitaAPresupuestoPdf(
       telefono: c?.telefono?.trim() || '',
     },
     vehiculo: {
-      patente: v?.patente || '—',
+      patente: v?.patente || row.patente_pendiente?.trim() || '—',
       marca: v?.marca || '',
       modelo: v?.modelo || '',
     },

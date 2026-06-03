@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { InstallPWA } from '@/components/ui/InstallPWA';
+import { ActivatePushModal } from '@/components/ui/ActivatePushModal';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 
@@ -224,6 +225,7 @@ export default function VendedorLayout({
       />
 
       <InstallPWA />
+      <ActivatePushModal />
     </div>
   );
 }

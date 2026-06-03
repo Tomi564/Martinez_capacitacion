@@ -17,13 +17,12 @@ import { apiClient } from '@/lib/api';
 import type { ModuloConProgreso, ResumenCalificaciones } from '@/types';
 import type { InfoNivel } from '@/components/ui/NivelBadge';
 import { Insignias } from '@/components/ui/Insignias';
-import { suscribirPush } from '@/hooks/usePushNotifications';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, Megaphone } from 'lucide-react';
+import { Megaphone } from 'lucide-react';
 import { PreguntasDiariasDashboard } from '@/components/vendedor/PreguntasDiariasDashboard';
 
 interface Comunicado {
@@ -58,14 +57,6 @@ export default function DashboardPage() {
   const [comunicado, setComunicado] = useState<Comunicado | null>(null);
   const [objetivo, setObjetivo] = useState<Objetivo | null>(null);
   const [progresoObjetivo, setProgresoObjetivo] = useState<ProgresoObjetivo | null>(null);
-  const [pushPermiso, setPushPermiso] = useState<NotificationPermission | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPushPermiso(Notification.permission);
-      if (Notification.permission === 'granted') suscribirPush();
-    }
-  }, []);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -308,24 +299,6 @@ export default function DashboardPage() {
       {/* Insignias */}
       {data && data.modulos.length > 0 && (
         <Insignias modulos={data.modulos} />
-      )}
-
-      {/* Activar notificaciones push */}
-      {pushPermiso === 'default' && (
-        <Button
-          onClick={async () => {
-            const ok = await suscribirPush();
-            setPushPermiso(ok ? 'granted' : 'denied');
-          }}
-          variant="outline"
-          className="w-full justify-start rounded-xl"
-        >
-          <Bell className="w-5 h-5 text-gray-500" />
-          <div className="text-left">
-            <p className="font-semibold">Activar notificaciones</p>
-            <p className="text-xs text-gray-400">Recibí avisos de comunicados y novedades</p>
-          </div>
-        </Button>
       )}
 
     </div>

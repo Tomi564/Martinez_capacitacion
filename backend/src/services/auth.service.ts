@@ -20,6 +20,7 @@ interface JWTPayload {
   rol: 'vendedor' | 'admin' | 'mecanico' | 'gomero';
   nombre: string;
   apellido: string;
+  sucursal: string | null;
 }
 
 interface LoginResult {
@@ -31,6 +32,7 @@ interface LoginResult {
     nombre: string;
     apellido: string;
     avatar_url: string | null;
+    sucursal: string | null;
   };
 }
 
@@ -43,7 +45,7 @@ export class AuthService {
     // 1. Buscar el usuario por email
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, password_hash, rol, nombre, apellido, avatar_url, activo')
+      .select('id, email, password_hash, rol, nombre, apellido, avatar_url, activo, sucursal')
       .eq('email', email.toLowerCase().trim())
       .single();
 
@@ -66,12 +68,16 @@ export class AuthService {
     }
 
     // 4. Generar el JWT con los datos mínimos necesarios
+    const sucursal =
+      user.rol === 'admin' ? null : (user.sucursal as string | null) ?? null;
+
     const payload: JWTPayload = {
       id: user.id,
       email: user.email,
       rol: user.rol,
       nombre: user.nombre,
       apellido: user.apellido,
+      sucursal,
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET!, {
@@ -87,6 +93,7 @@ export class AuthService {
         nombre: user.nombre,
         apellido: user.apellido,
         avatar_url: user.avatar_url,
+        sucursal,
       },
     };
   }
@@ -99,7 +106,7 @@ export class AuthService {
   async getMe(userId: string) {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, rol, nombre, apellido, avatar_url, activo, created_at')
+      .select('id, email, rol, nombre, apellido, avatar_url, activo, created_at, sucursal')
       .eq('id', userId)
       .single();
 
@@ -107,7 +114,10 @@ export class AuthService {
       throw new AppError('Usuario no encontrado', 404);
     }
 
-    return user;
+    return {
+      ...user,
+      sucursal: user.rol === 'admin' ? null : (user.sucursal as string | null) ?? null,
+    };
   }
 
   /**

@@ -13,7 +13,9 @@ export class ClientesController {
   async sugerencias(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const q = (req.query.q as string) || '';
-      const result = await clientesService.buscarSugerencias(q);
+      const user = req.user!;
+      const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
+      const result = await clientesService.buscarSugerencias(q, 12, { vendedorId });
       return res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -30,6 +32,32 @@ export class ClientesController {
       const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
       const result = await clientesService.listarClientesVentas(vendedorId);
       return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** GET /api/clientes/:id/dependencias */
+  async dependencias(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const user = req.user!;
+      const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
+      const result = await clientesService.dependenciasCliente(id, { vendedorId });
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** DELETE /api/clientes/:id */
+  async eliminar(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const user = req.user!;
+      const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
+      const result = await clientesService.eliminarCliente(id, { vendedorId });
+      return res.status(200).json({ mensaje: result.mensaje });
     } catch (error) {
       next(error);
     }

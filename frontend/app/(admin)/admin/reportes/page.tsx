@@ -13,6 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { apiClient, ApiError } from '@/lib/api';
 import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
+import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { appendSucursalQuery } from '@/lib/sucursales';
 
 interface CalificacionQrDetalle {
   id: string;
@@ -164,6 +166,7 @@ export default function ReportesPage() {
   const [tallerEmpleados, setTallerEmpleados] = useState<ReporteTallerEmpleado[]>([]);
   const [isLoadingTaller, setIsLoadingTaller] = useState(false);
   const [errorTaller, setErrorTaller] = useState<string | null>(null);
+  const [filtroSucursal, setFiltroSucursal] = useState('');
 
   const loadBloqueados = useCallback(async () => {
     const res = await apiClient.get<{ vendedoresBloqueados: VendedorBloqueado[] }>(
@@ -177,7 +180,7 @@ export default function ReportesPage() {
     setErrorVelocidad(null);
     try {
       const res = await apiClient.get<{ velocidad: VelocidadCapacitacion[] }>(
-        '/admin/reportes/velocidad'
+        appendSucursalQuery('/admin/reportes/velocidad', filtroSucursal),
       );
       setVelocidad(res.velocidad || []);
     } catch (err) {
@@ -189,13 +192,13 @@ export default function ReportesPage() {
     } finally {
       setIsLoadingVelocidad(false);
     }
-  }, []);
+  }, [filtroSucursal]);
 
   const loadCalificacionesDetalle = useCallback(async () => {
     setIsLoadingCalificacionesDetalle(true);
     try {
       const res = await apiClient.get<{ calificaciones: CalificacionQrDetalle[] }>(
-        '/admin/calificaciones-qr?limit=100'
+        appendSucursalQuery('/admin/calificaciones-qr?limit=100', filtroSucursal),
       );
       setCalificacionesDetalle(res.calificaciones || []);
     } catch (err) {
@@ -204,14 +207,14 @@ export default function ReportesPage() {
     } finally {
       setIsLoadingCalificacionesDetalle(false);
     }
-  }, []);
+  }, [filtroSucursal]);
 
   const loadTaller = useCallback(async () => {
     setIsLoadingTaller(true);
     setErrorTaller(null);
     try {
       const res = await apiClient.get<{ empleados: ReporteTallerEmpleado[] }>(
-        '/admin/calificaciones-taller',
+        appendSucursalQuery('/admin/calificaciones-taller', filtroSucursal),
       );
       setTallerEmpleados(res.empleados || []);
     } catch (err) {
@@ -223,7 +226,7 @@ export default function ReportesPage() {
     } finally {
       setIsLoadingTaller(false);
     }
-  }, []);
+  }, [filtroSucursal]);
 
   useEffect(() => {
     if (tabActiva === 'velocidad') {
@@ -235,16 +238,18 @@ export default function ReportesPage() {
     if (tabActiva === 'taller') {
       void loadTaller();
     }
-  }, [tabActiva, loadVelocidad, loadCalificacionesDetalle, loadTaller]);
+  }, [tabActiva, filtroSucursal, loadVelocidad, loadCalificacionesDetalle, loadTaller]);
 
   const fetchReportesRefresh = useCallback(async () => {
     try {
-      const reportesRes = await apiClient.get<ReportesData>('/admin/reportes');
+      const reportesRes = await apiClient.get<ReportesData>(
+        appendSucursalQuery('/admin/reportes', filtroSucursal),
+      );
       setData(reportesRes);
     } catch {
       /* el resumen agregado puede quedar desactualizado hasta recargar */
     }
-  }, []);
+  }, [filtroSucursal]);
 
   const confirmarEliminarCalificacion = async () => {
     const c = calificacionAEliminar;
@@ -295,7 +300,7 @@ export default function ReportesPage() {
       setErrorBloqueados(null);
 
       const reqReportes = apiClient
-        .get<ReportesData>('/admin/reportes')
+        .get<ReportesData>(appendSucursalQuery('/admin/reportes', filtroSucursal))
         .then((reportesRes) => setData(reportesRes))
         .catch((err) => {
           console.error('[ReportesPage] Error cargando reportes', err);
@@ -314,7 +319,7 @@ export default function ReportesPage() {
     };
 
     void fetchReportes();
-  }, [loadBloqueados]);
+  }, [loadBloqueados, filtroSucursal]);
 
   const handleResetIntentos = async (item: VendedorBloqueado) => {
     const confirmar = window.confirm(
@@ -346,7 +351,11 @@ export default function ReportesPage() {
         const authRaw = localStorage.getItem('martinez-auth');
         const token = authRaw ? JSON.parse(authRaw)?.state?.token : null;
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-        const response = await fetch(`${baseUrl}/admin/reportes/csv?tipo=${tipo}`, {
+        const csvUrl = appendSucursalQuery(
+          `${baseUrl}/admin/reportes/csv?tipo=${tipo}`,
+          filtroSucursal,
+        );
+        const response = await fetch(csvUrl, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
@@ -406,13 +415,19 @@ export default function ReportesPage() {
       )}
 
       {/* Encabezado */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Analíticas</h1>
           <p className="text-sm text-gray-500 mt-1">
             Intentos, promedios y calificaciones del equipo
           </p>
         </div>
+        <SelectorSucursal
+          modo="filtro"
+          value={filtroSucursal}
+          onChange={setFiltroSucursal}
+          className="sm:w-56"
+        />
         {tabActiva !== 'bloqueados' && tabActiva !== 'velocidad' && tabActiva !== 'taller' && (
         <button
           onClick={() => exportarCSV(tabActiva as 'progreso' | 'calificaciones')}

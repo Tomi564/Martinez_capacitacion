@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { apiClient, ApiError } from '@/lib/api';
+import { formatPatenteArDisplay } from '@/lib/patente';
 import { PageState } from '@/components/ui/PageState';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,7 @@ export interface InformeVisita {
   fotos_neumatico_urls?: string[] | null;
   created_at: string;
   updated_at?: string | null;
+  patente_pendiente?: string | null;
   enviado_al_mecanico_at?: string | null;
   mecanico_tomo_at?: string | null;
   gomero?: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null;
@@ -53,6 +55,10 @@ export interface InformeVisita {
     medida_rueda: string | null;
     clientes: { nombre: string; apellido: string; dni: string | null; email: string | null; telefono: string | null } | null;
   } | null;
+  atenciones?: {
+    id: string;
+    clientes: { nombre: string; apellido: string; dni: string | null; email: string | null; telefono: string | null } | null;
+  } | { id: string; clientes: { nombre: string; apellido: string; dni: string | null; email: string | null; telefono: string | null } | null }[] | null;
 }
 
 function fmt(ts: string | null | undefined) {
@@ -259,8 +265,8 @@ export function InformeVisitaTaller({
     setDescargandoPdf(true);
     setErrorPdf(null);
     try {
-      const patente = visita.vehiculos?.patente || 'sin-patente';
-      const fallback = nombrePresupuestoPdf(patente, visita.created_at);
+      const patenteRaw = visita.vehiculos?.patente || visita.patente_pendiente || 'sin-patente';
+      const fallback = nombrePresupuestoPdf(patenteRaw, visita.created_at);
       await apiClient.downloadFile(
         `${presupuestoApiBase}/${visitaId}/presupuesto.pdf`,
         fallback,
@@ -288,8 +294,8 @@ export function InformeVisitaTaller({
       setPreciosVendedor(preciosDesdeLineas(lineas));
       setModo('presupuesto');
 
-      const patente = visita.vehiculos?.patente || 'sin-patente';
-      const fallback = nombrePresupuestoPdf(patente, visita.created_at);
+      const patenteRaw = visita.vehiculos?.patente || visita.patente_pendiente || 'sin-patente';
+      const fallback = nombrePresupuestoPdf(patenteRaw, visita.created_at);
       await apiClient.downloadFile(
         `${presupuestoApiBase}/${visitaId}/presupuesto.pdf`,
         fallback,
@@ -315,7 +321,13 @@ export function InformeVisitaTaller({
   }
 
   const v = visita.vehiculos;
-  const c = v?.clientes;
+  const atencionRow = Array.isArray(visita.atenciones) ? visita.atenciones[0] : visita.atenciones;
+  const c = v?.clientes ?? atencionRow?.clientes ?? null;
+  const patenteDisplay = v?.patente
+    ? formatPatenteArDisplay(v.patente)
+    : visita.patente_pendiente
+      ? formatPatenteArDisplay(visita.patente_pendiente)
+      : '—';
   const fotos = Array.isArray(visita.fotos_neumatico_urls) ? visita.fotos_neumatico_urls : [];
   const tieneParteGomero =
     visita.neumaticos_cambiados != null ||
@@ -421,7 +433,10 @@ export function InformeVisitaTaller({
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Vehículo y cliente</p>
-        <p className="text-3xl font-black tracking-widest text-gray-900">{v?.patente}</p>
+        <p className="text-3xl font-black tracking-widest text-gray-900">{patenteDisplay}</p>
+        {visita.patente_pendiente && !v?.patente && (
+          <p className="text-xs text-amber-700 mt-1">Patente pendiente de alta en taller</p>
+        )}
         <p className="text-gray-700 font-medium mt-1">
           {v?.modelo}
           {v?.anio ? ` · ${v.anio}` : ''}

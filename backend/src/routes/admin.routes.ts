@@ -15,6 +15,8 @@ import { preguntasDiariasService } from '../services/preguntas-diarias.service';
 import { presupuestoVisitaController } from '../controllers/presupuesto-visita.controller';
 import { tallerController } from '../controllers/taller.controller';
 import { visitaTieneDiagnosticoCargado } from '../utils/visita-diagnostico';
+import { parseSucursalQueryAdmin } from '../constants/sucursales';
+import { idsGomerosPorSucursal, idsVendedoresPorSucursal } from '../utils/sucursal-filter';
 
 const router = Router();
 
@@ -679,6 +681,43 @@ router.get('/notificaciones-ranking', async (req, res, next) => {
   }
 });
 
+// DELETE /api/admin/push-subscriptions — resetear todas las suscripciones push
+router.delete('/push-subscriptions', async (req, res, next) => {
+  try {
+    const { count, error: countErr } = await supabase
+      .from('push_subscriptions')
+      .select('id', { count: 'exact', head: true });
+
+    if (countErr) {
+      console.error('[admin] DELETE /push-subscriptions count', countErr);
+      return res.status(500).json({ error: 'Error al leer suscripciones push' });
+    }
+
+    const { error: delErr } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .not('user_id', 'is', null);
+
+    if (delErr) {
+      console.error('[admin] DELETE /push-subscriptions', delErr);
+      return res.status(500).json({ error: 'Error al eliminar suscripciones push' });
+    }
+
+    await registrarAuditoria(req, {
+      accion: 'reset_push_subscriptions',
+      entidad: 'push_subscriptions',
+      datosNuevos: { eliminadas: count ?? 0 },
+    });
+
+    return res.status(200).json({
+      mensaje: 'Suscripciones push reseteadas',
+      eliminadas: count ?? 0,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ─────────────────────────────────────────────────────
 // Objetivos
 // ─────────────────────────────────────────────────────
@@ -692,19 +731,25 @@ router.get('/visitas', async (req, res, next) => {
   try {
     const fecha = (req.query.fecha as string) || '';
     const mecanicoId = (req.query.mecanico_id as string) || '';
+    const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
     let query = supabase
       .from('visitas_taller')
       .select(`
-        id, created_at, estado, estado_visita, motivo, observaciones, updated_at, updated_by_admin_at, updated_by_admin_id,
+        id, created_at, estado, estado_visita, motivo, observaciones, updated_at, updated_by_admin_at, updated_by_admin_id, gomero_id,
         vehiculos(patente, marca, modelo, clientes(nombre, apellido)),
         users!visitas_taller_mecanico_id_fkey(id, nombre, apellido)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
+    if (filtroSucursal) {
+      const gomeroIds = await idsGomerosPorSucursal(filtroSucursal);
+      if (gomeroIds.length) query = query.in('gomero_id', gomeroIds);
+      else query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+    }
     if (mecanicoId) {
       query = query.eq('mecanico_id', mecanicoId);
     }
@@ -730,14 +775,21 @@ router.get('/visitas', async (req, res, next) => {
 /** Contador SLA: pendiente_mecanico, sin tomar, enviada hace más de 2 h. */
 router.get('/taller/ordenes-mecanico-retrasadas-count', async (req, res, next) => {
   try {
+    const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
     const limite = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const { count, error } = await supabase
+    let q = supabase
       .from('visitas_taller')
       .select('id', { count: 'exact', head: true })
       .eq('orden_estado', 'pendiente_mecanico')
       .is('mecanico_tomo_at', null)
       .not('enviado_al_mecanico_at', 'is', null)
       .lt('enviado_al_mecanico_at', limite);
+    if (filtroSucursal) {
+      const gomeroIds = await idsGomerosPorSucursal(filtroSucursal);
+      if (gomeroIds.length) q = q.in('gomero_id', gomeroIds);
+      else return res.status(200).json({ count: 0 });
+    }
+    const { count, error } = await q;
     if (error) throw error;
     return res.status(200).json({ count: count ?? 0 });
   } catch (error) {
@@ -898,20 +950,30 @@ router.get('/calificaciones-taller', tallerController.getReporteAdmin.bind(talle
 // GET /api/admin/calificaciones-qr — listado individual para gestión
 router.get('/calificaciones-qr', async (req, res, next) => {
   try {
+    const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
     const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
-    const { data, error, count } = await supabase
+    let q = supabase
       .from('calificaciones_qr')
       .select(
         `
         id, estrellas_vendedor, estrellas_empresa, comentario, created_at,
         users!calificaciones_qr_vendedor_id_fkey(id, nombre, apellido, email)
       `,
-        { count: 'exact' }
+        { count: 'exact' },
       )
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
+
+    if (filtroSucursal) {
+      const vendedorIds = await idsVendedoresPorSucursal(filtroSucursal);
+      if (!vendedorIds.length) {
+        return res.status(200).json({ calificaciones: [], total: 0, limit, offset });
+      }
+      q = q.in('vendedor_id', vendedorIds);
+    }
+
+    const { data, error, count } = await q.range(offset, offset + limit - 1);
 
     if (error) throw new Error('Error al obtener calificaciones QR');
     return res.status(200).json({
@@ -1340,8 +1402,10 @@ router.delete('/sugerencias/:id', async (req, res, next) => {
 // Estadísticas para gráficos
 // GET /api/admin/estadisticas
 // ─────────────────────────────────────────────────────
-router.get('/estadisticas', async (_req, res, next) => {
+router.get('/estadisticas', async (req, res, next) => {
   try {
+    const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+
     const [{ data: ventasPorSemana, error: ventasPorSemanaError }, { data: montoPorMes, error: montoPorMesError }] =
       await Promise.all([
         supabase.rpc('admin_estadisticas_ventas_por_semana', { p_weeks: 8 }),
@@ -1351,15 +1415,44 @@ router.get('/estadisticas', async (_req, res, next) => {
     if (ventasPorSemanaError) throw new Error('Error al obtener ventas por semana');
     if (montoPorMesError) throw new Error('Error al obtener monto por mes');
 
+    let vendedorIdsFiltro: string[] | null = null;
+    if (filtroSucursal) {
+      vendedorIdsFiltro = await idsVendedoresPorSucursal(filtroSucursal);
+    }
+
+    let atencionesQuery = supabase.from('atenciones').select('user_id, resultado, monto, created_at');
+    if (vendedorIdsFiltro) {
+      if (!vendedorIdsFiltro.length) {
+        return res.status(200).json({
+          ventasPorSemana: ventasPorSemana || [],
+          moduloStats: [],
+          conversionPorVendedor: [],
+          montoPorMes: montoPorMes || [],
+        });
+      }
+      atencionesQuery = atencionesQuery.in('user_id', vendedorIdsFiltro);
+    }
+
+    let vendedoresQuery = supabase
+      .from('users')
+      .select('id, nombre, apellido')
+      .eq('rol', 'vendedor')
+      .eq('activo', true);
+    if (vendedorIdsFiltro) {
+      vendedoresQuery = vendedoresQuery.in('id', vendedorIdsFiltro);
+    }
+
     const [
       { data: atenciones },
       { data: vendedores },
       { data: progresos },
       { data: modulos },
     ] = await Promise.all([
-      supabase.from('atenciones').select('user_id, resultado, monto, created_at'),
-      supabase.from('users').select('id, nombre, apellido').eq('rol', 'vendedor').eq('activo', true),
-      supabase.from('progreso').select('user_id, modulo_id, estado, mejor_nota'),
+      atencionesQuery,
+      vendedoresQuery,
+      vendedorIdsFiltro
+        ? supabase.from('progreso').select('user_id, modulo_id, estado, mejor_nota').in('user_id', vendedorIdsFiltro)
+        : supabase.from('progreso').select('user_id, modulo_id, estado, mejor_nota'),
       supabase.from('modulos').select('id, titulo, orden').eq('activo', true).order('orden'),
     ]);
 

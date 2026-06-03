@@ -1,5 +1,22 @@
 import { Router, Response, NextFunction } from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware';
+import {
+  gomeroIdsMismaSucursalSiAplica,
+  mecanicoPuedeAccederVisita,
+  mecanicoPuedeTomarOrdenPendiente,
+} from '../utils/gomero-orden-access';
+import { parseSucursalQueryAdmin, type SucursalNombre } from '../constants/sucursales';
+import {
+  entradasPatentePendienteTabTaller,
+  filtrarVisitasTallerPorSucursal,
+  filtrarVisitasTallerPorAtencionVendedor,
+  idsGomerosPorSucursal,
+  idsUsuariosNotificarVisitaFinalizada,
+  idsVehiculosConVisitasTallerPorSucursal,
+  idsVehiculosConVisitasTallerPorVendedor,
+  orFiltroVisitasMecanicoConSucursal,
+  vendedorPuedeAccederVisitaTaller,
+} from '../utils/sucursal-filter';
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { normalizePatenteAr } from '../utils/patente';
@@ -7,6 +24,7 @@ import type { AuthRequest } from '../middleware/auth.middleware';
 import { Resend } from 'resend';
 import { sendPushToUserIds } from '../services/push-send.service';
 import { presionPsiFromBody } from '../utils/presion-neumaticos';
+import { parseFotosNeumaticoUrls } from '../utils/fotos-neumatico';
 import {
   guardarLineasVisita,
   listarCatalogoPresupuesto,
@@ -15,6 +33,7 @@ import {
   textoResumenPresupuesto,
   type PresupuestoLineaInput,
 } from '../services/presupuesto-lineas.service';
+import { clienteIdsConAtencionesVendedor } from '../services/clientes.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -48,26 +67,148 @@ const registrarAuditoria = async (
   }
 };
 
+async function assertMecanicoAccesoVisita(req: AuthRequest, visitaId: string): Promise<void> {
+  if (req.user!.rol === 'admin') return;
+
+  const { data: visita, error } = await supabase
+    .from('visitas_taller')
+    .select('id, mecanico_id, gomero_id, orden_estado')
+    .eq('id', visitaId)
+    .maybeSingle();
+  if (error) throw new AppError('Error al buscar visita', 500);
+  if (!visita) throw new AppError('Visita no encontrada', 404);
+
+  const sucursalUsuario = (req.user!.sucursal as string | null) ?? null;
+  const gomeroIdsBranch = (await gomeroIdsMismaSucursalSiAplica(sucursalUsuario)) ?? [];
+  if (
+    !mecanicoPuedeAccederVisita(visita, req.user!.id, 'mecanico', {
+      sucursal: sucursalUsuario,
+      gomeroIdsMismaSucursal: gomeroIdsBranch,
+    })
+  ) {
+    throw new AppError('No autorizado', 403);
+  }
+}
+
 // ─── Clientes ───────────────────────────────────────────────────────────────
 
 // GET /api/mecanico/clientes — lista para admin/vendedor
-router.get('/clientes', requireRole('admin', 'vendedor'), async (req, res: Response, next: NextFunction) => {
+router.get('/clientes', requireRole('admin', 'vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const includeEmpty = String(req.query.include_empty || '').toLowerCase() === 'true';
-    const { data, error, count } = await supabase
+
+    const filtroSucursalAdmin = parseSucursalQueryAdmin(req.query.sucursal);
+    const sucursalVendedor =
+      req.user!.rol === 'vendedor' ? ((req.user!.sucursal as string | null) ?? null) : null;
+    const filtroSucursal: SucursalNombre | null =
+      req.user!.rol === 'vendedor'
+        ? sucursalVendedor
+          ? (sucursalVendedor as SucursalNombre)
+          : null
+        : filtroSucursalAdmin;
+
+    let vehiculoIdsFilter: string[] | null = null;
+    if (filtroSucursal) {
+      vehiculoIdsFilter = await idsVehiculosConVisitasTallerPorSucursal(filtroSucursal);
+    } else if (req.user!.rol === 'vendedor') {
+      vehiculoIdsFilter = await idsVehiculosConVisitasTallerPorVendedor(req.user!.id);
+    }
+
+    const pendientesPatente = await entradasPatentePendienteTabTaller(
+      req.user!.rol === 'vendedor'
+        ? { sucursal: filtroSucursal, vendedorId: req.user!.id }
+        : filtroSucursal
+          ? { sucursal: filtroSucursal }
+          : {},
+    );
+
+    let q = supabase
       .from('vehiculos')
       .select(
-        `id, patente, marca, modelo, anio, medida_rueda, created_at, clientes(id, nombre, apellido, dni, telefono, email), visitas_taller(id, estado, orden_estado, motivo, observaciones, km, diagnostico_enviado, created_at)`,
-        { count: 'exact' }
+        `id, patente, marca, modelo, anio, medida_rueda, created_at, clientes(id, nombre, apellido, dni, telefono, email), visitas_taller(id, estado, orden_estado, motivo, observaciones, km, diagnostico_enviado, created_at, gomero_id, atencion_id)`,
+        { count: 'exact' },
       )
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-    if (error) throw new AppError('Error al obtener vehículos', 500);
-    const vehiculos = includeEmpty
-      ? (data || [])
-      : (data || []).filter((v: any) => Array.isArray(v.visitas_taller) && v.visitas_taller.length > 0);
+      .order('created_at', { ascending: false });
+
+    type VehiculoRow = {
+      id: string;
+      patente: string;
+      marca: string;
+      modelo: string;
+      anio: number | null;
+      medida_rueda: string | null;
+      created_at: string;
+      clientes: unknown;
+      visitas_taller: unknown;
+      es_cliente_propio?: boolean;
+      es_patente_pendiente?: boolean;
+    };
+
+    let vehiculos: VehiculoRow[] = [];
+    let count: number | null = 0;
+
+    if (vehiculoIdsFilter && vehiculoIdsFilter.length) {
+      const { data, error, count: c } = await q.in('id', vehiculoIdsFilter).range(offset, offset + limit - 1);
+      if (error) throw new AppError('Error al obtener vehículos', 500);
+      vehiculos = (data || []) as VehiculoRow[];
+      count = c;
+    } else if (!vehiculoIdsFilter) {
+      const { data, error, count: c } = await q.range(offset, offset + limit - 1);
+      if (error) throw new AppError('Error al obtener vehículos', 500);
+      vehiculos = (data || []) as VehiculoRow[];
+      count = c;
+    }
+
+    vehiculos = [...(pendientesPatente as VehiculoRow[]), ...vehiculos];
+    if (filtroSucursal) {
+      vehiculos = await Promise.all(
+        vehiculos.map(async (v) => {
+          const visitas = Array.isArray(v.visitas_taller) ? v.visitas_taller : [];
+          return {
+            ...v,
+            visitas_taller: await filtrarVisitasTallerPorSucursal(visitas, filtroSucursal),
+          };
+        }),
+      );
+    } else if (req.user!.rol === 'vendedor') {
+      vehiculos = await Promise.all(
+        vehiculos.map(async (v) => {
+          const visitas = Array.isArray(v.visitas_taller) ? v.visitas_taller : [];
+          return {
+            ...v,
+            visitas_taller: await filtrarVisitasTallerPorAtencionVendedor(visitas, req.user!.id),
+          };
+        }),
+      );
+    }
+
+    if (!includeEmpty) {
+      vehiculos = vehiculos.filter(
+        (v) => Array.isArray(v.visitas_taller) && v.visitas_taller.length > 0,
+      );
+    }
+
+    if (req.user!.rol === 'vendedor' && sucursalVendedor) {
+      const clienteIds = vehiculos
+        .map((v) => {
+          const c = v.clientes as { id?: string } | null | undefined;
+          return c?.id;
+        })
+        .filter((id): id is string => !!id);
+      const propiosSet = clienteIds.length
+        ? await clienteIdsConAtencionesVendedor(req.user!.id, clienteIds)
+        : new Set<string>();
+      vehiculos = vehiculos.map((v) => {
+        const cid = (v.clientes as { id?: string } | null | undefined)?.id;
+        return {
+          ...v,
+          es_cliente_propio: cid ? propiosSet.has(cid) : false,
+        };
+      });
+    }
+
     return res.json({
       vehiculos,
       total: includeEmpty ? (count || 0) : vehiculos.length,
@@ -260,13 +401,29 @@ router.get('/visitas', requireRole('mecanico', 'admin'), async (req: AuthRequest
     const mecanicoId = req.user!.id;
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const sucursalUsuario =
+      req.user!.rol === 'admin' ? null : (req.user!.sucursal as string | null) ?? null;
+    const gomeroIdsBranch = await gomeroIdsMismaSucursalSiAplica(sucursalUsuario);
 
-    const { data, error, count } = await supabase
+    let q = supabase
       .from('visitas_taller')
       .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' })
-      .eq('mecanico_id', mecanicoId)
-      .neq('estado', 'entregado')
-      .or('orden_estado.is.null,orden_estado.eq.pendiente_mecanico')
+      .neq('estado', 'entregado');
+
+    if (req.user!.rol === 'admin') {
+      const filtroAdmin = parseSucursalQueryAdmin(req.query.sucursal);
+      if (filtroAdmin) {
+        const gIds = await idsGomerosPorSucursal(filtroAdmin);
+        if (gIds.length) q = q.in('gomero_id', gIds);
+        else q = q.eq('id', '00000000-0000-0000-0000-000000000000');
+      }
+    } else if (sucursalUsuario) {
+      q = q.or(orFiltroVisitasMecanicoConSucursal(mecanicoId, gomeroIdsBranch ?? []));
+    } else {
+      q = q.eq('mecanico_id', mecanicoId);
+    }
+
+    const { data, error, count } = await q
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw new AppError('Error al obtener visitas', 500);
@@ -285,11 +442,28 @@ router.get('/visitas/historial', requireRole('mecanico', 'admin'), async (req: A
     const mecanicoId = req.user!.id;
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const sucursalUsuario =
+      req.user!.rol === 'admin' ? null : (req.user!.sucursal as string | null) ?? null;
+    const gomeroIdsBranch = await gomeroIdsMismaSucursalSiAplica(sucursalUsuario);
 
-    const { data, error, count } = await supabase
+    let q = supabase
       .from('visitas_taller')
-      .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' })
-      .eq('mecanico_id', mecanicoId)
+      .select(`*, vehiculos(patente, marca, modelo, clientes(nombre, apellido))`, { count: 'exact' });
+
+    if (req.user!.rol === 'admin') {
+      const filtroAdmin = parseSucursalQueryAdmin(req.query.sucursal);
+      if (filtroAdmin) {
+        const gIds = await idsGomerosPorSucursal(filtroAdmin);
+        if (gIds.length) q = q.in('gomero_id', gIds);
+        else q = q.eq('id', '00000000-0000-0000-0000-000000000000');
+      }
+    } else if (sucursalUsuario) {
+      q = q.or(orFiltroVisitasMecanicoConSucursal(mecanicoId, gomeroIdsBranch ?? []));
+    } else {
+      q = q.eq('mecanico_id', mecanicoId);
+    }
+
+    const { data, error, count } = await q
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -342,7 +516,7 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
         amortiguadores_revisados: amortiguadores_revisados,
         auxilio_revisado: auxilio_revisado,
         presupuesto: presupuesto || null,
-        fotos_neumatico_urls: Array.isArray(fotos_neumatico_urls) ? fotos_neumatico_urls : null,
+        fotos_neumatico_urls: parseFotosNeumaticoUrls(fotos_neumatico_urls) ?? null,
         estado_visita: 'abierta',
         km: km || null,
         estado: 'en_revision',
@@ -355,7 +529,7 @@ router.post('/visitas', requireRole('mecanico', 'admin'), async (req: AuthReques
   } catch (e) { next(e); }
 });
 
-// GET /api/mecanico/visitas/:id — detalle de visita (vendedor: lectura si el vehículo tiene cliente registrado)
+// GET /api/mecanico/visitas/:id — vendedor legacy: vehículo con cliente; con sucursal: visita de la rama
 router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const rawId = req.params.id;
@@ -366,6 +540,7 @@ router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (
       .from('visitas_taller')
       .select(
         `*, vehiculos(patente, marca, modelo, anio, medida_rueda, cliente_id, clientes(nombre, apellido, dni, email, telefono)),
+         atenciones(id, clientes(nombre, apellido, dni, email, telefono)),
          gomero:users!visitas_taller_gomero_id_fkey(id, nombre, apellido),
          mecanico:users!visitas_taller_mecanico_id_fkey(id, nombre, apellido)`,
       )
@@ -375,15 +550,27 @@ router.get('/visitas/:id', requireRole('mecanico', 'admin', 'vendedor'), async (
 
     const rol = req.user!.rol;
     if (rol === 'mecanico') {
-      if (!visita.mecanico_id || String(visita.mecanico_id) !== String(req.user!.id)) {
+      const gomeroIdsBranch = await gomeroIdsMismaSucursalSiAplica(req.user!.sucursal);
+      if (
+        !mecanicoPuedeAccederVisita(visita, req.user!.id, rol, {
+          sucursal: req.user!.sucursal,
+          gomeroIdsMismaSucursal: gomeroIdsBranch ?? undefined,
+        })
+      ) {
         throw new AppError('No autorizado', 403);
       }
     } else if (rol === 'vendedor') {
-      const veh = visita.vehiculos as {
-        cliente_id?: string | null;
-        clientes?: { id?: string } | null;
-      } | null;
-      if (!veh?.cliente_id || !veh.clientes) {
+      const sucursalVendedor = (req.user!.sucursal as string | null) ?? null;
+      if (
+        !(await vendedorPuedeAccederVisitaTaller(
+          {
+            gomero_id: visita.gomero_id as string | null,
+            atencion_id: visita.atencion_id as string | null,
+          },
+          sucursalVendedor,
+          req.user!.id,
+        ))
+      ) {
         throw new AppError('No autorizado', 403);
       }
     }
@@ -452,18 +639,32 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
     const { data: prev, error: prevErr } = await supabase
       .from('visitas_taller')
       .select(
-        'id, orden_estado, mecanico_tomo_at, mecanico_id, operario_responsable, vehiculos(patente)'
+        'id, orden_estado, mecanico_tomo_at, mecanico_id, gomero_id, atencion_id, operario_responsable, vehiculos(patente)',
       )
       .eq('id', visitaId)
       .single();
     if (prevErr || !prev) throw new AppError('Visita no encontrada', 404);
 
     const uid = req.user!.id;
-    if (req.user!.rol === 'mecanico' && String(prev.mecanico_id) !== String(uid)) {
-      throw new AppError('No autorizado', 403);
+    let reasignarMecanico = false;
+    if (req.user!.rol === 'mecanico') {
+      const sucursalUsuario = (req.user!.sucursal as string | null) ?? null;
+      const gomeroIdsBranch = (await gomeroIdsMismaSucursalSiAplica(sucursalUsuario)) ?? [];
+      if (
+        !mecanicoPuedeAccederVisita(prev, uid, 'mecanico', {
+          sucursal: sucursalUsuario,
+          gomeroIdsMismaSucursal: gomeroIdsBranch,
+        })
+      ) {
+        throw new AppError('No autorizado', 403);
+      }
+      if (mecanicoPuedeTomarOrdenPendiente(prev, uid, gomeroIdsBranch)) {
+        reasignarMecanico = true;
+      }
     }
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (reasignarMecanico) updates.mecanico_id = uid;
     if (estado) updates.estado = estado;
     if (observaciones !== undefined) updates.observaciones = observaciones;
     if (estado_neumaticos !== undefined) updates.estado_neumaticos = estado_neumaticos || null;
@@ -489,7 +690,7 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
           : null;
     }
     if (fotos_neumatico_urls !== undefined) {
-      updates.fotos_neumatico_urls = Array.isArray(fotos_neumatico_urls) ? fotos_neumatico_urls : null;
+      updates.fotos_neumatico_urls = parseFotosNeumaticoUrls(fotos_neumatico_urls);
     }
 
     if (Array.isArray(presupuesto_lineas)) {
@@ -533,12 +734,11 @@ router.patch('/visitas/:id', requireRole('mecanico', 'admin'), async (req: AuthR
 
     const nuevoOrdenEstado = updates.orden_estado as string | undefined;
     if (nuevoOrdenEstado === 'finalizado' && prev.orden_estado !== 'finalizado') {
-      const { data: recipients } = await supabase
-        .from('users')
-        .select('id')
-        .in('rol', ['vendedor', 'admin'])
-        .eq('activo', true);
-      const ids = (recipients || []).map((r) => r.id).filter(Boolean);
+      const ids = await idsUsuariosNotificarVisitaFinalizada({
+        gomero_id: prev.gomero_id as string | null,
+        atencion_id: prev.atencion_id as string | null,
+        mecanico_id: prev.mecanico_id as string | null,
+      });
       const patente = (prev.vehiculos as { patente?: string } | null)?.patente || 'orden';
       if (ids.length) {
         await sendPushToUserIds(ids, 'Orden de trabajo finalizada', `${patente} — informe listo`);
@@ -559,12 +759,23 @@ router.delete('/visitas/:id', requireRole('mecanico', 'admin'), async (req: Auth
 
     const { data: visita, error: readErr } = await supabase
       .from('visitas_taller')
-      .select('id, estado, mecanico_id')
+      .select('id, estado, mecanico_id, gomero_id, orden_estado')
       .eq('id', visitaId)
       .maybeSingle();
     if (readErr) throw new AppError('Error al buscar visita', 500);
     if (!visita) throw new AppError('Visita no encontrada', 404);
-    if (String(visita.mecanico_id) !== String(mecanicoId)) throw new AppError('No autorizado', 403);
+    if (req.user!.rol === 'mecanico') {
+      const sucursalUsuario = (req.user!.sucursal as string | null) ?? null;
+      const gomeroIdsBranch = (await gomeroIdsMismaSucursalSiAplica(sucursalUsuario)) ?? [];
+      if (
+        !mecanicoPuedeAccederVisita(visita, mecanicoId, 'mecanico', {
+          sucursal: sucursalUsuario,
+          gomeroIdsMismaSucursal: gomeroIdsBranch,
+        })
+      ) {
+        throw new AppError('No autorizado', 403);
+      }
+    }
     if (visita.estado === 'entregado') {
       throw new AppError('No se puede eliminar una visita entregada', 400);
     }
@@ -592,10 +803,15 @@ router.delete('/visitas/:id', requireRole('mecanico', 'admin'), async (req: Auth
 // POST /api/mecanico/visitas/:id/checklist — guardar respuestas
 router.post('/visitas/:id/checklist', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const rawId = req.params.id;
+    const visitaId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    if (!visitaId) throw new AppError('ID de visita inválido', 400);
+
+    await assertMecanicoAccesoVisita(req, visitaId);
+
     const { respuestas } = req.body as { respuestas: { item_id: string; estado: string; nota?: string }[] };
     if (!respuestas?.length) throw new AppError('Respuestas requeridas', 400);
 
-    const visitaId = req.params.id;
     const estadosPermitidos = new Set(['ok', 'revisar', 'urgente']);
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     for (const r of respuestas) {
@@ -652,10 +868,16 @@ router.post('/visitas/:id/checklist', requireRole('mecanico', 'admin'), async (r
 // POST /api/mecanico/visitas/:id/diagnostico — enviar email
 router.post('/visitas/:id/diagnostico', requireRole('mecanico', 'admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const rawId = req.params.id;
+    const visitaId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    if (!visitaId) throw new AppError('ID de visita inválido', 400);
+
+    await assertMecanicoAccesoVisita(req, visitaId);
+
     const { data: visita } = await supabase
       .from('visitas_taller')
       .select(`*, vehiculos(patente, marca, modelo, anio, clientes(nombre, apellido, email))`)
-      .eq('id', req.params.id)
+      .eq('id', visitaId)
       .single();
 
     if (!visita) throw new AppError('Visita no encontrada', 404);
@@ -668,7 +890,7 @@ router.post('/visitas/:id/diagnostico', requireRole('mecanico', 'admin'), async 
     const { data: respuestas } = await supabase
       .from('checklist_respuestas')
       .select(`*, checklist_items(descripcion)`)
-      .eq('visita_id', req.params.id);
+      .eq('visita_id', visitaId);
 
     const revisar = (respuestas || []).filter((r: any) => r.estado === 'revisar');
     const urgente = (respuestas || []).filter((r: any) => r.estado === 'urgente');
@@ -732,7 +954,7 @@ router.post('/visitas/:id/diagnostico', requireRole('mecanico', 'admin'), async 
       html,
     });
 
-    await supabase.from('visitas_taller').update({ diagnostico_enviado: true, estado: 'listo' }).eq('id', req.params.id);
+    await supabase.from('visitas_taller').update({ diagnostico_enviado: true, estado: 'listo' }).eq('id', visitaId);
 
     return res.json({ ok: true });
   } catch (e) { next(e); }

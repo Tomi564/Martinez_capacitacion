@@ -5,6 +5,7 @@
 import { Response, NextFunction } from 'express';
 import { adminService } from '../services/admin.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { parseSucursalQueryAdmin } from '../constants/sucursales';
 
 export class AdminController {
   private escapeCsvCell(value: unknown): string {
@@ -65,7 +66,8 @@ export class AdminController {
    */
   async getVendedores(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const result = await adminService.getVendedores();
+      const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+      const result = await adminService.getVendedores(filtroSucursal);
       return res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -79,11 +81,11 @@ export class AdminController {
    */
   async crearVendedor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { nombre, apellido, email, password, rol } = req.body;
+      const { nombre, apellido, email, password, rol, sucursal } = req.body;
 
-      if (!nombre || !apellido || !email || !password) {
+      if (!nombre || !apellido || !email || !password || !sucursal) {
         return res.status(400).json({
-          error: 'Todos los campos son requeridos',
+          error: 'Nombre, apellido, email, contraseña y sucursal son requeridos',
         });
       }
 
@@ -93,6 +95,7 @@ export class AdminController {
         email,
         password,
         rol,
+        sucursal,
       });
 
       return res.status(201).json(result);
@@ -108,11 +111,12 @@ export class AdminController {
   async updateVendedor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const vendedorId = req.params.id as string;
-      const { activo, nombre, apellido, email } = req.body as {
+      const { activo, nombre, apellido, email, sucursal } = req.body as {
         activo?: boolean;
         nombre?: string;
         apellido?: string;
         email?: string;
+        sucursal?: string | null;
       };
 
       if (nombre !== undefined && !String(nombre).trim()) {
@@ -131,7 +135,7 @@ export class AdminController {
 
       const result = await adminService.updateVendedor(
         vendedorId,
-        { activo, nombre, apellido, email },
+        { activo, nombre, apellido, email, sucursal },
         {
           id: req.user!.id,
           rol: req.user!.rol,
@@ -219,7 +223,8 @@ export class AdminController {
    */
   async getReportes(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const result = await adminService.getReportes();
+      const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+      const result = await adminService.getReportes(filtroSucursal);
       return res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -231,7 +236,8 @@ export class AdminController {
    */
   async getVelocidadCapacitacion(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const result = await adminService.getVelocidadCapacitacion();
+      const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+      const result = await adminService.getVelocidadCapacitacion(filtroSucursal);
       return res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -249,7 +255,8 @@ export class AdminController {
         return res.status(400).json({ error: 'tipo debe ser progreso o calificaciones' });
       }
 
-      const result = await adminService.getReportes();
+      const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+      const result = await adminService.getReportes(filtroSucursal);
       const hoy = new Date().toISOString().split('T')[0];
 
       if (tipo === 'progreso') {

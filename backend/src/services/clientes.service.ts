@@ -86,11 +86,38 @@ async function actualizarClientePorId(clienteId: string, datos: ClienteDatosVali
   }
 }
 
+/** Cliente IDs con al menos una atención del vendedor (opcional: restringir a un subconjunto). */
+export async function clienteIdsConAtencionesVendedor(
+  vendedorId: string,
+  soloIds?: string[],
+): Promise<Set<string>> {
+  let query = supabase
+    .from('atenciones')
+    .select('cliente_id')
+    .eq('user_id', vendedorId)
+    .not('cliente_id', 'is', null);
+
+  if (soloIds?.length) {
+    query = query.in('cliente_id', soloIds);
+  }
+
+  const { data, error } = await query;
+  if (error) return new Set();
+  return new Set(
+    (data || []).map((r) => r.cliente_id as string).filter(Boolean),
+  );
+}
+
 export class ClientesService {
   /**
    * Sugerencias para autocompletar en el formulario de atenciones.
+   * Vendedor: solo clientes con atenciones propias y participantes QR propios.
    */
-  async buscarSugerencias(q: string, limit = 12) {
+  async buscarSugerencias(
+    q: string,
+    limit = 12,
+    opts?: { vendedorId?: string },
+  ) {
     const term = q.trim();
     const soloDigitos = term.replace(/\D/g, '');
     const esSoloTelefono = soloDigitos.length > 0 && soloDigitos.length === term.replace(/\s/g, '').length;
@@ -114,31 +141,66 @@ export class ClientesService {
       ? `nombre.ilike.${pattern},apellido.ilike.${pattern},dni.ilike.${pattern},contacto.ilike.${pattern}`
       : `nombre.ilike.${pattern},apellido.ilike.${pattern},dni.ilike.${pattern}`;
 
-    const [clientesRes, qrRes] = await Promise.all([
-      supabase
+    let clienteIdsVendedor: string[] | null = null;
+    if (opts?.vendedorId) {
+      const ids = await clienteIdsConAtencionesVendedor(opts.vendedorId);
+      if (!ids.size) {
+        clienteIdsVendedor = [];
+      } else {
+        clienteIdsVendedor = [...ids];
+      }
+    }
+
+    type ClienteSugerenciaRow = {
+      id: string;
+      nombre: string;
+      apellido: string;
+      dni: string | null;
+      telefono: string | null;
+      email: string | null;
+    };
+
+    let clientesData: ClienteSugerenciaRow[] = [];
+
+    if (clienteIdsVendedor === null || clienteIdsVendedor.length > 0) {
+      let clientesQuery = supabase
         .from('clientes')
         .select('id, nombre, apellido, dni, telefono, email')
         .or(orClientes)
         .order('nombre', { ascending: true })
-        .limit(limit),
-      supabase
-        .from('participantes_sorteo')
-        .select('id, nombre, apellido, dni, contacto')
-        .or(orQr)
-        .order('nombre', { ascending: true })
-        .limit(limit),
-    ]);
+        .limit(limit);
 
-    if (clientesRes.error) {
-      throw new AppError('Error al buscar clientes', 500);
+      if (clienteIdsVendedor !== null) {
+        clientesQuery = clientesQuery.in('id', clienteIdsVendedor);
+      }
+
+      const { data, error } = await clientesQuery;
+      if (error) {
+        throw new AppError('Error al buscar clientes', 500);
+      }
+      clientesData = data || [];
     }
-    if (qrRes.error) {
+
+    let qrQuery = supabase
+      .from('participantes_sorteo')
+      .select('id, nombre, apellido, dni, contacto')
+      .or(orQr)
+      .order('nombre', { ascending: true })
+      .limit(limit);
+
+    if (opts?.vendedorId) {
+      qrQuery = qrQuery.eq('vendedor_id', opts.vendedorId);
+    }
+
+    const { data: qrData, error: qrError } = await qrQuery;
+
+    if (qrError) {
       throw new AppError('Error al buscar participantes QR', 500);
     }
 
     const sugerencias: SugerenciaCliente[] = [];
 
-    for (const c of clientesRes.data || []) {
+    for (const c of clientesData) {
       sugerencias.push({
         tipo: 'cliente',
         id: c.id,
@@ -152,7 +214,7 @@ export class ClientesService {
       });
     }
 
-    for (const p of qrRes.data || []) {
+    for (const p of qrData || []) {
       sugerencias.push({
         tipo: 'qr',
         id: p.id,
@@ -383,6 +445,84 @@ export class ClientesService {
       });
 
     return { clientes };
+  }
+
+  async dependenciasCliente(clienteId: string, opts?: { vendedorId?: string }) {
+    const { data: cliente, error } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('id', clienteId)
+      .maybeSingle();
+    if (error || !cliente) throw new AppError('Cliente no encontrado', 404);
+
+    if (opts?.vendedorId) {
+      const { count: propias, error: aErr } = await supabase
+        .from('atenciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .eq('user_id', opts.vendedorId);
+      if (aErr) throw new AppError('Error al verificar el cliente', 500);
+      if (!propias) throw new AppError('Cliente no encontrado', 404);
+    }
+
+    const [{ count: vehiculos }, { count: atenciones }, vehiculosIdsRes] = await Promise.all([
+      supabase.from('vehiculos').select('id', { count: 'exact', head: true }).eq('cliente_id', clienteId),
+      supabase.from('atenciones').select('id', { count: 'exact', head: true }).eq('cliente_id', clienteId),
+      supabase.from('vehiculos').select('id').eq('cliente_id', clienteId),
+    ]);
+
+    let visitas = 0;
+    const vehiculoIds = (vehiculosIdsRes.data || []).map((v) => v.id);
+    if (vehiculoIds.length > 0) {
+      const { count } = await supabase
+        .from('visitas_taller')
+        .select('id', { count: 'exact', head: true })
+        .in('vehiculo_id', vehiculoIds);
+      visitas = count || 0;
+    }
+
+    return {
+      vehiculos: vehiculos || 0,
+      atenciones: atenciones || 0,
+      visitas,
+    };
+  }
+
+  async eliminarCliente(clienteId: string, opts?: { vendedorId?: string }) {
+    const { data: anterior, error: readErr } = await supabase
+      .from('clientes')
+      .select('id, nombre, apellido, dni, telefono, email')
+      .eq('id', clienteId)
+      .maybeSingle();
+    if (readErr || !anterior) throw new AppError('Cliente no encontrado', 404);
+
+    if (opts?.vendedorId) {
+      const { count: propias, error: pErr } = await supabase
+        .from('atenciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .eq('user_id', opts.vendedorId);
+      if (pErr) throw new AppError('Error al verificar el cliente', 500);
+      if (!propias) throw new AppError('Cliente no encontrado', 404);
+
+      const { count: ajenas, error: aErr } = await supabase
+        .from('atenciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .neq('user_id', opts.vendedorId);
+      if (aErr) throw new AppError('Error al verificar el cliente', 500);
+      if ((ajenas || 0) > 0) {
+        throw new AppError(
+          'No podés eliminar un cliente que también tiene atenciones de otros vendedores.',
+          403,
+        );
+      }
+    }
+
+    const { error } = await supabase.from('clientes').delete().eq('id', clienteId);
+    if (error) throw new AppError('Error al eliminar cliente', 500);
+
+    return { mensaje: 'Cliente eliminado', anterior };
   }
 }
 

@@ -6,10 +6,11 @@ import {
   PRESUPUESTO_GRUPO_LABELS,
   type PresupuestoGrupoKey,
   type PresupuestoLineaState,
-  formatPesosAr,
   lineaKey,
+  lineaMarcadaSinPrecio,
   subtotalGrupo,
   totalGeneral,
+  etiquetaMontoChecklist,
 } from '@/lib/presupuesto-checklist';
 
 type Props = {
@@ -66,7 +67,9 @@ export function PresupuestoChecklistForm({
                 {PRESUPUESTO_GRUPO_LABELS[grupo]}
               </span>
               <span className="flex items-center gap-3 text-sm">
-                {sub > 0 && <span className="font-bold">{formatPesosAr(sub)}</span>}
+                {delGrupo.some((l) => l.marcado) && (
+                  <span className="font-bold">{etiquetaMontoChecklist(delGrupo, sub)}</span>
+                )}
                 <span className="text-lg leading-none">{abierto ? '−' : '+'}</span>
               </span>
             </button>
@@ -125,6 +128,9 @@ export function PresupuestoChecklistForm({
                             placeholder="Opcional"
                             className="mt-1 w-full h-12 px-3 font-bold rounded-xl border-2 border-gray-200 text-base"
                           />
+                          {lineaMarcadaSinPrecio(linea) && (
+                            <p className="mt-1 text-xs font-semibold text-amber-700">Sin precio</p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -134,7 +140,9 @@ export function PresupuestoChecklistForm({
 
                 <div className="px-4 py-3 bg-gray-50 flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-500 uppercase">Subtotal</span>
-                  <span className="text-base font-black text-gray-900">{formatPesosAr(sub)}</span>
+                  <span className="text-base font-black text-gray-900">
+                    {etiquetaMontoChecklist(delGrupo, sub)}
+                  </span>
                 </div>
               </div>
             )}
@@ -144,7 +152,7 @@ export function PresupuestoChecklistForm({
 
       <div className="bg-[#C8102E] text-white rounded-2xl px-4 py-4 flex justify-between items-center">
         <span className="font-black uppercase text-sm tracking-wide">Total general</span>
-        <span className="text-xl font-black">{formatPesosAr(total)}</span>
+        <span className="text-xl font-black">{etiquetaMontoChecklist(lineas, total)}</span>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">

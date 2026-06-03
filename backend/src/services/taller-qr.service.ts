@@ -5,6 +5,7 @@
 import { randomBytes } from 'crypto';
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import type { SucursalNombre } from '../constants/sucursales';
 
 type RolTaller = 'gomero' | 'mecanico';
 
@@ -147,13 +148,17 @@ export class TallerQRService {
     return this.getResumenCalificaciones(userId);
   }
 
-  async getReporteAdmin() {
-    const { data: empleados, error: empError } = await supabase
+  async getReporteAdmin(filtroSucursal?: SucursalNombre | null) {
+    let empQuery = supabase
       .from('users')
       .select('id, nombre, apellido, rol')
       .in('rol', ['gomero', 'mecanico'])
       .eq('activo', true)
       .order('nombre');
+    if (filtroSucursal) {
+      empQuery = empQuery.eq('sucursal', filtroSucursal);
+    }
+    const { data: empleados, error: empError } = await empQuery;
 
     if (empError) {
       throw new AppError('Error al cargar empleados del taller', 500);

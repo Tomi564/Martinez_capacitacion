@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { tallerQRService } from '../services/taller-qr.service';
+import { parseSucursalQueryAdmin } from '../constants/sucursales';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 function ipCliente(req: Request): string {
@@ -74,9 +75,10 @@ export class TallerController {
     }
   }
 
-  async getReporteAdmin(_req: AuthRequest, res: Response, next: NextFunction) {
+  async getReporteAdmin(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const result = await tallerQRService.getReporteAdmin();
+      const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+      const result = await tallerQRService.getReporteAdmin(filtroSucursal);
       return res.status(200).json(result);
     } catch (error) {
       next(error);

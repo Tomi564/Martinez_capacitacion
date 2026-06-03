@@ -23,6 +23,8 @@ export interface Atencion {
   observaciones: string | null;
   created_at: string;
   cliente_id?: string | null;
+  vehiculo_id?: string | null;
+  patente_manual?: string | null;
   clientes?: ClienteAtencion | null;
 }
 
@@ -219,6 +221,8 @@ function patentePayloadFromForm(form: FormAtencionState) {
 
 export function formFromAtencion(atencion: Atencion): FormAtencionState {
   const c = atencion.clientes;
+  const patenteManual = atencion.patente_manual?.trim() || '';
+  const patenteCanon = patenteManual ? normalizePatenteAr(patenteManual) : null;
   return {
     canal: atencion.canal || '',
     resultado: atencion.resultado || '',
@@ -231,8 +235,8 @@ export function formFromAtencion(atencion: Atencion): FormAtencionState {
     cliente_apellido: c?.apellido || '',
     cliente_email: c?.email || '',
     cliente_telefono: c?.telefono || '',
-    patente: '',
-    vehiculo_id: null,
+    patente: patenteCanon ? formatPatenteArDisplay(patenteCanon) : '',
+    vehiculo_id: atencion.vehiculo_id ?? null,
     vehiculo_marca: '',
     vehiculo_modelo: '',
     vehiculo_anio: '',
@@ -249,6 +253,7 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
   const [isGuardando, setIsGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [warningMsg, setWarningMsg] = useState<string | null>(null);
   const [atencionDetalle, setAtencionDetalle] = useState<Atencion | null>(null);
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
   const [sugerencias, setSugerencias] = useState<ProductoSugerencia[]>([]);
@@ -525,8 +530,12 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
 
     setIsGuardando(true);
     setError(null);
+    setWarningMsg(null);
     try {
-      await apiClient.post('/atenciones', buildPayload());
+      const res = await apiClient.post<{ mensaje: string; advertencia_orden?: string }>(
+        '/atenciones',
+        buildPayload(),
+      );
       resetForm();
       setMostrarDetalles(false);
       setSugerencias([]);
@@ -534,6 +543,10 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
       setSugerenciasPatente([]);
       setShowForm(false);
       setSuccessMsg('¡Atención registrada!');
+      if (res.advertencia_orden) {
+        setWarningMsg(res.advertencia_orden);
+        setTimeout(() => setWarningMsg(null), 12000);
+      }
       setTimeout(() => setSuccessMsg(null), 3000);
       fetchAtenciones();
       return true;
@@ -557,8 +570,12 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
 
     setIsGuardando(true);
     setError(null);
+    setWarningMsg(null);
     try {
-      await apiClient.patch(`/atenciones/${atencionId}`, buildPayload());
+      const res = await apiClient.patch<{ mensaje: string; advertencia_orden?: string }>(
+        `/atenciones/${atencionId}`,
+        buildPayload(),
+      );
       resetForm();
       setMostrarDetalles(false);
       setSugerencias([]);
@@ -566,6 +583,10 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
       setSugerenciasPatente([]);
       setShowForm(false);
       setSuccessMsg('Atención actualizada');
+      if (res.advertencia_orden) {
+        setWarningMsg(res.advertencia_orden);
+        setTimeout(() => setWarningMsg(null), 12000);
+      }
       setTimeout(() => setSuccessMsg(null), 3000);
       fetchAtenciones();
       return true;
@@ -589,6 +610,7 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
     error,
     setError,
     successMsg,
+    warningMsg,
     atencionDetalle,
     setAtencionDetalle,
     mostrarDetalles,

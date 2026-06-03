@@ -17,6 +17,7 @@ import {
   prepararLineasParaGuardar,
   type PresupuestoLineaInput,
 } from './presupuesto-lineas.service';
+import { vendedorPuedeAccederVisitaTaller } from '../utils/sucursal-filter';
 
 function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
@@ -38,28 +39,41 @@ function normalizarVisitaRow(raw: Record<string, unknown>): VisitaRow {
 }
 
 export class PresupuestoVisitaService {
-  async assertVendedorAccesoVisita(visitaId: string): Promise<void> {
+  async assertVendedorAccesoVisita(
+    visitaId: string,
+    vendedorId: string,
+    sucursal: string | null | undefined,
+  ): Promise<void> {
     const { data: visita, error } = await supabase
       .from('visitas_taller')
-      .select('id, vehiculos(cliente_id, clientes(id))')
+      .select('id, gomero_id, atencion_id, patente_pendiente, vehiculos(cliente_id, clientes(id))')
       .eq('id', visitaId)
       .maybeSingle();
 
     if (error) throw new AppError('Error al verificar acceso', 500);
     if (!visita) throw new AppError('Visita no encontrada', 404);
 
-    const veh = visita.vehiculos as {
-      cliente_id?: string | null;
-      clientes?: { id?: string } | null;
-    } | null;
-
-    if (!veh?.cliente_id || !veh.clientes) {
+    if (
+      !(await vendedorPuedeAccederVisitaTaller(
+        {
+          gomero_id: visita.gomero_id as string | null,
+          atencion_id: visita.atencion_id as string | null,
+        },
+        sucursal,
+        vendedorId,
+      ))
+    ) {
       throw new AppError('No autorizado', 403);
     }
   }
 
-  async guardarPresupuestoVendedor(visitaId: string, rawLineas: PresupuestoLineaInput[]) {
-    await this.assertVendedorAccesoVisita(visitaId);
+  async guardarPresupuestoVendedor(
+    visitaId: string,
+    rawLineas: PresupuestoLineaInput[],
+    vendedorId: string,
+    sucursal: string | null | undefined,
+  ) {
+    await this.assertVendedorAccesoVisita(visitaId, vendedorId, sucursal);
 
     const existentes = await listarLineasVisita(visitaId);
     const idsMarcadosMecanico = new Set(
@@ -90,10 +104,11 @@ export class PresupuestoVisitaService {
 
   async generarPdfPorVisitaId(
     visitaId: string,
-    opts?: { verificarVendedor?: boolean },
+    opts?: { verificarVendedor?: boolean; vendedorId?: string; sucursal?: string | null },
   ): Promise<{ buffer: Buffer; filename: string }> {
     if (opts?.verificarVendedor) {
-      await this.assertVendedorAccesoVisita(visitaId);
+      if (!opts.vendedorId) throw new AppError('No autorizado', 403);
+      await this.assertVendedorAccesoVisita(visitaId, opts.vendedorId, opts.sucursal ?? null);
     }
     const { data, error } = await supabase
       .from('visitas_taller')

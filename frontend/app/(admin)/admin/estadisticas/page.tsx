@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
+import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { appendSucursalQuery } from '@/lib/sucursales';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -25,11 +27,14 @@ export default function EstadisticasPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [filtroSucursal, setFiltroSucursal] = useState('');
 
   const cargar = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setIsLoading(true);
     try {
-      const res = await apiClient.get<Estadisticas>('/admin/estadisticas');
+      const res = await apiClient.get<Estadisticas>(
+        appendSucursalQuery('/admin/estadisticas', filtroSucursal),
+      );
       setData(res);
       setLoadError(null);
     } catch (err) {
@@ -46,8 +51,8 @@ export default function EstadisticasPage() {
 
   useEffect(() => {
     void cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarga al cambiar sucursal
+  }, [filtroSucursal]);
 
   const reintentar = async () => {
     setRetrying(true);
@@ -113,9 +118,17 @@ export default function EstadisticasPage() {
   return (
     <div className="px-4 lg:px-8 py-6 flex flex-col gap-8 max-w-4xl mx-auto">
 
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Estadísticas</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Resumen de ventas, módulos y equipo</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Estadísticas</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Resumen de ventas, módulos y equipo</p>
+        </div>
+        <SelectorSucursal
+          modo="filtro"
+          value={filtroSucursal}
+          onChange={setFiltroSucursal}
+          className="sm:w-56"
+        />
       </div>
 
       {/* KPIs rápidos */}

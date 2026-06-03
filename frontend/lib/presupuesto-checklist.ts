@@ -132,12 +132,23 @@ export function precioLineaParaApi(raw: string): number | null {
 
 export function subtotalGrupo(lineas: PresupuestoLineaState[]): number {
   return lineas
-    .filter((l) => l.marcado)
+    .filter((l) => l.marcado && l.precio.trim() !== '')
     .reduce(
       (sum, l) =>
         sum + parsePrecioInput(l.precio) * (Math.max(0, parsePrecioInput(l.cantidad)) || 1),
       0,
     );
+}
+
+export function lineaMarcadaSinPrecio(l: PresupuestoLineaState): boolean {
+  return l.marcado && !l.precio.trim();
+}
+
+export function etiquetaMontoChecklist(lineas: PresupuestoLineaState[], monto: number): string {
+  const marcados = lineas.filter((l) => l.marcado);
+  if (!marcados.length) return formatPesosAr(0);
+  if (marcados.every((l) => !l.precio.trim())) return 'Sin precio';
+  return formatPesosAr(monto);
 }
 
 export function totalGeneral(lineas: PresupuestoLineaState[]): number {

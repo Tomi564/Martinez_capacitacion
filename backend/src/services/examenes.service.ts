@@ -570,8 +570,8 @@ export class ExamenesService {
       process.env.VAPID_PRIVATE_KEY!,
     );
     const payload = JSON.stringify({
-      title: `🎓 ${nombre} completó la capacitación`,
-      body: 'Aprobó todos los módulos. Coordiná la entrega del premio.',
+      titulo: `🎓 ${nombre} completó la capacitación`,
+      cuerpo: 'Aprobó todos los módulos. Coordiná la entrega del premio.',
     });
 
     await Promise.allSettled(
