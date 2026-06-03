@@ -5,9 +5,9 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { suscribirPush } from '@/hooks/usePushNotifications';
+import { pushHabilitadoEnEntorno, suscribirPush } from '@/hooks/usePushNotifications';
 import {
   dismissPushPromptThisSession,
   isPushPromptDismissedThisSession,
@@ -17,6 +17,9 @@ import {
   isPwaPromptPendingSession,
 } from '@/lib/pwa-install-session';
 
+const MSG_ERROR =
+  'No se pudieron activar las notificaciones. Intentá de nuevo.';
+
 export function ActivatePushModal() {
   const pendingPwaPrompt = useAuth((s) => s.pendingPwaPrompt);
   const pwaModalCerrado = useAuth((s) => s.pwaModalCerrado);
@@ -24,7 +27,9 @@ export function ActivatePushModal() {
 
   const [showModal, setShowModal] = useState(false);
   const [activando, setActivando] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const devLogHecho = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -34,6 +39,15 @@ export function ActivatePushModal() {
     (!pendingPwaPrompt && !isPwaPromptPendingSession());
 
   useEffect(() => {
+    if (!pushHabilitadoEnEntorno()) {
+      if (!devLogHecho.current) {
+        devLogHecho.current = true;
+        console.info('Push notifications deshabilitadas en desarrollo');
+      }
+      setShowModal(false);
+      return;
+    }
+
     if (!mounted || !isAuthenticated || !pwaGateOpen) {
       setShowModal(false);
       return;
@@ -43,7 +57,6 @@ export function ActivatePushModal() {
       return;
     }
     if (Notification.permission === 'granted') {
-      void suscribirPush();
       setShowModal(false);
       return;
     }
@@ -56,20 +69,29 @@ export function ActivatePushModal() {
       return;
     }
     setShowModal(true);
+    setErrorMsg(null);
   }, [mounted, isAuthenticated, pwaGateOpen]);
 
   const handleActivar = async () => {
     setActivando(true);
+    setErrorMsg(null);
     try {
-      await suscribirPush();
+      const ok = await suscribirPush();
+      if (ok) {
+        setShowModal(false);
+        return;
+      }
+      setErrorMsg(MSG_ERROR);
+    } catch {
+      setErrorMsg(MSG_ERROR);
     } finally {
       setActivando(false);
-      setShowModal(false);
     }
   };
 
   const handleDismiss = () => {
     dismissPushPromptThisSession();
+    setErrorMsg(null);
     setShowModal(false);
   };
 
@@ -108,24 +130,51 @@ export function ActivatePushModal() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={handleDismiss}
-            disabled={activando}
-            className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Ahora no
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleActivar()}
-            disabled={activando}
-            className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-[0.98] transition-transform disabled:opacity-50"
-          >
-            {activando ? 'Activando...' : 'Activar notificaciones'}
-          </button>
-        </div>
+        {errorMsg && (
+          <p role="alert" className="text-sm text-red-700 font-medium">
+            {errorMsg}
+          </p>
+        )}
+
+        {errorMsg ? (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleDismiss}
+              disabled={activando}
+              className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleActivar()}
+              disabled={activando}
+              className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {activando ? 'Activando...' : 'Reintentar'}
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleDismiss}
+              disabled={activando}
+              className="flex-1 h-11 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Ahora no
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleActivar()}
+              disabled={activando}
+              className="flex-1 h-11 bg-[#C8102E] text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {activando ? 'Activando...' : 'Activar notificaciones'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

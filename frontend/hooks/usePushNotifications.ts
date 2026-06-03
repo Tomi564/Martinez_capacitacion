@@ -7,33 +7,75 @@
 
 import { apiClient } from '@/lib/api';
 
+const SW_READY_TIMEOUT_MS = 5000;
+
+export function pushHabilitadoEnEntorno(): boolean {
+  return process.env.NODE_ENV !== 'development';
+}
+
+async function esperarServiceWorkerReady(
+  timeoutMs: number,
+): Promise<ServiceWorkerRegistration | null> {
+  try {
+    return await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('SW_READY_TIMEOUT')), timeoutMs);
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'SW_READY_TIMEOUT') {
+      console.warn(
+        `[suscribirPush] navigator.serviceWorker.ready no respondió en ${timeoutMs}ms (¿service worker no registrado, p. ej. dev sin PWA?)`,
+      );
+      return null;
+    }
+    throw err;
+  }
+}
+
 export async function suscribirPush(): Promise<boolean> {
+  if (!pushHabilitadoEnEntorno()) {
+    return false;
+  }
+
   try {
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidKey) return false;
+    if (!vapidKey) {
+      console.warn('[suscribirPush] Falta NEXT_PUBLIC_VAPID_PUBLIC_KEY');
+      return false;
+    }
 
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn('[suscribirPush] Push o Service Worker no disponibles en este navegador');
+      return false;
+    }
 
     const permiso = await Notification.requestPermission();
-    if (permiso !== 'granted') return false;
+    if (permiso !== 'granted') {
+      return false;
+    }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await esperarServiceWorkerReady(SW_READY_TIMEOUT_MS);
+    if (!registration) {
+      return false;
+    }
 
     const suscripcionExistente = await registration.pushManager.getSubscription();
     if (suscripcionExistente) {
-      // Ya suscrito — sincronizar con backend igual
       await enviarSuscripcion(suscripcionExistente);
       return true;
     }
 
     const suscripcion = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
     });
 
     await enviarSuscripcion(suscripcion);
     return true;
-  } catch {
+  } catch (err) {
+    console.error('[suscribirPush] Error al suscribir push', err);
     return false;
   }
 }
