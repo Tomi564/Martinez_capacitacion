@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
+import { emailClienteEsValido } from '@/lib/validarCliente';
 import { formatPatenteArDisplay, normalizePatenteAr } from '@/lib/patente';
 import type { VehiculoSugerido } from '@/hooks/usePatenteSugerencias';
 
@@ -147,7 +148,7 @@ export function puedeGuardarAtencion(
 ): boolean {
   if (!opts?.modoEdicion && opts?.mailPropioVendedor) return false;
   const email = form.cliente_email.trim();
-  if (email && !email.includes('@')) return false;
+  if (email && !emailClienteEsValido(email)) return false;
   const ventaOk = opts?.modoEdicion ? true : ventaCerradaCamposCompletos(form);
   return !!form.canal && !!form.resultado && clienteFormCompleto(form) && ventaOk;
 }
@@ -166,7 +167,7 @@ export function validarFormularioAtencion(
     return 'El teléfono del cliente es obligatorio';
   }
   const email = form.cliente_email.trim();
-  if (email && !email.includes('@')) {
+  if (email && !emailClienteEsValido(email)) {
     return 'Ingresá un mail válido o dejá el campo vacío';
   }
   if (
