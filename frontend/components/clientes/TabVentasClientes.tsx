@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiClient, ApiError } from '@/lib/api';
+import { appendSucursalQuery } from '@/lib/sucursales';
 import { BadgeRangoEtario } from '@/components/clientes/BadgeRangoEtario';
 import { PageState } from '@/components/ui/PageState';
 import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
@@ -46,6 +47,8 @@ const RESULTADO_LABEL: Record<string, string> = {
 interface TabVentasClientesProps {
   busqueda: string;
   showVendedor?: boolean;
+  /** Filtro admin por sucursal (query ?sucursal=). */
+  sucursal?: string;
   /** Base API sin prefijo /api — ej. `/clientes` (vendedor) o `/admin/clientes` (admin). */
   clientesApiBase?: string;
   onMensaje?: (msg: { tipo: 'ok' | 'error'; texto: string }) => void;
@@ -54,6 +57,7 @@ interface TabVentasClientesProps {
 export function TabVentasClientes({
   busqueda,
   showVendedor = false,
+  sucursal = '',
   clientesApiBase = '/clientes',
   onMensaje,
 }: TabVentasClientesProps) {
@@ -69,7 +73,9 @@ export function TabVentasClientes({
     setIsLoading(true);
     setHasError(false);
     try {
-      const res = await apiClient.get<{ clientes: ClienteVenta[] }>('/clientes/ventas');
+      const res = await apiClient.get<{ clientes: ClienteVenta[] }>(
+        appendSucursalQuery('/clientes/ventas', sucursal),
+      );
       setClientes(res.clientes);
     } catch (err) {
       console.error('[TabVentasClientes] Error cargando ventas', err);
@@ -77,7 +83,7 @@ export function TabVentasClientes({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [sucursal]);
 
   useEffect(() => {
     void cargar();

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiClient, ApiError } from '@/lib/api';
 import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
 import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { formatMonto } from '@/lib/format';
 import { appendSucursalQuery } from '@/lib/sucursales';
 
 interface Atencion {
@@ -203,7 +204,7 @@ export default function VentasAdminPage() {
           },
           {
             label: 'Monto total',
-            value: totalMonto > 0 ? `$${totalMonto.toLocaleString('es-AR')}` : '—',
+            value: totalMonto > 0 ? formatMonto(totalMonto) : '—',
             accent: 'bg-blue-600',
             color: 'text-blue-600',
           },
@@ -213,7 +214,7 @@ export default function VentasAdminPage() {
             className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 border border-gray-200/90"
           >
             <span className={`absolute left-0 top-0 bottom-0 w-1 ${stat.accent}`} aria-hidden />
-            <p className={`text-2xl font-bold tracking-tight pl-2 ${stat.color}`}>{stat.value}</p>
+            <p className={`text-2xl font-bold tracking-tight pl-2 truncate ${stat.color}`}>{stat.value}</p>
             <p className="text-xs font-medium text-gray-600 mt-1 pl-2">{stat.label}</p>
           </div>
         ))}

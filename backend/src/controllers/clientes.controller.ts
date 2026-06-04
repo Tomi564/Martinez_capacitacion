@@ -5,6 +5,8 @@
 import { Response, NextFunction } from 'express';
 import { clientesService } from '../services/clientes.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { parseSucursalQueryAdmin } from '../constants/sucursales';
+import { idsVendedoresPorSucursal } from '../utils/sucursal-filter';
 
 export class ClientesController {
   /**
@@ -30,7 +32,19 @@ export class ClientesController {
     try {
       const user = req.user!;
       const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
-      const result = await clientesService.listarClientesVentas(vendedorId);
+
+      let vendedorIdsSucursal: string[] | undefined;
+      if (user.rol === 'admin') {
+        const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+        if (filtroSucursal) {
+          vendedorIdsSucursal = await idsVendedoresPorSucursal(filtroSucursal);
+        }
+      }
+
+      const result = await clientesService.listarClientesVentas({
+        vendedorId,
+        vendedorIdsSucursal,
+      });
       return res.status(200).json(result);
     } catch (error) {
       next(error);

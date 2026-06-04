@@ -5,6 +5,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { qrService } from '../services/qr.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { parseSucursalQueryAdmin } from '../constants/sucursales';
+import { idsVendedoresPorSucursal } from '../utils/sucursal-filter';
 
 export class QRController {
   /**
@@ -108,7 +110,19 @@ export class QRController {
       const offset = Number(req.query.offset) || 0;
       const user = req.user!;
       const vendedorId = user.rol === 'vendedor' ? user.id : undefined;
-      const result = await qrService.getParticipantesSorteo(limit, offset, { vendedorId });
+
+      let vendedorIds: string[] | undefined;
+      if (user.rol === 'admin') {
+        const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
+        if (filtroSucursal) {
+          vendedorIds = await idsVendedoresPorSucursal(filtroSucursal);
+        }
+      }
+
+      const result = await qrService.getParticipantesSorteo(limit, offset, {
+        vendedorId,
+        vendedorIds,
+      });
       return res.status(200).json(result);
     } catch (error) {
       next(error);

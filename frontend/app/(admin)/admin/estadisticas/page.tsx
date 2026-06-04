@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
+import { formatMonto } from '@/lib/format';
 import { appendSucursalQuery } from '@/lib/sucursales';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
@@ -14,12 +15,6 @@ interface Estadisticas {
   moduloStats: { modulo: string; titulo: string; aprobados: number; reprobados: number }[];
   conversionPorVendedor: { nombre: string; tasa: number; ventas: number; total: number }[];
   montoPorMes: { mes: string; monto: number; ventas: number }[];
-}
-
-function formatMonto(val: number) {
-  if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-  if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
-  return `$${val}`;
 }
 
 export default function EstadisticasPage() {

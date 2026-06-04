@@ -499,7 +499,17 @@ export class ClientesService {
   /**
    * Clientes vinculados a atenciones (pestaña Ventas).
    */
-  async listarClientesVentas(vendedorId?: string) {
+  async listarClientesVentas(opts?: {
+    vendedorId?: string;
+    vendedorIdsSucursal?: string[];
+  }) {
+    const vendedorId = opts?.vendedorId;
+    const vendedorIdsSucursal = opts?.vendedorIdsSucursal;
+
+    if (vendedorIdsSucursal && vendedorIdsSucursal.length === 0) {
+      return { clientes: [] };
+    }
+
     let query = supabase
       .from('atenciones')
       .select(
@@ -531,6 +541,8 @@ export class ClientesService {
 
     if (vendedorId) {
       query = query.eq('user_id', vendedorId);
+    } else if (vendedorIdsSucursal?.length) {
+      query = query.in('user_id', vendedorIdsSucursal);
     }
 
     const { data, error } = await query;

@@ -195,7 +195,7 @@ export class QRService {
   async getParticipantesSorteo(
     limit = 20,
     offset = 0,
-    opts?: { vendedorId?: string },
+    opts?: { vendedorId?: string; vendedorIds?: string[] },
   ) {
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
     const safeOffset = Math.max(0, Number(offset) || 0);
@@ -209,6 +209,10 @@ export class QRService {
 
     if (opts?.vendedorId) {
       query = query.eq('vendedor_id', opts.vendedorId);
+    } else if (opts?.vendedorIds?.length) {
+      query = query.in('vendedor_id', opts.vendedorIds);
+    } else if (opts?.vendedorIds && opts.vendedorIds.length === 0) {
+      return { participantes: [], total: 0, limit: safeLimit, offset: safeOffset };
     }
 
     const { data, error, count } = await query

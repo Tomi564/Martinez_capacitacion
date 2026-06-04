@@ -62,7 +62,9 @@ export default function ClientesAdminPage() {
       apiClient.get<{ vehiculos: Vehiculo[] }>(
         appendSucursalQuery('/mecanico/clientes?include_empty=true', filtroSucursal),
       ),
-      apiClient.get<{ participantes: Participante[] }>('/qr/participantes'),
+      apiClient.get<{ participantes: Participante[] }>(
+        appendSucursalQuery('/qr/participantes', filtroSucursal),
+      ),
       ]);
       setVehiculos(vRes.vehiculos);
       setParticipantes(pRes.participantes);
@@ -513,6 +515,7 @@ export default function ClientesAdminPage() {
         <TabVentasClientes
           busqueda={busqueda}
           showVendedor
+          sucursal={filtroSucursal}
           clientesApiBase="/admin/clientes"
           onMensaje={(m) => setMsg(m)}
         />

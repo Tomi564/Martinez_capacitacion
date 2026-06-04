@@ -17,6 +17,12 @@ import { tallerController } from '../controllers/taller.controller';
 import { visitaTieneDiagnosticoCargado } from '../utils/visita-diagnostico';
 import { parseSucursalQueryAdmin } from '../constants/sucursales';
 import { idsGomerosPorSucursal, idsVendedoresPorSucursal } from '../utils/sucursal-filter';
+import {
+  agregarMontoPorMes,
+  agregarVentasPorSemana,
+  montoPorMesVacios,
+  ventasPorSemanaVacias,
+} from '../utils/estadisticas-agregaciones';
 
 const router = Router();
 
@@ -1406,30 +1412,44 @@ router.get('/estadisticas', async (req, res, next) => {
   try {
     const filtroSucursal = parseSucursalQueryAdmin(req.query.sucursal);
 
-    const [{ data: ventasPorSemana, error: ventasPorSemanaError }, { data: montoPorMes, error: montoPorMesError }] =
-      await Promise.all([
-        supabase.rpc('admin_estadisticas_ventas_por_semana', { p_weeks: 8 }),
-        supabase.rpc('admin_estadisticas_monto_por_mes', { p_months: 6 }),
-      ]);
-
-    if (ventasPorSemanaError) throw new Error('Error al obtener ventas por semana');
-    if (montoPorMesError) throw new Error('Error al obtener monto por mes');
-
     let vendedorIdsFiltro: string[] | null = null;
     if (filtroSucursal) {
       vendedorIdsFiltro = await idsVendedoresPorSucursal(filtroSucursal);
     }
 
-    let atencionesQuery = supabase.from('atenciones').select('user_id, resultado, monto, created_at');
+    let ventasPorSemana: { semana: string; ventas: number; monto: number }[] = [];
+    let montoPorMes: { mes: string; monto: number; ventas: number }[] = [];
+
     if (vendedorIdsFiltro) {
       if (!vendedorIdsFiltro.length) {
         return res.status(200).json({
-          ventasPorSemana: ventasPorSemana || [],
+          ventasPorSemana: ventasPorSemanaVacias(),
           moduloStats: [],
           conversionPorVendedor: [],
-          montoPorMes: montoPorMes || [],
+          montoPorMes: montoPorMesVacios(),
         });
       }
+      const { data: atencionesCharts, error: chartsErr } = await supabase
+        .from('atenciones')
+        .select('resultado, monto, created_at')
+        .in('user_id', vendedorIdsFiltro);
+      if (chartsErr) throw new Error('Error al obtener atenciones para estadísticas');
+      ventasPorSemana = agregarVentasPorSemana(atencionesCharts || []);
+      montoPorMes = agregarMontoPorMes(atencionesCharts || []);
+    } else {
+      const [{ data: rpcSemana, error: ventasPorSemanaError }, { data: rpcMes, error: montoPorMesError }] =
+        await Promise.all([
+          supabase.rpc('admin_estadisticas_ventas_por_semana', { p_weeks: 8 }),
+          supabase.rpc('admin_estadisticas_monto_por_mes', { p_months: 6 }),
+        ]);
+      if (ventasPorSemanaError) throw new Error('Error al obtener ventas por semana');
+      if (montoPorMesError) throw new Error('Error al obtener monto por mes');
+      ventasPorSemana = (rpcSemana || []) as typeof ventasPorSemana;
+      montoPorMes = (rpcMes || []) as typeof montoPorMes;
+    }
+
+    let atencionesQuery = supabase.from('atenciones').select('user_id, resultado, monto, created_at');
+    if (vendedorIdsFiltro) {
       atencionesQuery = atencionesQuery.in('user_id', vendedorIdsFiltro);
     }
 
@@ -1488,10 +1508,10 @@ router.get('/estadisticas', async (req, res, next) => {
     }).sort((a, b) => b.tasa - a.tasa);
 
     return res.status(200).json({
-      ventasPorSemana: ventasPorSemana || [],
+      ventasPorSemana,
       moduloStats,
       conversionPorVendedor,
-      montoPorMes: montoPorMes || [],
+      montoPorMes,
     });
   } catch (error) {
     next(error);
