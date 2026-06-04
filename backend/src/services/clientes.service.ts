@@ -46,9 +46,32 @@ type SupabaseErrorLike = {
   hint?: string;
 };
 
+function textoErrorPostgres(err: SupabaseErrorLike): string {
+  return `${err.message ?? ''} ${err.details ?? ''} ${err.hint ?? ''}`.toLowerCase();
+}
+
+function esViolacionUnica(err: SupabaseErrorLike): boolean {
+  if (err.code === '23505') return true;
+  const t = textoErrorPostgres(err);
+  return t.includes('duplicate key') || t.includes('unique constraint');
+}
+
 function mapErrorActualizacionCliente(err: SupabaseErrorLike): AppError {
-  if (err.code === '23505') {
+  if (esViolacionUnica(err)) {
+    const t = textoErrorPostgres(err);
+    if (t.includes('email') || t.includes('mail')) {
+      return new AppError('Ya existe otro cliente con ese mail', 400);
+    }
+    if (t.includes('telefono') || t.includes('phone')) {
+      return new AppError('Ya existe otro cliente con ese teléfono', 400);
+    }
+    if (t.includes('dni')) {
+      return new AppError('Ya existe otro cliente con ese DNI', 400);
+    }
     return new AppError('Ya existe otro cliente con ese teléfono, mail o DNI', 400);
+  }
+  if (err.code === '23514' || textoErrorPostgres(err).includes('check constraint')) {
+    return new AppError('Los datos del cliente no son válidos (revisá el mail)', 400);
   }
   console.error('[ClientesService] Error actualizando cliente', {
     code: err.code,
@@ -75,21 +98,35 @@ function logBusquedaClienteAmbigua(
   });
 }
 
+export type ActualizarClienteOpts = {
+  /** No actualizar teléfono (evita unique en prod si hay duplicados). */
+  omitirTelefono?: boolean;
+};
+
 /** Payload de update: no envía email vacío/null para no violar NOT NULL ni borrar sin intención. */
-function buildClienteUpdatePayload(datos: ClienteDatosValidados): Record<string, string | null> {
+function buildClienteUpdatePayload(
+  datos: ClienteDatosValidados,
+  opts?: ActualizarClienteOpts,
+): Record<string, string | null> {
   const payload: Record<string, string | null> = {
     nombre: datos.nombre,
     apellido: datos.apellido,
-    telefono: datos.telefono || null,
   };
+  if (!opts?.omitirTelefono) {
+    payload.telefono = datos.telefono || null;
+  }
   if (datos.email) {
     payload.email = datos.email;
   }
   return payload;
 }
 
-async function actualizarClientePorId(clienteId: string, datos: ClienteDatosValidados): Promise<void> {
-  if (datos.telefono) {
+async function actualizarClientePorId(
+  clienteId: string,
+  datos: ClienteDatosValidados,
+  opts?: ActualizarClienteOpts,
+): Promise<void> {
+  if (datos.telefono && !opts?.omitirTelefono) {
     const { data: conflicto, error: conflictoErr } = await supabase
       .from('clientes')
       .select('id')
@@ -97,17 +134,39 @@ async function actualizarClientePorId(clienteId: string, datos: ClienteDatosVali
       .neq('id', clienteId)
       .maybeSingle();
     if (conflictoErr) {
-      throw new AppError('Error al validar el teléfono del cliente', 500);
-    }
-    if (conflicto) {
+      console.warn('[ClientesService] No se pudo validar unicidad de teléfono, se continúa', {
+        clienteId,
+        telefono: datos.telefono,
+        code: conflictoErr.code,
+        message: conflictoErr.message,
+      });
+    } else if (conflicto) {
       throw new AppError('Ya existe otro cliente con ese teléfono', 400);
     }
   }
 
-  const { error: updErr } = await supabase
-    .from('clientes')
-    .update(buildClienteUpdatePayload(datos))
-    .eq('id', clienteId);
+  const payload = buildClienteUpdatePayload(datos, opts);
+
+  // Corregir mail inválido en DB: actualizar email primero (CHECK/unique suelen fallar si el row queda inconsistente).
+  if (datos.email) {
+    const { error: emailErr } = await supabase
+      .from('clientes')
+      .update({ email: datos.email })
+      .eq('id', clienteId);
+    if (emailErr) {
+      throw mapErrorActualizacionCliente(emailErr);
+    }
+  }
+
+  const resto: Record<string, string | null> = {
+    nombre: payload.nombre,
+    apellido: payload.apellido,
+  };
+  if (payload.telefono !== undefined) {
+    resto.telefono = payload.telefono;
+  }
+
+  const { error: updErr } = await supabase.from('clientes').update(resto).eq('id', clienteId);
 
   if (updErr) {
     throw mapErrorActualizacionCliente(updErr);
@@ -268,10 +327,13 @@ export class ClientesService {
       cliente: ClienteInput | ClienteDatosValidados;
       participante_qr_id?: string | null;
     },
-    opts?: { mutarDatosCliente?: boolean },
+    opts?: { mutarDatosCliente?: boolean; omitirTelefonoEnUpdate?: boolean },
   ): Promise<string> {
     const datos = validarDatosCliente(input.cliente);
     const mutarDatosCliente = opts?.mutarDatosCliente !== false;
+    const updateOpts: ActualizarClienteOpts | undefined = opts?.omitirTelefonoEnUpdate
+      ? { omitirTelefono: true }
+      : undefined;
 
     if (input.cliente_id) {
       const { data, error } = await supabase
@@ -283,7 +345,7 @@ export class ClientesService {
       if (!data) throw new AppError('El cliente seleccionado no existe', 400);
 
       if (mutarDatosCliente) {
-        await actualizarClientePorId(data.id, datos);
+        await actualizarClientePorId(data.id, datos, updateOpts);
       }
 
       return data.id;
@@ -306,7 +368,7 @@ export class ClientesService {
           .maybeSingle();
         if (porDni) {
           if (mutarDatosCliente) {
-            await actualizarClientePorId(porDni.id, datos);
+            await actualizarClientePorId(porDni.id, datos, updateOpts);
           }
           return porDni.id;
         }
@@ -323,7 +385,7 @@ export class ClientesService {
         logBusquedaClienteAmbigua('telefono', datos.telefono, telErr);
       } else if (porTel) {
         if (mutarDatosCliente) {
-          await actualizarClientePorId(porTel.id, datos);
+          await actualizarClientePorId(porTel.id, datos, updateOpts);
         }
         return porTel.id;
       }
@@ -339,7 +401,7 @@ export class ClientesService {
         logBusquedaClienteAmbigua('email', datos.email, emailErr);
       } else if (porEmail) {
         if (mutarDatosCliente) {
-          await actualizarClientePorId(porEmail.id, datos);
+          await actualizarClientePorId(porEmail.id, datos, updateOpts);
         }
         return porEmail.id;
       }

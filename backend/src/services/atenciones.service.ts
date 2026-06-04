@@ -223,8 +223,8 @@ export class AtencionesService {
         cliente: data.cliente,
         participante_qr_id: data.participante_qr_id,
       },
-      // Editar atención: sincronizar datos del cliente (mail, nombre, etc.) cuando el vendedor los corrige.
-      { mutarDatosCliente: true },
+      // Editar atención: sincronizar nombre/apellido/mail; no tocar teléfono (evita unique en prod).
+      { mutarDatosCliente: true, omitirTelefonoEnUpdate: true },
     );
 
     const patenteInput: PatenteAtencionInput = {
