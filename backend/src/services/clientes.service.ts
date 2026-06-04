@@ -305,7 +305,9 @@ export class ClientesService {
           .eq('dni', p.dni)
           .maybeSingle();
         if (porDni) {
-          await actualizarClientePorId(porDni.id, datos);
+          if (mutarDatosCliente) {
+            await actualizarClientePorId(porDni.id, datos);
+          }
           return porDni.id;
         }
       }
@@ -320,7 +322,9 @@ export class ClientesService {
       if (telErr) {
         logBusquedaClienteAmbigua('telefono', datos.telefono, telErr);
       } else if (porTel) {
-        await actualizarClientePorId(porTel.id, datos);
+        if (mutarDatosCliente) {
+          await actualizarClientePorId(porTel.id, datos);
+        }
         return porTel.id;
       }
     }
@@ -334,7 +338,9 @@ export class ClientesService {
       if (emailErr) {
         logBusquedaClienteAmbigua('email', datos.email, emailErr);
       } else if (porEmail) {
-        await actualizarClientePorId(porEmail.id, datos);
+        if (mutarDatosCliente) {
+          await actualizarClientePorId(porEmail.id, datos);
+        }
         return porEmail.id;
       }
     }

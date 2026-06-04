@@ -157,8 +157,8 @@ export class AtencionesService {
         cliente: data.cliente,
         participante_qr_id: data.participante_qr_id,
       },
-      // Cliente elegido del autocompletado: solo re-vincular, no actualizar la fila en cada atención nueva.
-      { mutarDatosCliente: !data.cliente_id },
+      // Alta: solo vincular cliente existente o crear uno nuevo; no actualizar fila en clientes.
+      { mutarDatosCliente: false },
     );
 
     const patenteInput: PatenteAtencionInput = {
