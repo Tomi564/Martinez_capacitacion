@@ -223,8 +223,7 @@ export class AtencionesService {
         cliente: data.cliente,
         participante_qr_id: data.participante_qr_id,
       },
-      // Editar atención: sincronizar nombre/apellido/mail; no tocar teléfono (evita unique en prod).
-      { mutarDatosCliente: true, omitirTelefonoEnUpdate: true },
+      { mutarDatosCliente: false },
     );
 
     const patenteInput: PatenteAtencionInput = {
@@ -256,6 +255,11 @@ export class AtencionesService {
     if (error) throw mapErrorSupabaseAtencion(error);
     if (!updated) throw new AppError('Atención no encontrada', 404);
 
+    const advertenciaCliente = await clientesService.sincronizarContactoClienteEdicion(
+      clienteId,
+      data.cliente,
+    );
+
     const advertenciaOrden = await sincronizarOrdenGomero(
       atencionId,
       clienteId,
@@ -266,6 +270,7 @@ export class AtencionesService {
 
     return {
       mensaje: 'Atención actualizada correctamente',
+      ...(advertenciaCliente ? { advertencia_cliente: advertenciaCliente } : {}),
       ...(advertenciaOrden ? { advertencia_orden: advertenciaOrden } : {}),
     };
   }

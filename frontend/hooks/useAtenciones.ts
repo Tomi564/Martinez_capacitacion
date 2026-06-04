@@ -573,10 +573,11 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
     setError(null);
     setWarningMsg(null);
     try {
-      const res = await apiClient.patch<{ mensaje: string; advertencia_orden?: string }>(
-        `/atenciones/${atencionId}`,
-        buildPayload(),
-      );
+      const res = await apiClient.patch<{
+        mensaje: string;
+        advertencia_orden?: string;
+        advertencia_cliente?: string;
+      }>(`/atenciones/${atencionId}`, buildPayload());
       resetForm();
       setMostrarDetalles(false);
       setSugerencias([]);
@@ -584,8 +585,9 @@ export function useAtenciones(atencionEnEdicionId: string | null = null) {
       setSugerenciasPatente([]);
       setShowForm(false);
       setSuccessMsg('Atención actualizada');
-      if (res.advertencia_orden) {
-        setWarningMsg(res.advertencia_orden);
+      const aviso = res.advertencia_cliente || res.advertencia_orden;
+      if (aviso) {
+        setWarningMsg(aviso);
         setTimeout(() => setWarningMsg(null), 12000);
       }
       setTimeout(() => setSuccessMsg(null), 3000);

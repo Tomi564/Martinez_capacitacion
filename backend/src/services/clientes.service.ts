@@ -79,7 +79,11 @@ function mapErrorActualizacionCliente(err: SupabaseErrorLike): AppError {
     details: err.details,
     hint: err.hint,
   });
-  return new AppError('Error al actualizar datos del cliente', 500);
+  const detalle = err.message?.trim();
+  const msg = detalle
+    ? `Error al actualizar datos del cliente: ${detalle}`
+    : 'Error al actualizar datos del cliente';
+  return new AppError(msg, 500);
 }
 
 /** maybeSingle con 0 o 2+ filas: loguear y seguir (insert / siguiente criterio). */
@@ -316,6 +320,59 @@ export class ClientesService {
     }
 
     return { sugerencias: sugerencias.slice(0, limit) };
+  }
+
+  /**
+   * Sincroniza nombre/apellido/mail al editar una atención (sin tocar teléfono).
+   * Usa RPC en Supabase; si falla, intenta update directo.
+   */
+  async sincronizarContactoClienteEdicion(
+    clienteId: string,
+    input: ClienteInput | ClienteDatosValidados,
+  ): Promise<string | undefined> {
+    const datos = validarDatosCliente(input);
+
+    if (datos.email) {
+      const { data: duplicados, error: dupErr } = await supabase
+        .from('clientes')
+        .select('id')
+        .ilike('email', datos.email)
+        .neq('id', clienteId)
+        .limit(1);
+      if (dupErr) {
+        console.warn('[ClientesService] No se pudo verificar mail duplicado', dupErr);
+      } else if (duplicados?.length) {
+        throw new AppError('Ya existe otro cliente con ese mail', 400);
+      }
+    }
+
+    const { error: rpcErr } = await supabase.rpc('actualizar_cliente_contacto', {
+      p_cliente_id: clienteId,
+      p_nombre: datos.nombre,
+      p_apellido: datos.apellido,
+      p_email: datos.email ?? '',
+    });
+
+    if (!rpcErr) {
+      return undefined;
+    }
+
+    console.warn('[ClientesService] RPC actualizar_cliente_contacto falló, fallback a update', {
+      code: rpcErr.code,
+      message: rpcErr.message,
+      details: rpcErr.details,
+    });
+
+    try {
+      await actualizarClientePorId(clienteId, datos, { omitirTelefono: true });
+      return undefined;
+    } catch (e) {
+      if (e instanceof AppError && e.statusCode < 500) {
+        throw e;
+      }
+      const detalle = e instanceof AppError ? e.message : 'Error desconocido';
+      return `La atención se guardó, pero no se pudo actualizar el cliente: ${detalle}`;
+    }
   }
 
   /**
