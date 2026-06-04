@@ -12,6 +12,16 @@ export interface ClienteDatosValidados {
   email: string | null;
 }
 
+/** Formato básico: local@dominio.tld, sin espacios. */
+const EMAIL_FORMATO_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function emailClienteEsValido(email: string): boolean {
+  if (/\s/.test(email) || email.includes('..')) {
+    return false;
+  }
+  return EMAIL_FORMATO_REGEX.test(email);
+}
+
 export function validarDatosCliente(input: ClienteInput): ClienteDatosValidados {
   const nombre = input.nombre?.trim() || '';
   const apellido = input.apellido?.trim() || '';
@@ -22,7 +32,7 @@ export function validarDatosCliente(input: ClienteInput): ClienteDatosValidados 
     throw new AppError('Nombre, apellido y teléfono del cliente son obligatorios', 400);
   }
 
-  if (email && (!email.includes('@') || !email.includes('.'))) {
+  if (email && !emailClienteEsValido(email)) {
     throw new AppError('El mail del cliente no es válido', 400);
   }
 

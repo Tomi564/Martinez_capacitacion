@@ -151,11 +151,15 @@ export class AtencionesService {
   async crear(userId: string, data: AtencionPayload) {
     this.assertCanal(data.canal);
 
-    const clienteId = await clientesService.resolverClienteParaAtencion({
-      cliente_id: data.cliente_id,
-      cliente: data.cliente,
-      participante_qr_id: data.participante_qr_id,
-    });
+    const clienteId = await clientesService.resolverClienteParaAtencion(
+      {
+        cliente_id: data.cliente_id,
+        cliente: data.cliente,
+        participante_qr_id: data.participante_qr_id,
+      },
+      // Cliente elegido del autocompletado: solo re-vincular, no actualizar la fila en cada atención nueva.
+      { mutarDatosCliente: !data.cliente_id },
+    );
 
     const patenteInput: PatenteAtencionInput = {
       vehiculo_id: data.vehiculo_id,

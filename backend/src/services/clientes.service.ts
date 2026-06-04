@@ -39,12 +39,40 @@ function etiquetaSugerencia(
   return partes.filter(Boolean).join(' · ');
 }
 
-function mapErrorActualizacionCliente(err: { code?: string; message?: string }): AppError {
+type SupabaseErrorLike = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+function mapErrorActualizacionCliente(err: SupabaseErrorLike): AppError {
   if (err.code === '23505') {
     return new AppError('Ya existe otro cliente con ese teléfono, mail o DNI', 400);
   }
-  console.error('[ClientesService] Error actualizando cliente', err);
+  console.error('[ClientesService] Error actualizando cliente', {
+    code: err.code,
+    message: err.message,
+    details: err.details,
+    hint: err.hint,
+  });
   return new AppError('Error al actualizar datos del cliente', 500);
+}
+
+/** maybeSingle con 0 o 2+ filas: loguear y seguir (insert / siguiente criterio). */
+function logBusquedaClienteAmbigua(
+  criterio: 'telefono' | 'email',
+  valor: string,
+  error: SupabaseErrorLike,
+): void {
+  console.warn('[ClientesService] Búsqueda de cliente ambigua o fallida, se continúa', {
+    criterio,
+    valor,
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+  });
 }
 
 /** Payload de update: no envía email vacío/null para no violar NOT NULL ni borrar sin intención. */
@@ -284,24 +312,28 @@ export class ClientesService {
     }
 
     if (datos.telefono) {
-      const { data: porTel } = await supabase
+      const { data: porTel, error: telErr } = await supabase
         .from('clientes')
         .select('id')
         .eq('telefono', datos.telefono)
         .maybeSingle();
-      if (porTel) {
+      if (telErr) {
+        logBusquedaClienteAmbigua('telefono', datos.telefono, telErr);
+      } else if (porTel) {
         await actualizarClientePorId(porTel.id, datos);
         return porTel.id;
       }
     }
 
     if (datos.email) {
-      const { data: porEmail } = await supabase
+      const { data: porEmail, error: emailErr } = await supabase
         .from('clientes')
         .select('id')
         .ilike('email', datos.email)
         .maybeSingle();
-      if (porEmail) {
+      if (emailErr) {
+        logBusquedaClienteAmbigua('email', datos.email, emailErr);
+      } else if (porEmail) {
         await actualizarClientePorId(porEmail.id, datos);
         return porEmail.id;
       }
