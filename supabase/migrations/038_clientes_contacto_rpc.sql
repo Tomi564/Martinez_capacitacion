@@ -1,4 +1,12 @@
 -- Actualización de contacto de cliente (edición desde atenciones) + limpieza de mails inválidos.
+-- Prod: a veces existe tr_clientes_updated_at sin columna updated_at (falla cualquier UPDATE).
+
+ALTER TABLE public.clientes
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+UPDATE public.clientes
+SET updated_at = COALESCE(updated_at, now())
+WHERE updated_at IS NULL;
 
 ALTER TABLE public.clientes DROP CONSTRAINT IF EXISTS clientes_email_check;
 ALTER TABLE public.clientes DROP CONSTRAINT IF EXISTS check_email;
@@ -27,8 +35,7 @@ BEGIN
     email = CASE
       WHEN NULLIF(btrim(p_email), '') IS NOT NULL THEN btrim(p_email)
       ELSE email
-    END,
-    updated_at = now()
+    END
   WHERE id = p_cliente_id;
 
   IF NOT FOUND THEN
