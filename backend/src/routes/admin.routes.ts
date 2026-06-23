@@ -23,6 +23,8 @@ import {
   montoPorMesVacios,
   ventasPorSemanaVacias,
 } from '../utils/estadisticas-agregaciones';
+import { examenesRevisionService } from '../services/examenes-revision.service';
+import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -1568,6 +1570,39 @@ router.post('/preguntas-diarias', async (req, res, next) => {
 router.patch('/preguntas-diarias/:id', async (req, res, next) => {
   try {
     const result = await preguntasDiariasService.updatePreguntaAdmin(req.params.id, req.body);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// Revisión manual de exámenes (preguntas de desarrollo)
+// ─────────────────────────────────────────────────────
+
+router.get('/examenes/pendientes', async (req, res, next) => {
+  try {
+    const raw = String(req.query.estado || 'pendiente');
+    if (raw !== 'pendiente' && raw !== 'revisado') {
+      throw new AppError('estado debe ser pendiente o revisado', 400);
+    }
+    const result = await examenesRevisionService.listarIntentosRevision(raw);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/examenes/:intentoId/revisar', async (req, res, next) => {
+  try {
+    const adminId = (req as { user?: { id?: string } }).user?.id;
+    if (!adminId) throw new AppError('No autorizado', 401);
+    const puntajePorPregunta = (req.body?.puntaje_por_pregunta || {}) as Record<string, number>;
+    const result = await examenesRevisionService.revisarIntento(
+      adminId,
+      req.params.intentoId,
+      puntajePorPregunta,
+    );
     return res.status(200).json(result);
   } catch (error) {
     next(error);

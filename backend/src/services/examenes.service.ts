@@ -7,9 +7,18 @@
 
 import { supabase } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import {
+  evaluarRevisionEstadoDesarrollo,
+  examenesRevisionService,
+} from './examenes-revision.service';
+import {
+  normalizarTipoPregunta,
+  puntosPreguntaAutomaticos,
+  type TipoPreguntaExamen,
+} from '../utils/examenes-scoring';
 
 const NOTA_MINIMA_APROBACION_DEFAULT = 80;
-type TipoPregunta = 'opcion_unica' | 'verdadero_falso' | 'caso_practico' | 'desarrollo';
+type TipoPregunta = TipoPreguntaExamen;
 function shuffleArray<T>(items: T[]): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -34,35 +43,6 @@ function parseOpciones(raw: unknown): { id: string; texto: string }[] {
     }
   }
   return [];
-}
-
-function normalizarTexto(texto: string): string {
-  return (texto || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function puntuarDesarrollo(respuesta: string, clave: string, puntajeMaximo: number) {
-  const respuestaNorm = normalizarTexto(respuesta);
-  const keywords = clave
-    .split('|')
-    .map((k) => normalizarTexto(k))
-    .filter(Boolean);
-
-  if (!keywords.length || !respuestaNorm) {
-    return { puntaje: 0, ratio: 0 };
-  }
-
-  const hits = keywords.filter((k) => respuestaNorm.includes(k)).length;
-  const ratio = hits / keywords.length;
-
-  if (ratio >= 0.6) return { puntaje: puntajeMaximo, ratio };
-  if (ratio >= 0.35) return { puntaje: Number((puntajeMaximo * 0.5).toFixed(2)), ratio };
-  return { puntaje: 0, ratio };
 }
 
 export class ExamenesService {
@@ -310,7 +290,7 @@ export class ExamenesService {
     const porcentajeAprobacion = (moduloData as any)?.porcentaje_aprobacion ?? NOTA_MINIMA_APROBACION_DEFAULT;
     const preguntasConMeta = (preguntas || []).map((p: any) => ({
       ...p,
-      tipo: (p.tipo as TipoPregunta | undefined) || 'opcion_unica',
+      tipo: normalizarTipoPregunta(p.tipo),
       puntaje: Number(p.puntaje ?? 1),
     }));
     const puntajeTotal = preguntasConMeta.reduce((acc, p) => acc + p.puntaje, 0);
@@ -332,23 +312,25 @@ export class ExamenesService {
       tipo?: TipoPregunta;
     }[] = [];
 
+    const preguntasCalificables = preguntasConMeta.map((p) => ({
+      id: p.id as string,
+      tipo: p.tipo as TipoPregunta,
+      puntaje: p.puntaje,
+      respuesta_correcta: String(p.respuesta_correcta || ''),
+    }));
+
     for (const pregunta of preguntasConMeta) {
       const respuestaDada = respuestasNormalizadas[pregunta.id] || '';
-      let esCorrecta = false;
-      let puntosPregunta = 0;
-
-      if (pregunta.tipo === 'desarrollo') {
-        const desarrollo = puntuarDesarrollo(
-          respuestaDada,
-          String(pregunta.respuesta_correcta || ''),
-          pregunta.puntaje
-        );
-        puntosPregunta = desarrollo.puntaje;
-        esCorrecta = puntosPregunta >= pregunta.puntaje;
-      } else {
-        esCorrecta = respuestaDada === pregunta.respuesta_correcta;
-        puntosPregunta = esCorrecta ? pregunta.puntaje : 0;
-      }
+      const puntosPregunta = puntosPreguntaAutomaticos(
+        {
+          id: pregunta.id,
+          tipo: pregunta.tipo,
+          puntaje: pregunta.puntaje,
+          respuesta_correcta: String(pregunta.respuesta_correcta || ''),
+        },
+        respuestaDada,
+      );
+      const esCorrecta = puntosPregunta >= pregunta.puntaje;
       if (esCorrecta) correctas++;
       puntajeObtenido += puntosPregunta;
 
@@ -366,7 +348,13 @@ export class ExamenesService {
 
     const puntajePerdido = Number((puntajeTotal - puntajeObtenido).toFixed(2));
     const nota = puntajeTotal > 0 ? (puntajeObtenido / puntajeTotal) * 100 : 0;
-    const aprobado = puntajeObtenido >= puntajeMinimoAprobacion;
+    const aprobadoAutomatico = puntajeObtenido >= puntajeMinimoAprobacion;
+    const revisionEstado = evaluarRevisionEstadoDesarrollo(
+      preguntasCalificables,
+      respuestasNormalizadas,
+    );
+    const pendienteRevision = revisionEstado === 'pendiente';
+    const aprobado = pendienteRevision ? false : aprobadoAutomatico;
 
     // Mostrar retroalimentación detallada solo si el vendedor falló
     // dentro de la tolerancia del módulo. Si supera la tolerancia,
@@ -389,7 +377,16 @@ export class ExamenesService {
       nota,
       aprobado,
       duracion_seg: duracionSeg || null,
+      revision_estado: revisionEstado,
     });
+
+    if (pendienteRevision) {
+      await examenesRevisionService
+        .notificarAdminsRevisionPendiente(userId, moduloId)
+        .catch((error) => {
+          console.error('[ExamenesService] Error notificando revisión pendiente', { userId, moduloId, error });
+        });
+    }
 
     // 6. Actualizar progreso
     const nuevaMejorNota = Math.max(nota, progreso.mejor_nota || 0);
@@ -450,7 +447,11 @@ export class ExamenesService {
       capacitacionCompleta: aprobado && !siguienteModuloDesbloqueado,
       retroalimentacion,
       mostrarRetroalimentacionDetallada,
-      mensaje: aprobado
+      pendienteRevision,
+      revisionEstado,
+      mensaje: pendienteRevision
+        ? `Recibimos tu examen (${nota.toFixed(1)}% automático). Un supervisor revisará tus respuestas de desarrollo y te confirmará el resultado.`
+        : aprobado
         ? `¡Aprobaste con ${nota.toFixed(1)}%! ${
             siguienteModuloDesbloqueado
               ? 'Se desbloqueó el siguiente módulo.'

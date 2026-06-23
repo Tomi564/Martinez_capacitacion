@@ -15,6 +15,7 @@ import { apiClient, ApiError } from '@/lib/api';
 import { ConfirmarEliminacionModal } from '@/components/admin/ConfirmarEliminacionModal';
 import { SelectorSucursal } from '@/components/admin/SelectorSucursal';
 import { appendSucursalQuery } from '@/lib/sucursales';
+import { TabRevisionExamenes } from '@/components/admin/TabRevisionExamenes';
 
 interface CalificacionQrDetalle {
   id: string;
@@ -101,7 +102,7 @@ interface ReporteTallerEmpleado {
   }[];
 }
 
-type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados' | 'velocidad' | 'taller';
+type TabAnaliticas = 'progreso' | 'calificaciones' | 'bloqueados' | 'velocidad' | 'taller' | 'revision';
 
 type VelocidadSortKey =
   | 'vendedor'
@@ -116,6 +117,7 @@ const TAB_LABELS: Record<TabAnaliticas, string> = {
   bloqueados: 'Bloqueados',
   velocidad: 'Velocidad',
   taller: 'Taller',
+  revision: 'Revisión pendiente',
 };
 
 function compareVelocidad(
@@ -428,7 +430,7 @@ export default function ReportesPage() {
           onChange={setFiltroSucursal}
           className="sm:w-56"
         />
-        {tabActiva !== 'bloqueados' && tabActiva !== 'velocidad' && tabActiva !== 'taller' && (
+        {tabActiva !== 'bloqueados' && tabActiva !== 'velocidad' && tabActiva !== 'taller' && tabActiva !== 'revision' && (
         <button
           onClick={() => exportarCSV(tabActiva as 'progreso' | 'calificaciones')}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#C8102E] text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"
@@ -445,7 +447,7 @@ export default function ReportesPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
-        {(['progreso', 'calificaciones', 'bloqueados', 'velocidad', 'taller'] as const).map((tab) => (
+        {(['progreso', 'calificaciones', 'bloqueados', 'velocidad', 'taller', 'revision'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setTabActiva(tab)}
@@ -946,6 +948,8 @@ export default function ReportesPage() {
           )}
         </div>
       )}
+
+      {tabActiva === 'revision' && <TabRevisionExamenes />}
 
       <ConfirmarEliminacionModal
         open={!!calificacionAEliminar}
